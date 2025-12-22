@@ -1,15 +1,20 @@
 import React, { useState } from 'react';
 import { FileText, DollarSign, Calendar, Eye, Download, Send } from 'lucide-react';
-import { PageHeader } from '../components/layout/PageHeader';
-import { SearchFilter } from '../components/ui/SearchFilter';
-import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../components/ui/Card';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/Table';
-import { Badge } from '../components/ui/Badge';
-import { Button } from '../components/ui/Button';
+import { PageHeader } from '../../components/layout/PageHeader';
+import { SearchFilter } from '../../components/ui/SearchFilter';
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../../components/ui/Card';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/Table';
+import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import BillDetailsPopup from '../../components/BillingManagement/BillDetailsPopup';
 
 export default function BillingManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
+  
+  // Bill details popup state
+  const [isBillDetailsOpen, setIsBillDetailsOpen] = useState(false);
+  const [selectedBill, setSelectedBill] = useState(null);
 
   const summaryStats = [
     {
@@ -48,7 +53,9 @@ export default function BillingManagement() {
       billNumber: 'BILL-2025-001',
       client: {
         company: 'Acme Corp',
-        contact: 'John Smith'
+        contact: 'John Smith',
+        email: 'john@acmecorp.com',
+        phone: '+1-234-567-8901'
       },
       poNumber: 'PO-2025-001',
       billDate: '2025-01-20',
@@ -56,14 +63,27 @@ export default function BillingManagement() {
       totalAmount: '$274.97',
       paidAmount: '$274.97',
       status: 'Paid',
-      paymentStatus: 'Completed'
+      paymentStatus: 'Completed',
+      products: [
+        {
+          description: 'Microsoft Teams License',
+          quantity: 5,
+          unitPrice: '$54.99',
+          total: '$274.95'
+        }
+      ],
+      subtotal: '$274.95',
+      tax: '$0.02',
+      notes: 'Payment received on time'
     },
     {
       id: 2,
       billNumber: 'BILL-2025-002',
       client: {
         company: 'Tech Solutions Inc',
-        contact: 'Sarah Johnson'
+        contact: 'Sarah Johnson',
+        email: 'sarah@techsolutions.com',
+        phone: '+1-234-567-8902'
       },
       poNumber: 'PO-2025-002',
       billDate: '2025-01-18',
@@ -71,14 +91,33 @@ export default function BillingManagement() {
       totalAmount: '$32.98',
       paidAmount: '$15.00',
       status: 'Partially Paid',
-      paymentStatus: 'Pending'
+      paymentStatus: 'Pending',
+      products: [
+        {
+          description: 'Zoom Pro License',
+          quantity: 1,
+          unitPrice: '$29.99',
+          total: '$29.99'
+        },
+        {
+          description: 'Setup Fee',
+          quantity: 1,
+          unitPrice: '$2.99',
+          total: '$2.99'
+        }
+      ],
+      subtotal: '$32.98',
+      tax: '$0.00',
+      notes: 'Partial payment received'
     },
     {
       id: 3,
       billNumber: 'BILL-2025-003',
       client: {
         company: 'Global Dynamics',
-        contact: 'Mike Wilson'
+        contact: 'Mike Wilson',
+        email: 'mike@globaldynamics.com',
+        phone: '+1-234-567-8903'
       },
       poNumber: 'PO-2025-003',
       billDate: '2025-01-15',
@@ -86,7 +125,24 @@ export default function BillingManagement() {
       totalAmount: '$824.98',
       paidAmount: '$0.00',
       status: 'Unpaid',
-      paymentStatus: 'Overdue'
+      paymentStatus: 'Overdue',
+      products: [
+        {
+          description: 'Office 365 Business Premium',
+          quantity: 10,
+          unitPrice: '$79.99',
+          total: '$799.90'
+        },
+        {
+          description: 'Implementation Fee',
+          quantity: 1,
+          unitPrice: '$25.08',
+          total: '$25.08'
+        }
+      ],
+      subtotal: '$824.98',
+      tax: '$0.00',
+      notes: 'Payment overdue - follow up required'
     }
   ];
 
@@ -125,6 +181,30 @@ export default function BillingManagement() {
       case 'Overdue': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  // Handle opening bill details popup
+  const handleViewBill = (bill) => {
+    setSelectedBill(bill);
+    setIsBillDetailsOpen(true);
+  };
+
+  // Handle closing bill details popup
+  const handleCloseBillDetails = () => {
+    setIsBillDetailsOpen(false);
+    setSelectedBill(null);
+  };
+
+  // Handle download bill
+  const handleDownloadBill = (bill) => {
+    console.log('Downloading bill:', bill.billNumber);
+    // TODO: Implement download logic
+  };
+
+  // Handle send email
+  const handleSendEmail = (bill) => {
+    console.log('Sending email for bill:', bill.billNumber);
+    // TODO: Implement email sending logic
   };
 
   return (
@@ -235,6 +315,7 @@ export default function BillingManagement() {
                         variant="outline" 
                         size="icon"
                         title="View bill"
+                        onClick={() => handleViewBill(bill)}
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
@@ -242,6 +323,7 @@ export default function BillingManagement() {
                         variant="outline" 
                         size="icon"
                         title="Download bill"
+                        onClick={() => handleDownloadBill(bill)}
                       >
                         <Download className="h-4 w-4" />
                       </Button>
@@ -249,6 +331,7 @@ export default function BillingManagement() {
                         variant="outline" 
                         size="icon"
                         title="Send bill"
+                        onClick={() => handleSendEmail(bill)}
                       >
                         <Send className="h-4 w-4" />
                       </Button>
@@ -260,6 +343,15 @@ export default function BillingManagement() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Bill Details Popup */}
+      <BillDetailsPopup
+        bill={selectedBill}
+        isOpen={isBillDetailsOpen}
+        onClose={handleCloseBillDetails}
+        onDownload={handleDownloadBill}
+        onSendEmail={handleSendEmail}
+      />
     </div>
   );
 }

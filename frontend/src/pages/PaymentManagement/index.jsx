@@ -1,40 +1,23 @@
 import React, { useState } from 'react';
 import { Plus, Edit, Trash2, DollarSign, FileText, CheckCircle, AlertTriangle } from 'lucide-react';
-import { PageHeader } from '../components/layout/PageHeader';
-import { SearchFilter } from '../components/ui/SearchFilter';
-import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../components/ui/Card';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/Table';
-import { Badge } from '../components/ui/Badge';
-import { Button } from '../components/ui/Button';
+import { PageHeader } from '../../components/layout/PageHeader';
+import { SearchFilter } from '../../components/ui/SearchFilter';
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../../components/ui/Card';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/Table';
+import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import EditPaymentPopup from '../../components/PaymentManagement/EditPaymentPopup';
 
 export default function PaymentManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
+  
+  // Payment popup state
+  const [isPaymentPopupOpen, setIsPaymentPopupOpen] = useState(false);
+  const [editingPayment, setEditingPayment] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
 
-  const summaryStats = [
-    {
-      title: 'Total Received',
-      value: '$114.99',
-      icon: DollarSign,
-    },
-    {
-      title: 'Pending Payments',
-      value: '$150.00',
-      icon: AlertTriangle,
-    },
-    {
-      title: 'Outstanding Balance',
-      value: '$314.98',
-      icon: CheckCircle,
-    },
-    {
-      title: 'Total Transactions',
-      value: '5',
-      icon: FileText,
-    }
-  ];
-
-  const payments = [
+  const [payments, setPayments] = useState([
     {
       id: 1,
       poNumber: 'PO-2025-001',
@@ -77,6 +60,29 @@ export default function PaymentManagement() {
       status: 'Pending',
       receipt: 'Not Generated'
     }
+  ]);
+
+  const summaryStats = [
+    {
+      title: 'Total Received',
+      value: '$114.99',
+      icon: DollarSign,
+    },
+    {
+      title: 'Pending Payments',
+      value: '$150.00',
+      icon: AlertTriangle,
+    },
+    {
+      title: 'Outstanding Balance',
+      value: '$314.98',
+      icon: CheckCircle,
+    },
+    {
+      title: 'Total Transactions',
+      value: payments.length.toString(),
+      icon: FileText,
+    }
   ];
 
   const statusOptions = [
@@ -93,13 +99,86 @@ export default function PaymentManagement() {
     }
   ];
 
+  // Create empty payment template for recording new payments
+  const createEmptyPayment = () => ({
+    id: Date.now(),
+    poNumber: '',
+    client: {
+      company: '',
+      contact: ''
+    },
+    date: new Date().toISOString().split('T')[0],
+    amount: '$0.00',
+    method: 'Credit Card',
+    transactionId: '',
+    status: 'Completed',
+    receipt: 'Not Generated'
+  });
+
+  // Handle opening popup for recording new payment
+  const handleRecordPayment = () => {
+    setEditingPayment(createEmptyPayment());
+    setIsEditMode(false);
+    setIsPaymentPopupOpen(true);
+  };
+
+  // Handle opening popup for editing existing payment
+  const handleEditPayment = (payment) => {
+    setEditingPayment(payment);
+    setIsEditMode(true);
+    setIsPaymentPopupOpen(true);
+  };
+
+  // Handle closing payment popup
+  const handleClosePaymentPopup = () => {
+    setIsPaymentPopupOpen(false);
+    setEditingPayment(null);
+    setIsEditMode(false);
+  };
+
+  // Handle payment submit (both create and update)
+  const handlePaymentSubmit = (paymentData) => {
+    if (isEditMode) {
+      // Update existing payment
+      setPayments(prevPayments => 
+        prevPayments.map(payment => 
+          payment.id === paymentData.id ? paymentData : payment
+        )
+      );
+      console.log('Updated payment:', paymentData);
+    } else {
+      // Add new payment
+      const newPayment = {
+        ...paymentData,
+        id: Date.now() // Generate new ID for the payment
+      };
+      setPayments(prevPayments => [...prevPayments, newPayment]);
+      console.log('Recorded new payment:', newPayment);
+    }
+    
+    handleClosePaymentPopup();
+  };
+
+  // Handle payment deletion
+  const handleDeletePayment = (payment) => {
+    if (window.confirm(`Are you sure you want to delete payment ${payment.transactionId}?`)) {
+      setPayments(prevPayments => 
+        prevPayments.filter(p => p.id !== payment.id)
+      );
+      console.log('Deleted payment:', payment);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Payment Management"
         subtitle="Record payments and track outstanding balances"
         actions={
-          <Button icon={<Plus className="h-4 w-4" />}>
+          <Button 
+            icon={<Plus className="h-4 w-4" />}
+            onClick={handleRecordPayment}
+          >
             Record Payment
           </Button>
         }
@@ -181,6 +260,7 @@ export default function PaymentManagement() {
                         variant="outline" 
                         size="icon"
                         title="Edit payment"
+                        onClick={() => handleEditPayment(payment)}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -188,6 +268,7 @@ export default function PaymentManagement() {
                         variant="outline" 
                         size="icon"
                         title="Delete payment"
+                        onClick={() => handleDeletePayment(payment)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -199,6 +280,17 @@ export default function PaymentManagement() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Edit/Record Payment Popup */}
+      {editingPayment && (
+        <EditPaymentPopup
+          payment={editingPayment}
+          isOpen={isPaymentPopupOpen}
+          onClose={handleClosePaymentPopup}
+          onUpdate={handlePaymentSubmit}
+          isEditMode={isEditMode}
+        />
+      )}
     </div>
   );
 }

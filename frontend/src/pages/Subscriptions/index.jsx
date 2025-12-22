@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Package, AlertTriangle, Clock, CheckCircle, FileText } from 'lucide-react';
-import { PageHeader } from '../components/layout/PageHeader';
-import { SearchFilter } from '../components/ui/SearchFilter';
-import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../components/ui/Card';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/Table';
-import { Badge } from '../components/ui/Badge';
-import { Button } from '../components/ui/Button';
+import { PageHeader } from '../../components/layout/PageHeader';
+import { SearchFilter } from '../../components/ui/SearchFilter';
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../../components/ui/Card';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/Table';
+import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
 
 export default function Subscriptions() {
   const [searchTerm, setSearchTerm] = useState('');

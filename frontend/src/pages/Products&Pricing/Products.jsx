@@ -1,17 +1,28 @@
 import React, { useState } from 'react';
 import { Plus, DollarSign, Edit, Trash2 } from 'lucide-react';
-import { PageHeader } from '../components/layout/PageHeader';
-import { SearchFilter } from '../components/ui/SearchFilter';
-import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../components/ui/Card';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/Table';
-import { Badge } from '../components/ui/Badge';
-import { Button } from '../components/ui/Button';
+import { PageHeader } from '../../components/layout/PageHeader';
+import { SearchFilter } from '../../components/ui/SearchFilter';
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../../components/ui/Card';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/Table';
+import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import MultiCurrencyPricingPopup from '../../components/Products/MultiCurrencyPricingPopup';
+import EditProductPopup from '../../components/Products/EditProductPopup';
 
 export default function Products() {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All Categories');
+  
+  // Multi-currency popup state
+  const [isCurrencyPopupOpen, setIsCurrencyPopupOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
 
-  const products = [
+  // Unified product popup state
+  const [isProductPopupOpen, setIsProductPopupOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  const [products, setProducts] = useState([
     {
       id: 1,
       name: 'Microsoft Teams',
@@ -120,7 +131,7 @@ export default function Products() {
       ],
       status: 'Active'
     }
-  ];
+  ]);
 
   const categoryOptions = [
     { value: 'All Categories', label: 'All Categories' },
@@ -150,13 +161,126 @@ export default function Products() {
     return colors[category] || 'bg-gray-100 text-gray-800';
   };
 
+  // Create empty product template for adding new products
+  const createEmptyProduct = () => ({
+    id: Date.now(), // Temporary ID for new products
+    name: '',
+    description: '',
+    category: 'Communication',
+    vendor: '',
+    type: 'Per User',
+    basePrice: '0.00 USD',
+    profit: '0%',
+    bdtPrice: '৳0.00',
+    bdtLabel: 'BDT (final price)',
+    currencies: [
+      { code: 'USD', price: '0.00' }
+    ],
+    status: 'Active'
+  });
+
+  // Handle opening currency popup
+  const handleCurrencySettings = (product) => {
+    setSelectedProduct(product);
+    setIsCurrencyPopupOpen(true);
+  };
+
+  // Handle closing currency popup
+  const handleCloseCurrencyPopup = () => {
+    setIsCurrencyPopupOpen(false);
+    setSelectedProduct(null);
+  };
+
+  // Handle updating currency prices
+  const handleUpdateCurrencyPrices = (productId, prices) => {
+    setProducts(prevProducts => 
+      prevProducts.map(product => {
+        if (product.id === productId) {
+          // Update currencies array with new prices
+          const updatedCurrencies = [
+            { code: 'USD', price: prices.USD },
+            { code: 'EUR', price: prices.EUR },
+            { code: 'GBP', price: prices.GBP },
+            { code: 'CAD', price: prices.CAD },
+            { code: 'AUD', price: prices.AUD }
+          ].filter(currency => currency.price && currency.price !== '0.00');
+
+          return {
+            ...product,
+            currencies: updatedCurrencies
+          };
+        }
+        return product;
+      })
+    );
+    
+    console.log('Updated currency prices for product:', productId, prices);
+  };
+
+  // Handle opening popup for adding new product
+  const handleAddProduct = () => {
+    setEditingProduct(createEmptyProduct());
+    setIsEditMode(false);
+    setIsProductPopupOpen(true);
+  };
+
+  // Handle opening popup for editing existing product
+  const handleEditProduct = (product) => {
+    setEditingProduct(product);
+    setIsEditMode(true);
+    setIsProductPopupOpen(true);
+  };
+
+  // Handle closing product popup
+  const handleCloseProductPopup = () => {
+    setIsProductPopupOpen(false);
+    setEditingProduct(null);
+    setIsEditMode(false);
+  };
+
+  // Handle product submit (both create and update)
+  const handleProductSubmit = (productData) => {
+    if (isEditMode) {
+      // Update existing product
+      setProducts(prevProducts => 
+        prevProducts.map(product => 
+          product.id === productData.id ? productData : product
+        )
+      );
+      console.log('Updated product:', productData);
+    } else {
+      // Add new product
+      const newProduct = {
+        ...productData,
+        id: Date.now() // Generate new ID for the product
+      };
+      setProducts(prevProducts => [...prevProducts, newProduct]);
+      console.log('Added new product:', newProduct);
+    }
+    
+    handleCloseProductPopup();
+  };
+
+  // Handle product deletion
+  const handleDeleteProduct = (product) => {
+    if (window.confirm(`Are you sure you want to delete ${product.name}?`)) {
+      setProducts(prevProducts => 
+        prevProducts.filter(p => p.id !== product.id)
+      );
+      console.log('Deleted product:', product);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Products & Pricing"
         subtitle="Manage your product catalog and pricing"
         actions={
-          <Button icon={<Plus className="h-4 w-4" />}>
+          <Button 
+            icon={<Plus className="h-4 w-4" />}
+            onClick={handleAddProduct}
+          >
             Add Product
           </Button>
         }
@@ -244,6 +368,7 @@ export default function Products() {
                         variant="outline" 
                         size="icon"
                         title="Currency settings"
+                        onClick={() => handleCurrencySettings(product)}
                       >
                         <DollarSign className="h-4 w-4" />
                       </Button>
@@ -251,6 +376,7 @@ export default function Products() {
                         variant="outline" 
                         size="icon"
                         title="Edit product"
+                        onClick={() => handleEditProduct(product)}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -258,6 +384,7 @@ export default function Products() {
                         variant="outline" 
                         size="icon"
                         title="Delete product"
+                        onClick={() => handleDeleteProduct(product)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -269,6 +396,25 @@ export default function Products() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Multi-Currency Pricing Popup */}
+      <MultiCurrencyPricingPopup
+        product={selectedProduct}
+        isOpen={isCurrencyPopupOpen}
+        onClose={handleCloseCurrencyPopup}
+        onUpdate={handleUpdateCurrencyPrices}
+      />
+
+      {/* Unified Edit/Add Product Popup */}
+      {editingProduct && (
+        <EditProductPopup
+          product={editingProduct}
+          isOpen={isProductPopupOpen}
+          onClose={handleCloseProductPopup}
+          onUpdate={handleProductSubmit}
+          isEditMode={isEditMode}
+        />
+      )}
     </div>
   );
 }

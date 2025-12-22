@@ -3,16 +3,16 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Dashboard from './pages/Dashboard';
-import Clients from './pages/Clients';
-import Products from './pages/Products';
-import PurchaseOrders from './pages/PurchaseOrders';
-import Subscriptions from './pages/Subscriptions';
-import BillingManagement from './pages/BillingManagement';
-import PaymentManagement from './pages/PaymentManagement';
-import CurrencyRates from './pages/CurrencyRates';
-import ReportsAnalytics from './pages/ReportsAnalytics';
-import UserManagement from './pages/UserManagement';
-import Notifications from './pages/Notifications';
+import Clients from './pages/ClientManagement/Clients';
+import Products from './pages/Products&Pricing/Products';
+import PurchaseOrders from './pages/PurchaseOrders/index';
+import Subscriptions from './pages/Subscriptions/index';
+import BillingManagement from './pages/BillingManagement/index';
+import PaymentManagement from './pages/PaymentManagement/index';
+import CurrencyRates from './pages/Currency&Rates/index';
+import ReportsAnalytics from './pages/Reports&Analytics/index';
+import UserManagement from './pages/UserManagement/index';
+import Notifications from './pages/Notifications/index';
 
 function App() {
   return (

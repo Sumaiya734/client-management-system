@@ -1,17 +1,21 @@
 import React, { useState } from 'react';
 import { Plus, FileText, Trash2 } from 'lucide-react';
-import { PageHeader } from '../components/layout/PageHeader';
-import { SearchFilter } from '../components/ui/SearchFilter';
-import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../components/ui/Card';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/Table';
-import { Badge } from '../components/ui/Badge';
-import { Button } from '../components/ui/Button';
+import { PageHeader } from '../../components/layout/PageHeader';
+import { SearchFilter } from '../../components/ui/SearchFilter';
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../../components/ui/Card';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/Table';
+import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import CreatePurchaseOrderPopup from '../../components/PurchaseOrders/CreatePurchaseOrderPopup';
 
 export default function PurchaseOrders() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
+  
+  // Create PO popup state
+  const [isCreatePopupOpen, setIsCreatePopupOpen] = useState(false);
 
-  const purchaseOrders = [
+  const [purchaseOrders, setPurchaseOrders] = useState([
     {
       id: 1,
       poNumber: 'PO-2025-001',
@@ -81,7 +85,7 @@ export default function PurchaseOrders() {
       totalAmount: '৳21945.30 BDT',
       statuses: ['Completed', 'Expired']
     }
-  ];
+  ]);
 
   const statusOptions = [
     { value: 'All Status', label: 'All Status' },
@@ -99,17 +103,6 @@ export default function PurchaseOrders() {
     }
   ];
 
-  const getStatusVariant = (status) => {
-    switch (status) {
-      case 'Active': return 'active';
-      case 'In Progress': return 'warning';
-      case 'Expiring Soon': return 'danger';
-      case 'Completed': return 'success';
-      case 'Expired': return 'default';
-      default: return 'default';
-    }
-  };
-
   const getStatusColor = (status) => {
     switch (status) {
       case 'Active': return 'bg-gray-900 text-white';
@@ -121,13 +114,60 @@ export default function PurchaseOrders() {
     }
   };
 
+  // Handle opening create popup
+  const handleCreatePO = () => {
+    setIsCreatePopupOpen(true);
+  };
+
+  // Handle closing create popup
+  const handleCloseCreatePopup = () => {
+    setIsCreatePopupOpen(false);
+  };
+
+  // Handle creating new purchase order
+  const handleCreatePurchaseOrder = (orderData) => {
+    const newPO = {
+      id: Date.now(),
+      poNumber: orderData.poNumber,
+      createdDate: new Date().toISOString().split('T')[0],
+      client: {
+        company: orderData.client.split(' - ')[0] || 'Unknown Company',
+        contact: orderData.client.split(' - ')[1] || 'Unknown Contact'
+      },
+      products: [
+        {
+          name: orderData.product,
+          quantity: orderData.quantity,
+          price: '৳0.00', // Would be calculated based on product selection
+          dateRange: `${orderData.subscriptionStart} to ${orderData.subscriptionEnd}`
+        }
+      ],
+      totalAmount: '৳0.00 BDT', // Would be calculated
+      statuses: [orderData.status]
+    };
+
+    setPurchaseOrders(prev => [newPO, ...prev]);
+    console.log('Created new purchase order:', newPO);
+  };
+
+  // Handle deleting purchase order
+  const handleDeletePO = (po) => {
+    if (window.confirm(`Are you sure you want to delete ${po.poNumber}?`)) {
+      setPurchaseOrders(prev => prev.filter(p => p.id !== po.id));
+      console.log('Deleted purchase order:', po);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Purchase Orders"
         subtitle="Create and manage purchase orders from clients"
         actions={
-          <Button icon={<Plus className="h-4 w-4" />}>
+          <Button 
+            icon={<Plus className="h-4 w-4" />}
+            onClick={handleCreatePO}
+          >
             Create PO
           </Button>
         }
@@ -216,6 +256,7 @@ export default function PurchaseOrders() {
                         variant="outline" 
                         size="icon"
                         title="Delete purchase order"
+                        onClick={() => handleDeletePO(po)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -227,6 +268,13 @@ export default function PurchaseOrders() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Create Purchase Order Popup */}
+      <CreatePurchaseOrderPopup
+        isOpen={isCreatePopupOpen}
+        onClose={handleCloseCreatePopup}
+        onCreate={handleCreatePurchaseOrder}
+      />
     </div>
   );
 }

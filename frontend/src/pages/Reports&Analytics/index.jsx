@@ -9,19 +9,19 @@ const ReportsAnalytics = () => {
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-gray-100 p-4 rounded-lg">
           <h2 className="text-lg font-medium">Total Revenue</h2>
-          <p className="text-2xl font-bold">$114,000 <span className="text-green-500">(+18% from last period)</span></p>
+          <p className="text-2xl font-bold">$114,000 <span className="text-gray-500">(+18% from last period)</span></p>
         </div>
         <div className="bg-gray-100 p-4 rounded-lg">
           <h2 className="text-lg font-medium">Total Clients</h2>
-          <p className="text-2xl font-bold">52 <span className="text-green-500">(+12% from last period)</span></p>
+          <p className="text-2xl font-bold">52 <span className="text-gray-500">(+12% from last period)</span></p>
         </div>
         <div className="bg-gray-100 p-4 rounded-lg">
           <h2 className="text-lg font-medium">Active Subscriptions</h2>
-          <p className="text-2xl font-bold">95 <span className="text-green-500">(+8% from last period)</span></p>
+          <p className="text-2xl font-bold">95 <span className="text-gray-500">(+8% from last period)</span></p>
         </div>
         <div className="bg-gray-100 p-4 rounded-lg">
           <h2 className="text-lg font-medium">Avg Revenue/Client</h2>
-          <p className="text-2xl font-bold">$2,192 <span className="text-green-500">(+5% from last period)</span></p>
+          <p className="text-2xl font-bold">$2,192 <span className="text-gray-500">(+5% from last period)</span></p>
         </div>
       </div>
 
