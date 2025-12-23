@@ -6,10 +6,15 @@ import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../..
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/Table';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import SubscriptionModal from '../../components/subscriptions/SubscriptionModal';
 
 export default function Subscriptions() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedQuantity, setSelectedQuantity] = useState(0);
+  const [selectedTotalAmount, setSelectedTotalAmount] = useState(null);
 
   const summaryStats = [
     {
@@ -176,6 +181,18 @@ export default function Subscriptions() {
     }
   };
 
+  const handleOpenModal = (product, quantity, subscription) => {
+    setSelectedProduct(product);
+    setSelectedQuantity(quantity);
+    setSelectedTotalAmount(subscription?.totalAmount || null);
+    setIsModalOpen(true);
+  };
+
+  const handleModalSubmit = (data) => {
+    console.log('Subscription Data:', data);
+    // Handle subscription logic here
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -259,6 +276,7 @@ export default function Subscriptions() {
                               variant={product.action === 'Subscribe' ? 'primary' : 'outline'}
                               size="xs"
                               className="text-xs"
+                              onClick={() => handleOpenModal(product.name, product.quantity, subscription)}
                             >
                               {product.action}
                             </Button>
@@ -303,6 +321,16 @@ export default function Subscriptions() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Subscription Modal */}
+      <SubscriptionModal 
+        isOpen={isModalOpen} 
+        onRequestClose={() => setIsModalOpen(false)} 
+        product={selectedProduct} 
+        quantity={selectedQuantity}
+        totalAmount={selectedTotalAmount}
+        onSubmit={handleModalSubmit} 
+      />
     </div>
   );
 }
