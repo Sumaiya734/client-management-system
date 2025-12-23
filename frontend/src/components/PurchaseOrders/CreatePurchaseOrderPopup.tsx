@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, ChevronDown, Calendar, Plus } from 'lucide-react';
+import api from '../../api';
 
 interface Product {
   id: number;
@@ -25,10 +26,12 @@ const CreatePurchaseOrderPopup: React.FC<CreatePurchaseOrderPopupProps> = ({
   onCreate,
 }) => {
   const [formData, setFormData] = useState({
-    poNumber: 'PO-2025-004',
+    poNumber: '',
     status: 'Draft',
     client: '',
+    clientId: 0,
     product: '',
+    productId: 0,
     quantity: 1,
     subscriptionStart: '',
     subscriptionEnd: '',
@@ -41,22 +44,41 @@ const CreatePurchaseOrderPopup: React.FC<CreatePurchaseOrderPopupProps> = ({
     product: false
   });
 
-  // Mock data - in real app, these would come from props or API
+  const [loading, setLoading] = useState(false);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+
+  // Status options
   const statusOptions = ['Draft', 'Active', 'In Progress', 'Completed'];
   
-  const clientOptions = [
-    { id: 1, company: 'Acme Corp', contact: 'John Smith' },
-    { id: 2, company: 'Tech Solutions Inc', contact: 'Sarah Johnson' },
-    { id: 3, company: 'Global Dynamics', contact: 'Mike Wilson' }
-  ];
+  // Fetch clients and products when popup opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchData();
+    }
+  }, [isOpen]);
 
-  const productOptions = [
-    { id: 1, name: 'Microsoft Teams', price: '৳828.75' },
-    { id: 2, name: 'Zoom Pro', price: '৳2148.54' },
-    { id: 3, name: 'ChatGPT Plus', price: '৳3094.00' },
-    { id: 4, name: 'Office 365 Business', price: '৳1657.50' },
-    { id: 5, name: 'Figma Professional', price: '৳1790.10' }
-  ];
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [clientsResponse, productsResponse] = await Promise.all([
+        api.get('/clients'),
+        api.get('/products')
+      ]);
+      
+      if (clientsResponse.data.success) {
+        setClients(clientsResponse.data.data);
+      }
+      
+      if (productsResponse.data.success) {
+        setProducts(productsResponse.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({
@@ -72,27 +94,68 @@ const CreatePurchaseOrderPopup: React.FC<CreatePurchaseOrderPopupProps> = ({
     }));
   };
 
-  const selectOption = (dropdown: string, value: string) => {
-    handleInputChange(dropdown, value);
+  const selectClient = (client: Client) => {
+    setFormData(prev => ({
+      ...prev,
+      client: `${client.company} - ${client.contact}`,
+      clientId: client.id
+    }));
     setDropdownStates(prev => ({
       ...prev,
-      [dropdown]: false
+      client: false
+    }));
+  };
+
+  const selectProduct = (product: any) => {
+    setFormData(prev => ({
+      ...prev,
+      product: product.product_name || product.name,
+      productId: product.id
+    }));
+    setDropdownStates(prev => ({
+      ...prev,
+      product: false
+    }));
+  };
+
+  const selectStatus = (status: string) => {
+    handleInputChange('status', status);
+    setDropdownStates(prev => ({
+      ...prev,
+      status: false
     }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onCreate(formData);
+    
+    // Format the data for the API
+    const formattedData = {
+      poNumber: formData.poNumber,
+      status: formData.status,
+      client: formData.client,
+      clientId: formData.clientId,
+      product: formData.product,
+      productId: formData.productId,
+      quantity: formData.quantity,
+      subscriptionStart: formData.subscriptionStart,
+      subscriptionEnd: formData.subscriptionEnd,
+      subscriptionActive: formData.subscriptionActive
+    };
+    
+    onCreate(formattedData);
     onClose();
   };
 
   const handleCancel = () => {
     // Reset form
     setFormData({
-      poNumber: 'PO-2025-004',
+      poNumber: '',
       status: 'Draft',
       client: '',
+      clientId: 0,
       product: '',
+      productId: 0,
       quantity: 1,
       subscriptionStart: '',
       subscriptionEnd: '',
@@ -162,7 +225,7 @@ const CreatePurchaseOrderPopup: React.FC<CreatePurchaseOrderPopupProps> = ({
                           <button
                             key={option}
                             type="button"
-                            onClick={() => selectOption('status', option)}
+                            onClick={() => selectStatus(option)}
                             className="w-full px-3 py-2 text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50"
                           >
                             {option}
@@ -184,24 +247,30 @@ const CreatePurchaseOrderPopup: React.FC<CreatePurchaseOrderPopupProps> = ({
                       onClick={() => toggleDropdown('client')}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between"
                     >
-                      <span className="text-gray-500">
+                      <span className={formData.client ? 'text-gray-900' : 'text-gray-500'}>
                         {formData.client || 'Select client'}
                       </span>
                       <ChevronDown size={16} className={`transition-transform ${dropdownStates.client ? 'rotate-180' : ''}`} />
                     </button>
                     {dropdownStates.client && (
                       <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
-                        {clientOptions.map((client) => (
-                          <button
-                            key={client.id}
-                            type="button"
-                            onClick={() => selectOption('client', `${client.company} - ${client.contact}`)}
-                            className="w-full px-3 py-2 text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50"
-                          >
-                            <div className="font-medium">{client.company}</div>
-                            <div className="text-sm text-gray-600">{client.contact}</div>
-                          </button>
-                        ))}
+                        {loading ? (
+                          <div className="px-3 py-2 text-center text-gray-500">Loading clients...</div>
+                        ) : clients.length === 0 ? (
+                          <div className="px-3 py-2 text-center text-gray-500">No clients found</div>
+                        ) : (
+                          clients.map((client) => (
+                            <button
+                              key={client.id}
+                              type="button"
+                              onClick={() => selectClient(client)}
+                              className="w-full px-3 py-2 text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50"
+                            >
+                              <div className="font-medium">{client.company}</div>
+                              <div className="text-sm text-gray-600">{client.contact}</div>
+                            </button>
+                          ))
+                        )}
                       </div>
                     )}
                   </div>
@@ -233,17 +302,23 @@ const CreatePurchaseOrderPopup: React.FC<CreatePurchaseOrderPopupProps> = ({
                       </button>
                       {dropdownStates.product && (
                         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
-                          {productOptions.map((product) => (
-                            <button
-                              key={product.id}
-                              type="button"
-                              onClick={() => selectOption('product', product.name)}
-                              className="w-full px-3 py-2 text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50"
-                            >
-                              <div className="font-medium">{product.name}</div>
-                              <div className="text-sm text-gray-600">{product.price}</div>
-                            </button>
-                          ))}
+                          {loading ? (
+                            <div className="px-3 py-2 text-center text-gray-500">Loading products...</div>
+                          ) : products.length === 0 ? (
+                            <div className="px-3 py-2 text-center text-gray-500">No products found</div>
+                          ) : (
+                            products.map((product) => (
+                              <button
+                                key={product.id}
+                                type="button"
+                                onClick={() => selectProduct(product)}
+                                className="w-full px-3 py-2 text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50"
+                              >
+                                <div className="font-medium">{product.product_name || product.name}</div>
+                                <div className="text-sm text-gray-600">৳{product.base_price || product.price || '0.00'}</div>
+                              </button>
+                            ))
+                          )}
                         </div>
                       )}
                     </div>

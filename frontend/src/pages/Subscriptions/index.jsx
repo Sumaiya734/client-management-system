@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Package, AlertTriangle, Clock, CheckCircle, FileText } from 'lucide-react';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { SearchFilter } from '../../components/ui/SearchFilter';
@@ -7,6 +7,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '.
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import SubscriptionModal from '../../components/subscriptions/SubscriptionModal';
+import api from '../../api';
 
 export default function Subscriptions() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -15,127 +16,83 @@ export default function Subscriptions() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedQuantity, setSelectedQuantity] = useState(0);
   const [selectedTotalAmount, setSelectedTotalAmount] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [subscriptions, setSubscriptions] = useState([]);
+
+  // Fetch subscriptions from API
+  useEffect(() => {
+    fetchSubscriptions();
+  }, []);
+
+  const fetchSubscriptions = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/subscriptions');
+      if (response.data.success) {
+        // Transform the API response to match the expected format
+        const transformedSubscriptions = response.data.data.map(sub => {
+          // For now, we'll create a simplified structure
+          // In a real app, you'd structure this based on your API response
+          return {
+            id: sub.id,
+            poNumber: sub.po_number,
+            createdDate: sub.start_date || 'N/A',
+            client: {
+              company: sub.client?.company || sub.client || 'N/A',
+              contact: sub.client?.contact || 'N/A'
+            },
+            products: [
+              {
+                name: sub.product?.product_name || sub.product?.name || 'N/A',
+                quantity: sub.quantity || 1,
+                status: sub.status || 'Pending',
+                dateRange: sub.start_date && sub.end_date ? `${sub.start_date} to ${sub.end_date}` : 'N/A',
+                action: sub.status === 'Pending' ? 'Subscribe' : 'Edit'
+              }
+            ],
+            progress: {
+              status: sub.status || 'Pending',
+              completed: sub.status === 'Active' ? 1 : 0,
+              total: 1,
+              percentage: sub.status === 'Active' ? 100 : sub.status === 'Pending' ? 0 : 50
+            },
+            totalAmount: `৳${sub.total_amount?.toFixed(2) || '0.00'} BDT`,
+            canGenerateBill: sub.status === 'Active'
+          };
+        });
+        setSubscriptions(transformedSubscriptions);
+      }
+    } catch (error) {
+      console.error('Error fetching subscriptions:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const summaryStats = [
     {
-      title: 'Total POs',
-      value: '3',
+      title: 'Total Subscriptions',
+      value: subscriptions.length.toString(),
       icon: Package,
       color: 'blue'
     },
     {
+      title: 'Active',
+      value: subscriptions.filter(s => s.products.some(p => p.status === 'Active')).length.toString(),
+      icon: CheckCircle,
+      color: 'green'
+    },
+    {
       title: 'Pending',
-      value: '1',
+      value: subscriptions.filter(s => s.products.some(p => p.status === 'Pending')).length.toString(),
       icon: AlertTriangle,
       color: 'orange'
     },
     {
-      title: 'Partial',
-      value: '1',
+      title: 'Expiring Soon',
+      value: '0',
       icon: Clock,
       color: 'yellow'
-    },
-    {
-      title: 'Complete',
-      value: '1',
-      icon: CheckCircle,
-      color: 'green'
-    }
-  ];
-
-  const subscriptions = [
-    {
-      id: 1,
-      poNumber: 'PO-2025-001',
-      createdDate: '2025-01-15',
-      client: {
-        company: 'Acme Corp',
-        contact: 'John Smith'
-      },
-      products: [
-        {
-          name: 'Zoom Pro',
-          quantity: 2,
-          status: 'Pending',
-          action: 'Subscribe'
-        },
-        {
-          name: 'ChatGPT Plus',
-          quantity: 1,
-          status: 'Active',
-          dateRange: '2025-02-15 to 2026-02-14',
-          action: 'Edit'
-        }
-      ],
-      progress: {
-        status: 'Partial',
-        icon: Clock,
-        completed: 1,
-        total: 2,
-        percentage: 50
-      },
-      totalAmount: '৳7391.08 BDT',
-      canGenerateBill: false
-    },
-    {
-      id: 2,
-      poNumber: 'PO-2025-002',
-      createdDate: '2025-01-10',
-      client: {
-        company: 'Tech Solutions Inc',
-        contact: 'Sarah Johnson'
-      },
-      products: [
-        {
-          name: 'Microsoft Teams',
-          quantity: 5,
-          status: 'Pending',
-          action: 'Subscribe'
-        }
-      ],
-      progress: {
-        status: 'Pending',
-        icon: AlertTriangle,
-        completed: 0,
-        total: 1,
-        percentage: 0
-      },
-      totalAmount: '৳4143.75 BDT',
-      canGenerateBill: false
-    },
-    {
-      id: 3,
-      poNumber: 'PO-2024-089',
-      createdDate: '2024-12-01',
-      client: {
-        company: 'Global Dynamics',
-        contact: 'Mike Wilson'
-      },
-      products: [
-        {
-          name: 'Office 365 Business',
-          quantity: 10,
-          status: 'Active',
-          dateRange: '2024-12-15 to 2025-12-14',
-          action: 'Edit'
-        },
-        {
-          name: 'Figma Professional',
-          quantity: 3,
-          status: 'Active',
-          dateRange: '2024-12-20 to 2025-12-19',
-          action: 'Edit'
-        }
-      ],
-      progress: {
-        status: 'Complete',
-        icon: CheckCircle,
-        completed: 2,
-        total: 2,
-        percentage: 100
-      },
-      totalAmount: '৳21945.30 BDT',
-      canGenerateBill: true
     }
   ];
 
@@ -188,9 +145,34 @@ export default function Subscriptions() {
     setIsModalOpen(true);
   };
 
-  const handleModalSubmit = (data) => {
-    console.log('Subscription Data:', data);
-    // Handle subscription logic here
+  const handleModalSubmit = async (data) => {
+    try {
+      // Prepare subscription data for API
+      const subscriptionData = {
+        po_number: data.poNumber || 'PO-DEFAULT-001', // In a real app, you'd get this from the purchase
+        client_id: 1, // You'd get the actual client ID from the purchase data
+        product_id: 1, // You'd get the actual product ID from the product selection
+        start_date: data.startDate,
+        end_date: data.endDate,
+        status: 'Active',
+        notes: data.notes,
+        quantity: data.quantity,
+        total_amount: 0 // This would be calculated based on the product and quantity
+      };
+      
+      const response = await api.post('/subscriptions', subscriptionData);
+      
+      if (response.data.success) {
+        console.log('Subscription created:', response.data.data);
+        // Refresh the subscriptions list
+        fetchSubscriptions();
+      } else {
+        console.error('Failed to create subscription:', response.data.message);
+      }
+    } catch (error) {
+      console.error('Error creating subscription:', error);
+      alert('Failed to create subscription');
+    }
   };
 
   return (
@@ -244,79 +226,99 @@ export default function Subscriptions() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {subscriptions.map((subscription) => (
-                <TableRow key={subscription.id}>
-                  <TableCell>
-                    <div>
-                      <div className="font-semibold text-gray-900">{subscription.poNumber}</div>
-                      <div className="text-sm text-gray-600">Created: {subscription.createdDate}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium text-gray-900">{subscription.client.company}</div>
-                      <div className="text-sm text-gray-600">{subscription.client.contact}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-3">
-                      {subscription.products.map((product, index) => (
-                        <div key={index} className="border-b border-gray-100 last:border-b-0 pb-3 last:pb-0">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-gray-900">{product.name}</span>
-                              <span className="text-xs bg-gray-900 text-white px-2 py-1 rounded">
-                                x{product.quantity}
-                              </span>
-                              <Badge className={`text-xs ${getStatusBadgeColor(product.status)}`}>
-                                {product.status}
-                              </Badge>
-                            </div>
-                            <Button 
-                              variant={product.action === 'Subscribe' ? 'primary' : 'outline'}
-                              size="xs"
-                              className="text-xs"
-                              onClick={() => handleOpenModal(product.name, product.quantity, subscription)}
-                            >
-                              {product.action}
-                            </Button>
-                          </div>
-                          {product.dateRange && (
-                            <div className="text-sm text-gray-600">{product.dateRange}</div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <subscription.progress.icon className={`h-4 w-4 ${getProgressColor(subscription.progress.status)}`} />
-                      <div>
-                        <div className={`font-medium ${getProgressColor(subscription.progress.status)}`}>
-                          {subscription.progress.status}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          {subscription.progress.completed}/{subscription.progress.total} products ({subscription.progress.percentage}%)
-                        </div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-semibold text-gray-900">{subscription.totalAmount}</div>
-                  </TableCell>
-                  <TableCell>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      className="text-xs"
-                      icon={<FileText className="h-3 w-3" />}
-                      disabled={!subscription.canGenerateBill}
-                    >
-                      Generate Bill
-                    </Button>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan="6" className="text-center py-8 text-gray-500">
+                    Loading subscriptions...
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : subscriptions.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan="6" className="text-center py-8 text-gray-500">
+                    No subscriptions found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                subscriptions.map((subscription) => (
+                  <TableRow key={subscription.id}>
+                    <TableCell>
+                      <div>
+                        <div className="font-semibold text-gray-900">{subscription.poNumber}</div>
+                        <div className="text-sm text-gray-600">Created: {subscription.createdDate}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium text-gray-900">{subscription.client.company}</div>
+                        <div className="text-sm text-gray-600">{subscription.client.contact}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-3">
+                        {subscription.products.map((product, index) => (
+                          <div key={index} className="border-b border-gray-100 last:border-b-0 pb-3 last:pb-0">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-900">{product.name}</span>
+                                <span className="text-xs bg-gray-900 text-white px-2 py-1 rounded">
+                                  x{product.quantity}
+                                </span>
+                                <Badge className={`text-xs ${getStatusBadgeColor(product.status)}`}>
+                                  {product.status}
+                                </Badge>
+                              </div>
+                              <Button 
+                                variant={product.action === 'Subscribe' ? 'primary' : 'outline'}
+                                size="xs"
+                                className="text-xs"
+                                onClick={() => handleOpenModal(product.name, product.quantity, subscription)}
+                              >
+                                {product.action}
+                              </Button>
+                            </div>
+                            {product.dateRange && (
+                              <div className="text-sm text-gray-600">{product.dateRange}</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {subscription.progress.status === 'Active' ? (
+                          <CheckCircle className={`h-4 w-4 ${getProgressColor(subscription.progress.status)}`} />
+                        ) : subscription.progress.status === 'Pending' ? (
+                          <AlertTriangle className={`h-4 w-4 ${getProgressColor(subscription.progress.status)}`} />
+                        ) : (
+                          <Clock className={`h-4 w-4 ${getProgressColor(subscription.progress.status)}`} />
+                        )}
+                        <div>
+                          <div className={`font-medium ${getProgressColor(subscription.progress.status)}`}>
+                            {subscription.progress.status}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {subscription.progress.completed}/{subscription.progress.total} products ({subscription.progress.percentage}%)
+                          </div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-semibold text-gray-900">{subscription.totalAmount}</div>
+                    </TableCell>
+                    <TableCell>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="text-xs"
+                        icon={<FileText className="h-3 w-3" />}
+                        disabled={!subscription.canGenerateBill}
+                      >
+                        Generate Bill
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -330,6 +332,7 @@ export default function Subscriptions() {
         quantity={selectedQuantity}
         totalAmount={selectedTotalAmount}
         onSubmit={handleModalSubmit} 
+        poNumber={subscriptions.find(s => s.id === selectedProduct?.id)?.poNumber || 'PO-DEFAULT-001'}
       />
     </div>
   );

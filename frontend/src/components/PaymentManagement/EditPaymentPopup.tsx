@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Calendar, ChevronDown } from 'lucide-react';
+import api from '../../api';
 
 interface Payment {
   id: number;
   poNumber: string;
+  client_id: number;
   client: {
     company: string;
     contact: string;
@@ -17,10 +19,11 @@ interface Payment {
 }
 
 interface PurchaseOrder {
-  poNumber: string;
+  id: number;
+  po_number: string;
   client: string;
-  totalAmount: string;
-  outstandingAmount: string;
+  total_amount: number;
+  outstanding_amount: number;
 }
 
 interface EditPaymentPopupProps {
@@ -53,40 +56,50 @@ const EditPaymentPopup: React.FC<EditPaymentPopupProps> = ({
     status: false
   });
 
-  // Mock purchase orders data
-  const purchaseOrders: PurchaseOrder[] = [
-    {
-      poNumber: 'PO-2025-001',
-      client: 'Acme Corp',
-      totalAmount: '$99.99',
-      outstandingAmount: '$0.00'
-    },
-    {
-      poNumber: 'PO-2025-002',
-      client: 'Tech Solutions Inc',
-      totalAmount: '$15.00',
-      outstandingAmount: '$0.00'
-    },
-    {
-      poNumber: 'PO-2024-089',
-      client: 'Global Dynamics',
-      totalAmount: '$150.00',
-      outstandingAmount: '$150.00'
-    }
-  ];
+  const [loading, setLoading] = useState(false);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
 
   const paymentMethods = ['Credit Card', 'Bank Transfer', 'Check', 'Cash', 'Wire Transfer'];
   const statusOptions = ['Completed', 'Pending', 'Failed', 'Cancelled'];
 
+  // Fetch purchase orders when popup opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchPurchaseOrders();
+    }
+  }, [isOpen]);
+
+  const fetchPurchaseOrders = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/purchases');
+      if (response.data.success) {
+        // Transform the API response to match the expected format
+        const transformedPOs = response.data.data.map((po: any) => ({
+          id: po.id,
+          po_number: po.po_number,
+          client: po.client?.company || po.client || 'N/A',
+          total_amount: typeof po.total_amount === 'number' ? po.total_amount : parseFloat(po.total_amount || 0),
+          outstanding_amount: 0 // This would be calculated based on unpaid bills
+        }));
+        setPurchaseOrders(transformedPOs);
+      }
+    } catch (error) {
+      console.error('Error fetching purchase orders:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Update form data when payment changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (payment) {
-      const selectedPO = purchaseOrders.find(po => po.poNumber === payment.poNumber);
+      const selectedPO = purchaseOrders.find(po => po.po_number === payment.poNumber);
       setFormData({
-        purchaseOrder: selectedPO ? `${selectedPO.poNumber} - ${selectedPO.client} (${selectedPO.totalAmount} - Outstanding: ${selectedPO.outstandingAmount})` : '',
+        purchaseOrder: selectedPO ? `${selectedPO.po_number} - ${selectedPO.client} ($${parseFloat(selectedPO.total_amount || 0).toFixed(2)} - Outstanding: $${parseFloat(selectedPO.outstanding_amount || 0).toFixed(2)})` : '',
         paymentDate: payment.date,
-        amount: payment.amount.replace('$', ''),
-        paymentMethod: payment.method,
+        amount: typeof payment.amount === 'string' ? payment.amount.replace('$', '') : parseFloat(payment.amount || 0).toString(),
+        paymentMethod: payment.method || 'Credit Card',
         transactionId: payment.transactionId,
         status: payment.status
       });
@@ -101,7 +114,7 @@ const EditPaymentPopup: React.FC<EditPaymentPopupProps> = ({
         status: 'Completed'
       });
     }
-  }, [payment]);
+  }, [payment, purchaseOrders]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -119,9 +132,9 @@ const EditPaymentPopup: React.FC<EditPaymentPopupProps> = ({
 
   const selectOption = (dropdown: string, value: string) => {
     if (dropdown === 'purchaseOrder') {
-      const selectedPO = purchaseOrders.find(po => po.poNumber === value.split(' - ')[0]);
+      const selectedPO = purchaseOrders.find(po => po.po_number === value);
       if (selectedPO) {
-        handleInputChange('purchaseOrder', `${selectedPO.poNumber} - ${selectedPO.client} (${selectedPO.totalAmount} - Outstanding: ${selectedPO.outstandingAmount})`);
+        handleInputChange('purchaseOrder', `${selectedPO.po_number} - ${selectedPO.client} ($${parseFloat(selectedPO.total_amount || 0).toFixed(2)} - Outstanding: $${parseFloat(selectedPO.outstanding_amount || 0).toFixed(2)})`);
       }
     } else {
       handleInputChange(dropdown, value);
@@ -144,16 +157,20 @@ const EditPaymentPopup: React.FC<EditPaymentPopupProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Extract the PO number from the formatted string
+    const poNumber = formData.purchaseOrder.split(' - ')[0];
+    
     const updatedPayment: Payment = {
       id: payment?.id || Date.now(),
-      poNumber: formData.purchaseOrder.split(' - ')[0],
+      poNumber: poNumber,
+      client_id: payment?.client_id || 1,
       client: {
-        company: formData.purchaseOrder.split(' - ')[1]?.split(' (')[0] || '',
+        company: payment?.client.company || 'Unknown Company',
         contact: payment?.client.contact || 'Unknown Contact'
       },
       date: formData.paymentDate,
-      amount: `$${formData.amount}`,
-      method: formData.paymentMethod,
+      amount: `$${parseFloat(formData.amount || 0).toFixed(2)}`,
+      method: formData.method || formData.paymentMethod,
       transactionId: formData.transactionId,
       status: formData.status,
       receipt: formData.status === 'Completed' ? 'Generated' : 'Not Generated'
@@ -211,19 +228,25 @@ const EditPaymentPopup: React.FC<EditPaymentPopupProps> = ({
                 </button>
                 {dropdownStates.purchaseOrder && (
                   <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
-                    {purchaseOrders.map((po) => (
-                      <button
-                        key={po.poNumber}
-                        type="button"
-                        onClick={() => selectOption('purchaseOrder', po.poNumber)}
-                        className="w-full px-3 py-2 text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50"
-                      >
-                        <div className="font-medium">{po.poNumber} - {po.client}</div>
-                        <div className="text-sm text-gray-600">
-                          {po.totalAmount} - Outstanding: {po.outstandingAmount}
-                        </div>
-                      </button>
-                    ))}
+                    {loading ? (
+                      <div className="px-3 py-2 text-center text-gray-500">Loading purchase orders...</div>
+                    ) : purchaseOrders.length === 0 ? (
+                      <div className="px-3 py-2 text-center text-gray-500">No purchase orders found</div>
+                    ) : (
+                      purchaseOrders.map((po) => (
+                        <button
+                          key={po.id}
+                          type="button"
+                          onClick={() => selectOption('purchaseOrder', po.po_number)}
+                          className="w-full px-3 py-2 text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50"
+                        >
+                          <div className="font-medium">{po.po_number} - {po.client}</div>
+                          <div className="text-sm text-gray-600">
+                            ${parseFloat(po.total_amount || 0).toFixed(2)} - Outstanding: ${parseFloat(po.outstanding_amount || 0).toFixed(2)}
+                          </div>
+                        </button>
+                      ))
+                    )}
                   </div>
                 )}
               </div>

@@ -2,24 +2,7 @@ import React, { useState } from 'react';
 import { X, Calendar, ChevronDown } from 'lucide-react';
 import { currencyRatesApi } from '../../api';
 
-interface ExchangeRate {
-  id: number;
-  currencyPair: string;
-  rate: string;
-  lastUpdated: string;
-  change: string;
-  trend: string;
-}
-
-interface EditExchangeRatePopupProps {
-  rate: ExchangeRate | null;
-  isOpen: boolean;
-  onClose: () => void;
-  onUpdate: (rate: ExchangeRate) => void;
-  isEditMode?: boolean;
-}
-
-const EditExchangeRatePopup: React.FC<EditExchangeRatePopupProps> = ({
+const EditExchangeRatePopup = ({
   rate,
   isOpen,
   onClose,
@@ -36,7 +19,7 @@ const EditExchangeRatePopup: React.FC<EditExchangeRatePopupProps> = ({
     currency: false
   });
 
-  const currencyOptions = ['EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'CNY', 'INR'];
+  const currencyOptions = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'CNY', 'INR'];
 
   // Update form data when rate changes
   React.useEffect(() => {
@@ -57,21 +40,21 @@ const EditExchangeRatePopup: React.FC<EditExchangeRatePopupProps> = ({
     }
   }, [rate]);
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
   };
 
-  const toggleDropdown = (dropdown: string) => {
+  const toggleDropdown = (dropdown) => {
     setDropdownStates(prev => ({
       ...prev,
-      [dropdown]: !prev[dropdown as keyof typeof prev]
+      [dropdown]: !prev[dropdown]
     }));
   };
 
-  const selectCurrency = (currency: string) => {
+  const selectCurrency = (currency) => {
     handleInputChange('currency', currency);
     setDropdownStates(prev => ({
       ...prev,
@@ -79,20 +62,39 @@ const EditExchangeRatePopup: React.FC<EditExchangeRatePopupProps> = ({
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    const updatedRate: ExchangeRate = {
-      id: rate?.id || Date.now(),
-      currencyPair: `${formData.currency} / USD`,
-      rate: formData.rateValue,
-      lastUpdated: formData.date,
-      change: rate?.change || '+0.0000 (0.0%)',
-      trend: rate?.trend || 'up'
-    };
-
-    onUpdate(updatedRate);
-    onClose();
+    try {
+      const updatedRate = {
+        id: rate?.id || Date.now(),
+        currencyPair: `${formData.currency} / USD`,
+        rate: formData.rateValue,
+        lastUpdated: formData.date,
+        change: rate?.change || '+0.0000 (0.0%)',
+        trend: rate?.trend || 'up'
+      };
+      
+      onUpdate(updatedRate);
+      onClose();
+    } catch (err) {
+      console.error('Error saving exchange rate:', err);
+      let errorMessage = 'Failed to save exchange rate';
+      
+      if (err.response?.data?.errors) {
+        // Handle validation errors
+        const errors = err.response.data.errors;
+        if (typeof errors === 'object') {
+          errorMessage = Object.values(errors).flat().join(', ');
+        } else {
+          errorMessage = errors;
+        }
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      }
+      
+      alert(errorMessage);
+    }
   };
 
   const handleCancel = () => {

@@ -43,3 +43,22 @@ Route::apiResource('notifications', \App\Http\Controllers\Api\NotificationContro
 Route::patch('notifications/{id}/mark-as-read', [\App\Http\Controllers\Api\NotificationController::class, 'markAsRead']);
 Route::get('notifications/user/{userId}', [\App\Http\Controllers\Api\NotificationController::class, 'getUserNotifications']);
 Route::post('notifications/{id}/send', [\App\Http\Controllers\Api\NotificationController::class, 'sendNotification']);
+
+// Purchase Management Routes
+Route::apiResource('purchases', \App\Http\Controllers\Api\PurchaseController::class);
+
+// Subscription Management Routes
+Route::apiResource('subscriptions', \App\Http\Controllers\Api\SubscriptionController::class);
+
+// Payment Management Routes
+Route::apiResource('payment-managements', \App\Http\Controllers\Api\PaymentManagementController::class);
+
+// Report Management Routes
+Route::apiResource('reports', \App\Http\Controllers\Api\ReportController::class);
+
+// Additional report routes
+Route::get('reports-overview', [\App\Http\Controllers\Api\ReportController::class, 'overview']);
+Route::get('reports-revenue', [\App\Http\Controllers\Api\ReportController::class, 'revenue']);
+Route::get('reports-client', [\App\Http\Controllers\Api\ReportController::class, 'clientReport']);
+Route::get('reports-subscription', [\App\Http\Controllers\Api\ReportController::class, 'subscriptionReport']);
+Route::post('reports-generate', [\App\Http\Controllers\Api\ReportController::class, 'generateReport']);

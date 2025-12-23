@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Edit, Trash2, ArrowUpRight, ArrowDownRight, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Edit, Trash2, ArrowUpRight, ArrowDownRight, RefreshCw, Loader2 } from 'lucide-react';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { SearchFilter } from '../../components/ui/SearchFilter';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../../components/ui/Card';
@@ -7,6 +7,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '.
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import EditExchangeRatePopup from '../../components/Currency/EditExchangeRatePopup';
+import { currencyRatesApi } from '../../api';
 
 export default function CurrencyRates() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -19,6 +20,55 @@ export default function CurrencyRates() {
   const [isRatePopupOpen, setIsRatePopupOpen] = useState(false);
   const [editingRate, setEditingRate] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  
+  // API data state
+  const [exchangeRates, setExchangeRates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  // Fetch exchange rates from API
+  useEffect(() => {
+    const fetchExchangeRates = async () => {
+      try {
+        setLoading(true);
+        const response = await currencyRatesApi.getAll();
+        
+        // Transform the API response to match frontend format
+        const transformedRates = response.data.data.map(rate => ({
+          id: rate.id,
+          currencyPair: `${rate.currency} / USD`,
+          rate: rate.rate.toString(),
+          lastUpdated: rate.last_updated,
+          change: formatChangeDisplay(rate.change) || '+0.0000 (0.0%)',
+          trend: rate.trend || 'stable'
+        }));
+        
+        setExchangeRates(transformedRates);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching exchange rates:', err);
+        let errorMessage = 'Failed to load exchange rates';
+        
+        if (err.response?.data?.errors) {
+          // Handle validation errors
+          const errors = err.response.data.errors;
+          if (typeof errors === 'object') {
+            errorMessage = Object.values(errors).flat().join(', ');
+          } else {
+            errorMessage = errors;
+          }
+        } else if (err.response?.data?.message) {
+          errorMessage = err.response.data.message;
+        }
+        
+        setError(errorMessage);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchExchangeRates();
+  }, []);
 
   // Currency converter state
   const [converterData, setConverterData] = useState({
@@ -27,41 +77,30 @@ export default function CurrencyRates() {
     toCurrency: 'EUR',
     result: ''
   });
+  
+  // Helper function to extract numeric value from change string (e.g., '+0.0200 (+2.4%)' -> 0.0200)
+  const extractNumericValue = (changeString) => {
+    if (!changeString) return 0;
+    const match = changeString.match(/([+-]?\d+\.\d+)/);
+    return match ? parseFloat(match[1]) : 0;
+  };
+  
+  // Helper function to format change value for display
+  const formatChangeDisplay = (changeValue) => {
+    if (typeof changeValue === 'string' && changeValue.includes('(')) {
+      // Already in display format like '+0.0200 (+2.4%)'
+      return changeValue;
+    }
+    
+    // Convert numeric value to display format
+    const numValue = parseFloat(changeValue) || 0;
+    const percentage = (Math.abs(numValue) * 100).toFixed(1);
+    const sign = numValue >= 0 ? '+' : '-';
+    
+    return `${sign}${Math.abs(numValue).toFixed(4)} (${sign}${percentage}%)`;
+  };
 
-  const [exchangeRates, setExchangeRates] = useState([
-    {
-      id: 1,
-      currencyPair: 'EUR / USD',
-      rate: '0.8580',
-      lastUpdated: '2025-01-20',
-      change: '+0.0200 (+2.4%)',
-      trend: 'up',
-    },
-    {
-      id: 2,
-      currencyPair: 'GBP / USD',
-      rate: '0.7500',
-      lastUpdated: '2025-01-20',
-      change: '-0.0100 (-1.3%)',
-      trend: 'down',
-    },
-    {
-      id: 3,
-      currencyPair: 'CAD / USD',
-      rate: '1.3500',
-      lastUpdated: '2025-01-20',
-      change: '+0.0300 (+2.3%)',
-      trend: 'up',
-    },
-    {
-      id: 4,
-      currencyPair: 'AUD / USD',
-      rate: '1.4500',
-      lastUpdated: '2025-01-20',
-      change: '+0.0100 (+0.7%)',
-      trend: 'up',
-    },
-  ]);
+
 
   // Historical exchange rate data
   const rateHistory = [
@@ -168,35 +207,113 @@ export default function CurrencyRates() {
   };
 
   // Handle rate submit (both create and update)
-  const handleRateSubmit = (rateData) => {
-    if (isEditMode) {
-      // Update existing rate
-      setExchangeRates(prevRates => 
-        prevRates.map(rate => 
-          rate.id === rateData.id ? rateData : rate
-        )
-      );
-      console.log('Updated exchange rate:', rateData);
-    } else {
-      // Add new rate
-      const newRate = {
-        ...rateData,
-        id: Date.now() // Generate new ID for the rate
-      };
-      setExchangeRates(prevRates => [...prevRates, newRate]);
-      console.log('Set new exchange rate:', newRate);
+  const handleRateSubmit = async (rateData) => {
+    try {
+      if (isEditMode) {
+        // Update existing rate
+        const rateToUpdate = exchangeRates.find(r => r.id === rateData.id);
+        if (rateToUpdate) {
+          // Transform the frontend format to backend format
+          const rateValue = parseFloat(rateData.rate);
+          if (isNaN(rateValue) || rateValue < 0) {
+            alert('Rate must be a valid number greater than or equal to 0');
+            return;
+          }
+          
+          const backendData = {
+            currency: rateData.currencyPair.split(' / ')[0],
+            rate: rateValue,
+            last_updated: rateData.lastUpdated,
+            change: extractNumericValue(rateData.change) || 0,
+            trend: rateData.trend
+          };
+          
+          await currencyRatesApi.update(rateData.id, backendData);
+          
+          // Update the local state
+          setExchangeRates(prevRates => 
+            prevRates.map(rate => 
+              rate.id === rateData.id ? rateData : rate
+            )
+          );
+          console.log('Updated exchange rate:', rateData);
+        }
+      } else {
+        // Add new rate
+        // Transform the frontend format to backend format
+        const backendData = {
+          currency: rateData.currencyPair.split(' / ')[0],
+          rate: parseFloat(rateData.rate),
+          last_updated: rateData.lastUpdated,
+          change: extractNumericValue(rateData.change) || 0,
+          trend: rateData.trend
+        };
+        
+        const response = await currencyRatesApi.create(backendData);
+        
+        // Transform the response to match frontend format
+        const newRate = {
+          id: response.data.data.id,
+          currencyPair: `${response.data.data.currency} / USD`,
+          rate: response.data.data.rate.toString(),
+          lastUpdated: response.data.data.last_updated,
+          change: formatChangeDisplay(response.data.data.change) || '+0.0000 (0.0%)',
+          trend: response.data.data.trend || 'stable'
+        };
+        
+        setExchangeRates(prevRates => [...prevRates, newRate]);
+        console.log('Set new exchange rate:', newRate);
+      }
+      
+      handleCloseRatePopup();
+    } catch (err) {
+      console.error('Error saving exchange rate:', err);
+      let errorMessage = 'Failed to save exchange rate';
+      
+      if (err.response?.data?.errors) {
+        // Handle validation errors
+        const errors = err.response.data.errors;
+        if (typeof errors === 'object') {
+          errorMessage = Object.values(errors).flat().join(', ');
+        } else {
+          errorMessage = errors;
+        }
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      }
+      
+      alert(errorMessage);
     }
-    
-    handleCloseRatePopup();
   };
 
   // Handle rate deletion
-  const handleDeleteRate = (rate) => {
+  const handleDeleteRate = async (rate) => {
     if (window.confirm(`Are you sure you want to delete the ${rate.currencyPair} exchange rate?`)) {
-      setExchangeRates(prevRates => 
-        prevRates.filter(r => r.id !== rate.id)
-      );
-      console.log('Deleted exchange rate:', rate);
+      try {
+        await currencyRatesApi.delete(rate.id);
+        
+        setExchangeRates(prevRates => 
+          prevRates.filter(r => r.id !== rate.id)
+        );
+        console.log('Deleted exchange rate:', rate);
+      } catch (err) {
+        console.error('Error deleting exchange rate:', err);
+        let errorMessage = 'Failed to delete exchange rate';
+        
+        if (err.response?.data?.errors) {
+          // Handle validation errors
+          const errors = err.response.data.errors;
+          if (typeof errors === 'object') {
+            errorMessage = Object.values(errors).flat().join(', ');
+          } else {
+            errorMessage = errors;
+          }
+        } else if (err.response?.data?.message) {
+          errorMessage = err.response.data.message;
+        }
+        
+        alert(errorMessage);
+      }
     }
   };
 
@@ -213,17 +330,30 @@ export default function CurrencyRates() {
     const amount = parseFloat(converterData.amount) || 0;
     let rate = 1;
 
-    // Find the exchange rate (simplified logic)
-    if (converterData.fromCurrency === 'USD' && converterData.toCurrency === 'EUR') {
-      rate = 0.8580;
-    } else if (converterData.fromCurrency === 'EUR' && converterData.toCurrency === 'USD') {
-      rate = 1 / 0.8580;
-    } else if (converterData.fromCurrency === 'USD' && converterData.toCurrency === 'GBP') {
-      rate = 0.7500;
-    } else if (converterData.fromCurrency === 'GBP' && converterData.toCurrency === 'USD') {
-      rate = 1 / 0.7500;
+    // Find the exchange rate from the loaded rates
+    if (converterData.fromCurrency === 'USD' && converterData.toCurrency !== 'USD') {
+      // From USD to other currency
+      const rateEntry = exchangeRates.find(r => r.currencyPair === `${converterData.toCurrency} / USD`);
+      if (rateEntry) {
+        rate = parseFloat(rateEntry.rate);
+      }
+    } else if (converterData.toCurrency === 'USD' && converterData.fromCurrency !== 'USD') {
+      // From other currency to USD
+      const rateEntry = exchangeRates.find(r => r.currencyPair === `${converterData.fromCurrency} / USD`);
+      if (rateEntry) {
+        rate = 1 / parseFloat(rateEntry.rate);
+      }
+    } else if (converterData.fromCurrency !== 'USD' && converterData.toCurrency !== 'USD') {
+      // Between two non-USD currencies
+      const fromRateEntry = exchangeRates.find(r => r.currencyPair === `${converterData.fromCurrency} / USD`);
+      const toRateEntry = exchangeRates.find(r => r.currencyPair === `${converterData.toCurrency} / USD`);
+      
+      if (fromRateEntry && toRateEntry) {
+        const fromToUsdRate = 1 / parseFloat(fromRateEntry.rate); // How much USD equals 1 fromCurrency
+        const usdToToRate = parseFloat(toRateEntry.rate); // How much toCurrency equals 1 USD
+        rate = fromToUsdRate * usdToToRate; // Combined rate
+      }
     }
-    // Add more conversion logic as needed
 
     const result = (amount * rate).toFixed(2);
     setConverterData(prev => ({
@@ -290,59 +420,69 @@ export default function CurrencyRates() {
               <CardDescription>All rates are relative to USD (Base: 1 USD)</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Currency</TableHead>
-                    <TableHead>Rate</TableHead>
-                    <TableHead>Last Updated</TableHead>
-                    <TableHead>Change</TableHead>
-                    <TableHead>Trend</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {exchangeRates.map((rate) => (
-                    <TableRow key={rate.id}>
-                      <TableCell>{rate.currencyPair}</TableCell>
-                      <TableCell>{rate.rate}</TableCell>
-                      <TableCell>{rate.lastUpdated}</TableCell>
-                      <TableCell>
-                        <span className={`font-medium ${rate.change.includes('-') ? 'text-red-600' : 'text-green-600'}`}>
-                          {rate.change}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        {rate.trend === 'up' ? (
-                          <ArrowUpRight className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <ArrowDownRight className="h-4 w-4 text-red-500" />
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="icon"
-                            title="Edit rate"
-                            onClick={() => handleEditRate(rate)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="icon"
-                            title="Delete rate"
-                            onClick={() => handleDeleteRate(rate)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                </div>
+              ) : error ? (
+                <div className="p-6 text-center text-red-500">
+                  {error}
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Currency</TableHead>
+                      <TableHead>Rate</TableHead>
+                      <TableHead>Last Updated</TableHead>
+                      <TableHead>Change</TableHead>
+                      <TableHead>Trend</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {exchangeRates.map((rate) => (
+                      <TableRow key={rate.id}>
+                        <TableCell>{rate.currencyPair}</TableCell>
+                        <TableCell>{rate.rate}</TableCell>
+                        <TableCell>{rate.lastUpdated}</TableCell>
+                        <TableCell>
+                          <span className={`font-medium ${rate.change.includes('-') ? 'text-red-600' : 'text-green-600'}`}>
+                            {rate.change}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          {rate.trend === 'up' ? (
+                            <ArrowUpRight className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <ArrowDownRight className="h-4 w-4 text-red-500" />
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="icon"
+                              title="Edit rate"
+                              onClick={() => handleEditRate(rate)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="icon"
+                              title="Delete rate"
+                              onClick={() => handleDeleteRate(rate)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </>

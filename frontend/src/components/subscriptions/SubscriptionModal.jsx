@@ -3,7 +3,7 @@ import Modal from 'react-modal';
 import { X } from 'lucide-react';
 import { Button } from '../ui/Button';
 
-const SubscriptionModal = ({ isOpen, onRequestClose, product, quantity, totalAmount, onSubmit }) => {
+const SubscriptionModal = ({ isOpen, onRequestClose, product, quantity, totalAmount, poNumber, onSubmit }) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [notes, setNotes] = useState('');
@@ -23,7 +23,14 @@ const SubscriptionModal = ({ isOpen, onRequestClose, product, quantity, totalAmo
   const currencySuffix = totalAmount ? totalAmount.split(' ').pop() || 'BDT' : 'BDT';
 
   const handleSubmit = () => {
-    onSubmit({ startDate, endDate, notes, product, quantity });
+    onSubmit({ 
+      startDate, 
+      endDate, 
+      notes, 
+      product, 
+      quantity,
+      poNumber
+    });
     onRequestClose();
   };
 
@@ -75,6 +82,19 @@ const SubscriptionModal = ({ isOpen, onRequestClose, product, quantity, totalAmo
 
         {/* Form Fields */}
         <div className="space-y-4 mb-4">
+          {/* PO Number - Read-only */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              PO Number
+            </label>
+            <input
+              type="text"
+              value={poNumber || ''}
+              readOnly
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-700 text-sm"
+            />
+          </div>
+          
           {/* Subscription Start Date */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
