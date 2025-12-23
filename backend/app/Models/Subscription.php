@@ -11,6 +11,11 @@ class Subscription extends Model
         'client',
         'products_subscription_status',
         'progress',
-        'total_amount'
+        'total_amount',
+        'client_id',
+        'product_id',
+        'start_date',
+        'end_date',
+        'next_billing_date'
     ];
 }

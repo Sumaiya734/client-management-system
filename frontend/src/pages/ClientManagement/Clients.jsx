@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2 } from 'lucide-react';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { SearchFilter } from '../../components/ui/SearchFilter';
@@ -7,45 +7,18 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '.
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import EditClientPopup from '../../components/CilentForm/EditClientPopup';
+import api from '../../api';
 
 export default function Clients() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(true);
   
   // Popup state management
   const [isEditPopupOpen, setIsEditPopupOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
-
-  const clients = [
-    {
-      id: 1,
-      name: 'John Smith',
-      company: 'Acme Corp',
-      email: 'john@acmecorp.com',
-      phone: '+1-234-567-8900',
-      address: '123 Business St, New York, NY 10001',
-      status: 'Active'
-    },
-    {
-      id: 2,
-      name: 'Sarah Johnson',
-      company: 'Tech Solutions Inc',
-      email: 'sarah@techsolutions.com',
-      phone: '+1-234-567-8901',
-      address: '456 Innovation Ave, San Francisco, CA 94105',
-      status: 'Inactive'
-    },
-    {
-      id: 3,
-      name: 'Mike Wilson',
-      company: 'Global Dynamics',
-      email: 'mike@globaldynamics.com',
-      phone: '+1-234-567-8902',
-      address: '789 Corporate Blvd, Chicago, IL 60601',
-      status: 'Active'
-    }
-  ];
 
   const statusOptions = [
     { value: 'All Status', label: 'All Status' },
@@ -61,9 +34,44 @@ export default function Clients() {
     }
   ];
 
+  // Fetch clients from API
+  useEffect(() => {
+    fetchClients();
+  }, [statusFilter, searchTerm]);
+
+  const fetchClients = async () => {
+    try {
+      setLoading(true);
+      let url = '/clients';
+      
+      // Build query parameters
+      const params = {};
+      if (statusFilter !== 'All Status') {
+        params.status = statusFilter;
+      }
+      if (searchTerm) {
+        params.search = searchTerm;
+      }
+      
+      if (Object.keys(params).length > 0) {
+        const searchParams = new URLSearchParams(params);
+        url += `?${searchParams.toString()}`;
+      }
+      
+      const response = await api.get(url);
+      if (response.data.success) {
+        setClients(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching clients:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Create empty client template for adding new clients
   const createEmptyClient = () => ({
-    id: Date.now().toString(), // Temporary ID for new clients
+    id: null,
     name: '',
     company: '',
     email: '',
@@ -94,25 +102,74 @@ export default function Clients() {
   };
 
   // Handle client update/create
-  const handleClientSubmit = (clientData) => {
-    if (isEditMode) {
-      // Update existing client logic
-      console.log('Updating client:', clientData);
-      // TODO: Implement actual update logic (API call, state update, etc.)
-    } else {
-      // Create new client logic
-      console.log('Creating new client:', clientData);
-      // TODO: Implement actual create logic (API call, state update, etc.)
+  const handleClientSubmit = async (clientData) => {
+    try {
+      if (isEditMode) {
+        // Update existing client - ensure ID is properly formatted
+        const clientId = clientData.id;
+        if (!clientId) {
+          alert('Client ID is required for update');
+          return;
+        }
+        
+        const response = await api.put(`/clients/${clientId}`, clientData);
+        if (response.data.success) {
+          // Update the client in the local state
+          setClients(prev => prev.map(c => c.id === clientId ? response.data.data : c));
+          alert('Client updated successfully');
+        } else {
+          alert('Failed to update client: ' + response.data.message);
+        }
+      } else {
+        // Create new client
+        const response = await api.post('/clients', clientData);
+        if (response.data.success) {
+          // Add the new client to the local state
+          setClients(prev => [...prev, response.data.data]);
+          alert('Client created successfully');
+        } else {
+          alert('Failed to create client: ' + response.data.message);
+        }
+      }
+      
+      handleClosePopup();
+      fetchClients(); // Refresh the list
+    } catch (error) {
+      console.error('Error saving client:', error);
+      
+      // Check if it's a validation error with specific field errors
+      if (error.response?.status === 422 && error.response?.data?.errors) {
+        const errorMessages = Object.values(error.response.data.errors).flat();
+        alert('Validation errors: ' + errorMessages.join(', '));
+      } else {
+        alert('Error saving client: ' + error.response?.data?.message || error.message);
+      }
     }
-    
-    handleClosePopup();
   };
 
   // Handle client deletion
-  const handleDeleteClient = (client) => {
+  const handleDeleteClient = async (client) => {
     if (window.confirm(`Are you sure you want to delete ${client.name}?`)) {
-      console.log('Deleting client:', client);
-      // TODO: Implement actual delete logic
+      try {
+        const clientId = client.id;
+        if (!clientId) {
+          alert('Client ID is required for deletion');
+          return;
+        }
+        
+        const response = await api.delete(`/clients/${clientId}`);
+        if (response.data.success) {
+          // Remove the client from the local state
+          setClients(prev => prev.filter(c => c.id !== clientId));
+          alert('Client deleted successfully');
+          fetchClients(); // Refresh the list
+        } else {
+          alert('Failed to delete client: ' + response.data.message);
+        }
+      } catch (error) {
+        console.error('Error deleting client:', error);
+        alert('Error deleting client: ' + error.response?.data?.message || error.message);
+      }
     }
   };
 
@@ -140,7 +197,7 @@ export default function Clients() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Clients ({clients.length})</CardTitle>
+          <CardTitle>Clients ({loading ? '...' : clients.length})</CardTitle>
           <CardDescription>Manage your client information</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -156,39 +213,53 @@ export default function Clients() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {clients.map((client) => (
-                <TableRow key={client.id}>
-                  <TableCell>{client.name}</TableCell>
-                  <TableCell>{client.company}</TableCell>
-                  <TableCell>{client.email}</TableCell>
-                  <TableCell>{client.phone}</TableCell>
-                  <TableCell>
-                    <Badge variant={client.status === 'Active' ? 'active' : 'inactive'}>
-                      {client.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="icon"
-                        title="Edit client"
-                        onClick={() => handleEditClient(client)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="icon"
-                        title="Delete client"
-                        onClick={() => handleDeleteClient(client)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan="6" className="text-center py-8">
+                    Loading clients...
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : clients.length > 0 ? (
+                clients.map((client) => (
+                  <TableRow key={client.id}>
+                    <TableCell>{client.name}</TableCell>
+                    <TableCell>{client.company}</TableCell>
+                    <TableCell>{client.email}</TableCell>
+                    <TableCell>{client.phone}</TableCell>
+                    <TableCell>
+                      <Badge variant={client.status === 'Active' ? 'active' : 'inactive'}>
+                        {client.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="icon"
+                          title="Edit client"
+                          onClick={() => handleEditClient(client)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="icon"
+                          title="Delete client"
+                          onClick={() => handleDeleteClient(client)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan="6" className="text-center py-8">
+                    No clients found
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>

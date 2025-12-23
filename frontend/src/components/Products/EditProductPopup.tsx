@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, ChevronDown } from 'lucide-react';
 
 interface Product {
-  id: number;
+  id: number | null;
   name: string;
   description: string;
   category: string;
   vendor: string;
   type: string;
-  basePrice: string;
-  profit: string;
+  basePrice: string | number;
+  profit: string | number;
   bdtPrice: string;
   bdtLabel: string;
   currencies: Array<{ code: string; price: string }>;
@@ -49,20 +49,35 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
     baseCurrency: false, 
     status: false 
   });
+  
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Update form data when product changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (product) {
       setFormData({ 
-        name: product.name, 
-        vendor: product.vendor, 
-        category: product.category, 
-        subscriptionType: product.type, 
-        description: product.description, 
-        basePrice: product.basePrice.replace(' USD', ''), 
+        name: product.name || '', 
+        vendor: product.vendor || '', 
+        category: product.category || '', 
+        subscriptionType: product.type || '', 
+        description: product.description || '', 
+        basePrice: typeof product.basePrice === 'string' ? product.basePrice.replace(' USD', '') : product.basePrice.toString(), 
         baseCurrency: 'USD', 
-        profitMargin: product.profit.replace('%', ''), 
-        status: product.status 
+        profitMargin: typeof product.profit === 'string' ? product.profit.replace('%', '') : product.profit.toString(), 
+        status: product.status || 'Active' 
+      });
+    } else {
+      // Reset to default values when no product is provided
+      setFormData({ 
+        name: '', 
+        vendor: '', 
+        category: '', 
+        subscriptionType: '', 
+        description: '', 
+        basePrice: '', 
+        baseCurrency: 'USD', 
+        profitMargin: '', 
+        status: 'Active' 
       });
     }
   }, [product]);
@@ -77,6 +92,15 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
       ...prev, 
       [field]: value 
     }));
+    
+    // Clear error for this field when user types
+    if (errors[field]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
   };
 
   const toggleDropdown = (dropdown: string) => {
@@ -113,31 +137,70 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
   };
 
   const pricePreview = calculateBDTPrice();
+  
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    
+    if (!formData.name.trim()) {
+      newErrors.name = 'Name is required';
+    }
+    
+    if (!formData.vendor.trim()) {
+      newErrors.vendor = 'Vendor is required';
+    }
+    
+    if (!formData.category.trim()) {
+      newErrors.category = 'Category is required';
+    }
+    
+    if (!formData.description.trim()) {
+      newErrors.description = 'Description is required';
+    }
+    
+    if (!formData.basePrice || isNaN(parseFloat(formData.basePrice)) || parseFloat(formData.basePrice) <= 0) {
+      newErrors.basePrice = 'Valid base price is required';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (product) {
-      const updatedProduct = { 
-        ...product, 
-        name: formData.name, 
-        vendor: formData.vendor, 
-        category: formData.category, 
-        type: formData.subscriptionType, 
-        description: formData.description, 
-        basePrice: `${formData.basePrice} ${formData.baseCurrency}`, 
-        profit: `${formData.profitMargin}%`, 
-        status: formData.status, 
-        bdtPrice: `৳${pricePreview.bdtPrice}`, 
-      };
-      onUpdate(updatedProduct);
+    
+    if (validateForm()) {
+      if (product) {
+        const productToSubmit = { 
+          id: product.id,
+          name: formData.name, 
+          description: formData.description, 
+          category: formData.category, 
+          vendor: formData.vendor, 
+          type: formData.subscriptionType, 
+          basePrice: parseFloat(formData.basePrice), 
+          profit: parseFloat(formData.profitMargin), 
+          bdtPrice: `৳${pricePreview.bdtPrice}`, 
+          bdtLabel: 'BDT (final price)',
+          currencies: [],
+          status: formData.status, 
+          // API fields
+          product_name: formData.name, 
+          vendor_type: formData.subscriptionType, 
+          base_price: parseFloat(formData.basePrice), 
+          bdt_price: parseFloat(pricePreview.bdtPrice), 
+          multi_currency: JSON.stringify([]),
+        };
+        onUpdate(productToSubmit);
+      }
     }
   };
 
   const handleCancel = () => {
+    setErrors({}); // Clear errors
     onClose();
   };
 
-  if (!isOpen || !product) return null;
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -174,9 +237,10 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
                   id="name"
                   value={formData.name}
                   onChange={(e) => handleInputChange('name', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className={`w-full px-3 py-2 border ${errors.name ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
                   required
                 />
+                {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
               </div>
               <div>
                 <label htmlFor="vendor" className="block text-sm font-medium text-gray-700 mb-2">
@@ -187,9 +251,10 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
                   id="vendor"
                   value={formData.vendor}
                   onChange={(e) => handleInputChange('vendor', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className={`w-full px-3 py-2 border ${errors.vendor ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
                   required
                 />
+                {errors.vendor && <p className="mt-1 text-sm text-red-600">{errors.vendor}</p>}
               </div>
             </div>
 
@@ -203,7 +268,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
                   <button
                     type="button"
                     onClick={() => toggleDropdown('category')}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between"
+                    className={`w-full px-3 py-2 border ${errors.category ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between`}
                   >
                     <span>{formData.category}</span>
                     <ChevronDown size={16} className={`transition-transform ${dropdownStates.category ? 'rotate-180' : ''}`} />
@@ -222,6 +287,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
                       ))}
                     </div>
                   )}
+                  {errors.category && <p className="mt-1 text-sm text-red-600">{errors.category}</p>}
                 </div>
               </div>
               <div>
@@ -265,9 +331,10 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
                 value={formData.description}
                 onChange={(e) => handleInputChange('description', e.target.value)}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className={`w-full px-3 py-2 border ${errors.description ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
                 required
               />
+              {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}
             </div>
 
             {/* Base Price, Base Currency, and Profit Margin Row */}
@@ -282,9 +349,10 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
                   value={formData.basePrice}
                   onChange={(e) => handleInputChange('basePrice', e.target.value)}
                   step="0.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className={`w-full px-3 py-2 border ${errors.basePrice ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
                   required
                 />
+                {errors.basePrice && <p className="mt-1 text-sm text-red-600">{errors.basePrice}</p>}
               </div>
               <div>
                 <label htmlFor="baseCurrency" className="block text-sm font-medium text-gray-700 mb-2">

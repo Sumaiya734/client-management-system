@@ -12,6 +12,17 @@ class Product extends Model
         'base_price',
         'bdt_price',
         'multi_currency',
-        'status'
+        'status',
+        'name',
+        'description',
+        'category',
+        'vendor',
+        'type',
+        'profit_margin',
+        'currencies'
+    ];
+    
+    protected $casts = [
+        'multi_currency' => 'array',
     ];
 }

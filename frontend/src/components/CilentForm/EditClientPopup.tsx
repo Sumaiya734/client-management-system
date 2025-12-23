@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, ChevronDown } from 'lucide-react';
 
 interface Client {
-  id: string;
+  id: string | number | null;
   name: string;
   company: string;
   email: string;
@@ -26,12 +26,32 @@ const EditClientPopup: React.FC<EditClientPopupProps> = ({
   onUpdate,
   isEditMode = true,
 }) => {
-  const [formData, setFormData] = useState<Client>(client);
+  const [formData, setFormData] = useState<Client>(() => {
+    // Initialize with default values to prevent undefined values
+    return {
+      id: client.id || null,
+      name: client.name || '',
+      company: client.company || '',
+      email: client.email || '',
+      phone: client.phone || '',
+      address: client.address || '',
+      status: client.status || 'Active',
+    };
+  });
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Update form data when client prop changes
-  React.useEffect(() => {
-    setFormData(client);
+  useEffect(() => {
+    setFormData({
+      id: client.id || null,
+      name: client.name || '',
+      company: client.company || '',
+      email: client.email || '',
+      phone: client.phone || '',
+      address: client.address || '',
+      status: client.status || 'Active',
+    });
   }, [client]);
 
   const handleInputChange = (field: keyof Client, value: string) => {
@@ -39,15 +59,49 @@ const EditClientPopup: React.FC<EditClientPopupProps> = ({
       ...prev,
       [field]: value
     }));
+    
+    // Clear error for this field when user types
+    if (errors[field]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    
+    if (!formData.name.trim()) {
+      newErrors.name = 'Name is required';
+    }
+    
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Email is invalid';
+    }
+    
+    if (!formData.company.trim()) {
+      newErrors.company = 'Company is required';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onUpdate(formData);
+    
+    if (validateForm()) {
+      onUpdate(formData);
+    }
   };
 
   const handleCancel = () => {
     setFormData(client); // Reset form data
+    setErrors({}); // Clear errors
     onClose();
   };
 
@@ -90,9 +144,10 @@ const EditClientPopup: React.FC<EditClientPopupProps> = ({
                   id="name"
                   value={formData.name}
                   onChange={(e) => handleInputChange('name', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className={`w-full px-3 py-2 border ${errors.name ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
                   required
                 />
+                {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
               </div>
               <div>
                 <label htmlFor="company" className="block text-sm font-medium text-gray-700 mb-2">
@@ -103,9 +158,10 @@ const EditClientPopup: React.FC<EditClientPopupProps> = ({
                   id="company"
                   value={formData.company}
                   onChange={(e) => handleInputChange('company', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className={`w-full px-3 py-2 border ${errors.company ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
                   required
                 />
+                {errors.company && <p className="mt-1 text-sm text-red-600">{errors.company}</p>}
               </div>
             </div>
 
@@ -120,9 +176,10 @@ const EditClientPopup: React.FC<EditClientPopupProps> = ({
                   id="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className={`w-full px-3 py-2 border ${errors.email ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
                   required
                 />
+                {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
               </div>
               <div>
                 <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
