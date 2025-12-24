@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, ChevronDown, Upload, X as XIcon } from 'lucide-react';
+import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
 
 interface Product {
   id: number | null;
@@ -194,17 +195,20 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
     onClose();
   };
 
-  if (!isOpen) return null;
+  const { isVisible, isAnimating } = useAnimationState(isOpen);
+
+  if (!isVisible) return null;
 
   return (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
       onClick={onClose}
     >
-      <div 
-        className="bg-white rounded-lg shadow-lg w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <PopupAnimation animationType="zoomIn" duration="0.3s">
+        <div 
+          className="bg-white rounded-lg shadow-lg w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
 
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
@@ -465,6 +469,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
 
         </form>
       </div>
+      </PopupAnimation>
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, ChevronDown } from 'lucide-react';
 import api from '../../api';
+import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
 
 interface Payment {
   id: number;
@@ -184,11 +185,14 @@ const EditPaymentPopup: React.FC<EditPaymentPopupProps> = ({
     onClose();
   };
 
-  if (!isOpen) return null;
+  const { isVisible, isAnimating } = useAnimationState(isOpen);
+
+  if (!isVisible) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+    <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+      <PopupAnimation animationType="zoomIn" duration="0.3s">
+        <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
@@ -395,6 +399,7 @@ const EditPaymentPopup: React.FC<EditPaymentPopupProps> = ({
           </div>
         </form>
       </div>
+      </PopupAnimation>
     </div>
   );
 };

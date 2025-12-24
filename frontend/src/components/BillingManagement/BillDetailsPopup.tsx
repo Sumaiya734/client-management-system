@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Download, Mail } from 'lucide-react';
 import { billingManagementApi } from '../../api';
+import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
 
 interface Bill {
   id: number;
@@ -111,7 +112,9 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
     }
   };
 
-  if (!isOpen || !bill) return null;
+  const { isVisible, isAnimating } = useAnimationState(isOpen);
+
+  if (!isVisible || !bill) return null;
 
   // Format client data (can be object or string)
   const getClientData = () => {
@@ -154,8 +157,9 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
   const outstanding = (totalNumeric - paidNumeric).toFixed(2);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
+    <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+      <PopupAnimation animationType="zoomIn" duration="0.3s">
+        <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl mx-4 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
@@ -381,6 +385,7 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
           </div>
         </div>
       </div>
+      </PopupAnimation>
     </div>
   );
 };

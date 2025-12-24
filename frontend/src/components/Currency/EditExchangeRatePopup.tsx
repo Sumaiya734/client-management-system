@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Calendar, ChevronDown } from 'lucide-react';
 import { currencyRatesApi } from '../../api';
+import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
 
 interface ExchangeRate {
   id: number;
@@ -99,11 +100,14 @@ const EditExchangeRatePopup: React.FC<EditExchangeRatePopupProps> = ({
     onClose();
   };
 
-  if (!isOpen) return null;
+  const { isVisible, isAnimating } = useAnimationState(isOpen);
+
+  if (!isVisible) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+    <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+      <PopupAnimation animationType="zoomIn" duration="0.3s">
+        <div className="bg-white rounded-lg shadow-xl w-full max-w-xl mx-4">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
@@ -212,7 +216,8 @@ const EditExchangeRatePopup: React.FC<EditExchangeRatePopupProps> = ({
             </button>
           </div>
         </form>
-      </div>
+        </div>
+      </PopupAnimation>
     </div>
   );
 };

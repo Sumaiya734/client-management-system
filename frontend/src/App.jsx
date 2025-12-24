@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import './globals.css';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Dashboard from './pages/Dashboard';
@@ -26,13 +27,13 @@ function App() {
           {/* Protected routes */}
           <Route path="/" element={
             <ProtectedRoute>
-              <div className="flex h-screen bg-gray-50">
+              <div className="flex h-screen bg-[var(--soft-purple)]">
                 <Sidebar />
                 
                 <div className="flex-1 flex flex-col overflow-hidden">
                   <Header />
                   
-                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
                     <Dashboard />
                   </main>
                 </div>
@@ -41,13 +42,13 @@ function App() {
           } />
           <Route path="/clients" element={
             <ProtectedRoute>
-              <div className="flex h-screen bg-gray-50">
+              <div className="flex h-screen bg-[var(--soft-purple)]">
                 <Sidebar />
                 
                 <div className="flex-1 flex flex-col overflow-hidden">
                   <Header />
                   
-                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
                     <Clients />
                   </main>
                 </div>
@@ -56,13 +57,13 @@ function App() {
           } />
           <Route path="/products" element={
             <ProtectedRoute>
-              <div className="flex h-screen bg-gray-50">
+              <div className="flex h-screen bg-[var(--soft-purple)]">
                 <Sidebar />
                 
                 <div className="flex-1 flex flex-col overflow-hidden">
                   <Header />
                   
-                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
                     <Products />
                   </main>
                 </div>
@@ -71,13 +72,13 @@ function App() {
           } />
           <Route path="/orders" element={
             <ProtectedRoute>
-              <div className="flex h-screen bg-gray-50">
+              <div className="flex h-screen bg-[var(--soft-purple)]">
                 <Sidebar />
                 
                 <div className="flex-1 flex flex-col overflow-hidden">
                   <Header />
                   
-                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
                     <PurchaseOrders />
                   </main>
                 </div>
@@ -86,13 +87,13 @@ function App() {
           } />
           <Route path="/subscriptions" element={
             <ProtectedRoute>
-              <div className="flex h-screen bg-gray-50">
+              <div className="flex h-screen bg-[var(--soft-purple)]">
                 <Sidebar />
                 
                 <div className="flex-1 flex flex-col overflow-hidden">
                   <Header />
                   
-                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
                     <Subscriptions />
                   </main>
                 </div>
@@ -101,13 +102,13 @@ function App() {
           } />
           <Route path="/billing" element={
             <ProtectedRoute>
-              <div className="flex h-screen bg-gray-50">
+              <div className="flex h-screen bg-[var(--soft-purple)]">
                 <Sidebar />
                 
                 <div className="flex-1 flex flex-col overflow-hidden">
                   <Header />
                   
-                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
                     <BillingManagement />
                   </main>
                 </div>
@@ -116,13 +117,13 @@ function App() {
           } />
           <Route path="/payments" element={
             <ProtectedRoute>
-              <div className="flex h-screen bg-gray-50">
+              <div className="flex h-screen bg-[var(--soft-purple)]">
                 <Sidebar />
                 
                 <div className="flex-1 flex flex-col overflow-hidden">
                   <Header />
                   
-                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
                     <PaymentManagement />
                   </main>
                 </div>
@@ -131,13 +132,13 @@ function App() {
           } />
           <Route path="/reports" element={
             <ProtectedRoute>
-              <div className="flex h-screen bg-gray-50">
+              <div className="flex h-screen bg-[var(--soft-purple)]">
                 <Sidebar />
                 
                 <div className="flex-1 flex flex-col overflow-hidden">
                   <Header />
                   
-                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
                     <ReportsAnalytics />
                   </main>
                 </div>
@@ -146,13 +147,13 @@ function App() {
           } />
           <Route path="/users" element={
             <ProtectedRoute>
-              <div className="flex h-screen bg-gray-50">
+              <div className="flex h-screen bg-[var(--soft-purple)]">
                 <Sidebar />
                 
                 <div className="flex-1 flex flex-col overflow-hidden">
                   <Header />
                   
-                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
                     <UserManagement />
                   </main>
                 </div>
@@ -161,13 +162,13 @@ function App() {
           } />
           <Route path="/notifications" element={
             <ProtectedRoute>
-              <div className="flex h-screen bg-gray-50">
+              <div className="flex h-screen bg-[var(--soft-purple)]">
                 <Sidebar />
                 
                 <div className="flex-1 flex flex-col overflow-hidden">
                   <Header />
                   
-                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
                     <Notifications />
                   </main>
                 </div>
@@ -176,13 +177,13 @@ function App() {
           } />
           <Route path="/currency" element={
             <ProtectedRoute>
-              <div className="flex h-screen bg-gray-50">
+              <div className="flex h-screen bg-[var(--soft-purple)]">
                 <Sidebar />
                 
                 <div className="flex-1 flex flex-col overflow-hidden">
                   <Header />
                   
-                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
                     <CurrencyRates />
                   </main>
                 </div>

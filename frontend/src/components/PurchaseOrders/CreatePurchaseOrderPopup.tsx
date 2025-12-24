@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, ChevronDown, Calendar, Plus, Upload, X as XIcon } from 'lucide-react';
 import api from '../../api';
+import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
 
 interface Product {
   id: number;
@@ -181,280 +182,284 @@ const CreatePurchaseOrderPopup: React.FC<CreatePurchaseOrderPopupProps> = ({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  if (!isOpen) return null;
+  const { isVisible, isAnimating } = useAnimationState(isOpen);
+
+  if (!isOpen && !isAnimating) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose}>
+      <PopupAnimation animationType="zoomIn" duration="0.3s">
+        <div className="bg-white rounded-lg shadow-lg w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
 
-        {/* HEADER */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">Create Purchase Order</h2>
-            <p className="text-xs text-gray-500 mt-1">Fill the required information</p>
+          {/* HEADER */}
+          <div className="flex items-center justify-between p-4 border-b border-gray-200">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Create Purchase Order</h2>
+              <p className="text-xs text-gray-500 mt-1">Fill the required information</p>
+            </div>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+              <X size={20} />
+            </button>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X size={20} />
-          </button>
-        </div>
 
-        {/* FORM */}
-        <form onSubmit={handleSubmit} className="p-4 text-sm space-y-6">
+          {/* FORM */}
+          <form onSubmit={handleSubmit} className="p-4 text-sm space-y-6">
 
-          {/* BASIC INFORMATION */}
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Basic Information</h3>
+            {/* BASIC INFORMATION */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Basic Information</h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-              {/* PO NUMBER */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">PO Number</label>
-                <input
-                  type="text"
-                  value={formData.poNumber}
-                  onChange={(e) => handleInputChange('poNumber', e.target.value)}
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-gray-800"
-                  required
-                />
-              </div>
-
-              {/* STATUS */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => toggleDropdown('status')}
-                    className="w-full px-2 py-1.5 border border-gray-300 rounded-md bg-white text-left flex items-center justify-between"
-                  >
-                    {formData.status}
-                    <ChevronDown size={14} />
-                  </button>
-
-                  {dropdownStates.status && (
-                    <div className="absolute w-full bg-white border border-gray-200 rounded-md shadow-md z-20 mt-1 text-xs">
-                      {statusOptions.map((option) => (
-                        <button
-                          key={option}
-                          type="button"
-                          onClick={() => selectStatus(option)}
-                          className="w-full px-2 py-1.5 text-left hover:bg-gray-50"
-                        >
-                          {option}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                {/* PO NUMBER */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">PO Number</label>
+                  <input
+                    type="text"
+                    value={formData.poNumber}
+                    onChange={(e) => handleInputChange('poNumber', e.target.value)}
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-gray-800"
+                    required
+                  />
                 </div>
-              </div>
 
-              {/* CLIENT */}
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-gray-700 mb-1">Client</label>
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => toggleDropdown('client')}
-                    className="w-full px-2 py-1.5 border border-gray-300 rounded-md bg-white text-left flex items-center justify-between"
-                  >
-                    {formData.client || 'Select client'}
-                    <ChevronDown size={14} />
-                  </button>
+                {/* STATUS */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => toggleDropdown('status')}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded-md bg-white text-left flex items-center justify-between"
+                    >
+                      {formData.status}
+                      <ChevronDown size={14} />
+                    </button>
 
-                  {dropdownStates.client && (
-                    <div className="absolute w-full bg-white border border-gray-200 rounded-md shadow-md z-20 mt-1 max-h-40 overflow-auto text-xs">
-                      {loading ? (
-                        <div className="px-2 py-2 text-center text-gray-500">Loading...</div>
-                      ) : (
-                        clients.map((client) => (
+                    {dropdownStates.status && (
+                      <div className="absolute w-full bg-white border border-gray-200 rounded-md shadow-md z-20 mt-1 text-xs">
+                        {statusOptions.map((option) => (
                           <button
-                            key={client.id}
+                            key={option}
                             type="button"
-                            onClick={() => selectClient(client)}
+                            onClick={() => selectStatus(option)}
                             className="w-full px-2 py-1.5 text-left hover:bg-gray-50"
                           >
-                            <div className="font-medium">{client.company}</div>
-                            <div className="text-[10px] text-gray-500">{client.contact}</div>
+                            {option}
                           </button>
-                        ))
-                      )}
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-            </div>
-          </div>
+                {/* CLIENT */}
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Client</label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => toggleDropdown('client')}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded-md bg-white text-left flex items-center justify-between"
+                    >
+                      {formData.client || 'Select client'}
+                      <ChevronDown size={14} />
+                    </button>
 
-          {/* PRODUCTS */}
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Products & Subscription</h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-              {/* PRODUCT */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Product</label>
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => toggleDropdown('product')}
-                    className="w-full px-2 py-1.5 border border-gray-300 rounded-md bg-white text-left flex items-center justify-between"
-                  >
-                    {formData.product || 'Select product'}
-                    <ChevronDown size={14} />
-                  </button>
-
-                  {dropdownStates.product && (
-                    <div className="absolute w-full bg-white border border-gray-200 rounded-md shadow-md z-20 mt-1 max-h-40 overflow-auto text-xs">
-                      {products.map((product) => (
-                        <button
-                          key={product.id}
-                          type="button"
-                          onClick={() => selectProduct(product)}
-                          className="w-full px-2 py-1.5 text-left hover:bg-gray-50"
-                        >
-                          <div>{product.product_name || product.name}</div>
-                          <div className="text-[10px] text-gray-500">৳{product.base_price || product.price}</div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                    {dropdownStates.client && (
+                      <div className="absolute w-full bg-white border border-gray-200 rounded-md shadow-md z-20 mt-1 max-h-40 overflow-auto text-xs">
+                        {loading ? (
+                          <div className="px-2 py-2 text-center text-gray-500">Loading...</div>
+                        ) : (
+                          clients.map((client) => (
+                            <button
+                              key={client.id}
+                              type="button"
+                              onClick={() => selectClient(client)}
+                              className="w-full px-2 py-1.5 text-left hover:bg-gray-50"
+                            >
+                              <div className="font-medium">{client.company}</div>
+                              <div className="text-[10px] text-gray-500">{client.contact}</div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              {/* QUANTITY */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Quantity</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={formData.quantity}
-                  onChange={(e) => handleInputChange('quantity', parseInt(e.target.value) || 1)}
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-gray-800"
-                />
               </div>
             </div>
 
-            {/* DATES */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            {/* PRODUCTS */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Products & Subscription</h3>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Subscription Start</label>
-                <div className="relative">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                {/* PRODUCT */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Product</label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => toggleDropdown('product')}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded-md bg-white text-left flex items-center justify-between"
+                    >
+                      {formData.product || 'Select product'}
+                      <ChevronDown size={14} />
+                    </button>
+
+                    {dropdownStates.product && (
+                      <div className="absolute w-full bg-white border border-gray-200 rounded-md shadow-md z-20 mt-1 max-h-40 overflow-auto text-xs">
+                        {products.map((product) => (
+                          <button
+                            key={product.id}
+                            type="button"
+                            onClick={() => selectProduct(product)}
+                            className="w-full px-2 py-1.5 text-left hover:bg-gray-50"
+                          >
+                            <div>{product.product_name || product.name}</div>
+                            <div className="text-[10px] text-gray-500">৳{product.base_price || product.price}</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* QUANTITY */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Quantity</label>
                   <input
-                    type="date"
-                    value={formData.subscriptionStart}
-                    onChange={(e) => handleInputChange('subscriptionStart', e.target.value)}
+                    type="number"
+                    min={1}
+                    value={formData.quantity}
+                    onChange={(e) => handleInputChange('quantity', parseInt(e.target.value) || 1)}
                     className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-gray-800"
                   />
-                  <Calendar className="absolute right-2 top-2 h-3 w-3 text-gray-400 pointer-events-none" />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Subscription End</label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={formData.subscriptionEnd}
-                    onChange={(e) => handleInputChange('subscriptionEnd', e.target.value)}
-                    className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-gray-800"
-                  />
-                  <Calendar className="absolute right-2 top-2 h-3 w-3 text-gray-400 pointer-events-none" />
+              {/* DATES */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Subscription Start</label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={formData.subscriptionStart}
+                      onChange={(e) => handleInputChange('subscriptionStart', e.target.value)}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-gray-800"
+                    />
+                    <Calendar className="absolute right-2 top-2 h-3 w-3 text-gray-400 pointer-events-none" />
+                  </div>
                 </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Subscription End</label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={formData.subscriptionEnd}
+                      onChange={(e) => handleInputChange('subscriptionEnd', e.target.value)}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-gray-800"
+                    />
+                    <Calendar className="absolute right-2 top-2 h-3 w-3 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+
+              {/* SUBSCRIPTION ACTIVE & ADD PRODUCT */}
+              <div className="flex items-center justify-between mt-3">
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="subscriptionActive"
+                    checked={formData.subscriptionActive}
+                    onChange={(e) => handleInputChange('subscriptionActive', e.target.checked)}
+                    className="h-3 w-3 text-gray-900 focus:ring-gray-800 border-gray-300 rounded"
+                  />
+                  <label htmlFor="subscriptionActive" className="ml-2 text-xs font-medium text-gray-700">
+                    Subscription Active
+                  </label>
+                </div>
+
+                <button
+                  type="button"
+                  className="inline-flex items-center px-2 py-1 border border-gray-300 shadow-sm text-xs leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add Product
+                </button>
               </div>
             </div>
 
-            {/* SUBSCRIPTION ACTIVE & ADD PRODUCT */}
-            <div className="flex items-center justify-between mt-3">
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="subscriptionActive"
-                  checked={formData.subscriptionActive}
-                  onChange={(e) => handleInputChange('subscriptionActive', e.target.checked)}
-                  className="h-3 w-3 text-gray-900 focus:ring-gray-800 border-gray-300 rounded"
-                />
-                <label htmlFor="subscriptionActive" className="ml-2 text-xs font-medium text-gray-700">
-                  Subscription Active
+            {/* ATTACHMENTS */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Attachments</h3>
+
+              <div className="border border-dashed border-gray-300 rounded-md p-3 text-center hover:border-gray-400 transition">
+                <Upload className="h-6 w-6 mx-auto text-gray-400 mb-1" />
+
+                <label className="text-xs cursor-pointer text-blue-600 hover:text-blue-500">
+                  <span>Upload files</span>
+                  <input
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={handleFileChange}
+                    accept=".pdf,.doc,.docx,.zip,.xls,.xlsx,.txt,.png,.jpg,.jpeg,.gif"
+                  />
                 </label>
+
+                <p className="text-[10px] text-gray-400 mt-1">Up to 10MB each</p>
               </div>
 
+              {/* Selected files */}
+              {attachments.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {attachments.map((file, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between bg-gray-50 p-2 rounded-md text-xs"
+                    >
+                      <div>
+                        <p className="font-medium">{file.name}</p>
+                        <p className="text-gray-500">{formatFileSize(file.size)}</p>
+                      </div>
+
+                      <button onClick={() => removeAttachment(index)}>
+                        <XIcon className="h-4 w-4 text-gray-500 hover:text-gray-700" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* FOOTER */}
+            <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
               <button
                 type="button"
-                className="inline-flex items-center px-2 py-1 border border-gray-300 shadow-sm text-xs leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                onClick={handleCancel}
+                className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-300 rounded-md hover:bg-gray-50"
               >
-                <Plus className="h-3 w-3 mr-1" />
-                Add Product
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                className="px-3 py-1.5 text-xs font-medium text-white bg-gray-900 rounded-md hover:bg-gray-800"
+              >
+                Create Purchase Order
               </button>
             </div>
-          </div>
 
-          {/* ATTACHMENTS */}
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Attachments</h3>
-
-            <div className="border border-dashed border-gray-300 rounded-md p-3 text-center hover:border-gray-400 transition">
-              <Upload className="h-6 w-6 mx-auto text-gray-400 mb-1" />
-
-              <label className="text-xs cursor-pointer text-blue-600 hover:text-blue-500">
-                <span>Upload files</span>
-                <input
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={handleFileChange}
-                  accept=".pdf,.doc,.docx,.zip,.xls,.xlsx,.txt,.png,.jpg,.jpeg,.gif"
-                />
-              </label>
-
-              <p classname="text-[10px] text-gray-400 mt-1">Up to 10MB each</p>
-            </div>
-
-            {/* Selected files */}
-            {attachments.length > 0 && (
-              <div className="mt-3 space-y-2">
-                {attachments.map((file, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between bg-gray-50 p-2 rounded-md text-xs"
-                  >
-                    <div>
-                      <p className="font-medium">{file.name}</p>
-                      <p className="text-gray-500">{formatFileSize(file.size)}</p>
-                    </div>
-
-                    <button onClick={() => removeAttachment(index)}>
-                      <XIcon className="h-4 w-4 text-gray-500 hover:text-gray-700" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* FOOTER */}
-          <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-
-            <button
-              type="submit"
-              className="px-3 py-1.5 text-xs font-medium text-white bg-gray-900 rounded-md hover:bg-gray-800"
-            >
-              Create Purchase Order
-            </button>
-          </div>
-
-        </form>
-      </div>
+          </form>
+        </div>
+      </PopupAnimation>
     </div>
   );
 };
