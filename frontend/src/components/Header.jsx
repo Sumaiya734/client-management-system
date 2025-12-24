@@ -34,6 +34,7 @@ export default function Header() {
   };
 
   const displayName = user?.name || user?.email || 'User';
+  const userRole = user?.role || 'User';
 
   return (
     <header className="bg-white border-b border-gray-200 px-5 py-2 h-[54px]">
@@ -71,13 +72,19 @@ export default function Header() {
             <button
               onClick={() => setShowDropdown(!showDropdown)}
               className="flex items-center space-x-2 p-2 rounded-md hover:bg-gray-100"
+              title={`Logged in as ${displayName} (${userRole})`}
             >
               <div className="h-8 w-8 bg-blue-500 rounded-full flex items-center justify-center">
                 <User className="h-4 w-4 text-white" />
               </div>
-              <span className="text-sm font-medium text-gray-700">
-                {displayName}
-              </span>
+              <div className="text-left">
+                <div className="text-sm font-medium text-gray-700">
+                  {displayName}
+                </div>
+                <div className={`text-xs px-2 py-0.5 rounded-full inline-block mt-0.5 ${userRole.toLowerCase() === 'admin' ? 'bg-red-100 text-red-800' : userRole.toLowerCase() === 'manager' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
+                  {userRole}
+                </div>
+              </div>
             </button>
 
             {showDropdown && (

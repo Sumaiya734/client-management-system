@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import './globals.css';
+import AOSWrapper from './hoc/AOSWrapper';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Dashboard from './pages/Dashboard';
@@ -34,7 +35,11 @@ function App() {
                   <Header />
                   
                   <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
-                    <Dashboard />
+                    <AOSWrapper>
+                      <div data-aos="fade-up" data-aos-duration="800" className="shadow-3d">
+                        <Dashboard />
+                      </div>
+                    </AOSWrapper>
                   </main>
                 </div>
               </div>
@@ -49,7 +54,11 @@ function App() {
                   <Header />
                   
                   <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
-                    <Clients />
+                    <AOSWrapper>
+                      <div data-aos="fade-up" className="shadow-3d">
+                        <Clients />
+                      </div>
+                    </AOSWrapper>
                   </main>
                 </div>
               </div>
@@ -64,7 +73,11 @@ function App() {
                   <Header />
                   
                   <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
-                    <Products />
+                    <AOSWrapper>
+                      <div data-aos="fade-up" className="shadow-3d">
+                        <Products />
+                      </div>
+                    </AOSWrapper>
                   </main>
                 </div>
               </div>
@@ -79,7 +92,11 @@ function App() {
                   <Header />
                   
                   <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
-                    <PurchaseOrders />
+                    <AOSWrapper>
+                      <div data-aos="fade-up" className="shadow-3d">
+                        <PurchaseOrders />
+                      </div>
+                    </AOSWrapper>
                   </main>
                 </div>
               </div>
@@ -94,7 +111,11 @@ function App() {
                   <Header />
                   
                   <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
-                    <Subscriptions />
+                    <AOSWrapper>
+                      <div data-aos="fade-up" className="shadow-3d">
+                        <Subscriptions />
+                      </div>
+                    </AOSWrapper>
                   </main>
                 </div>
               </div>
@@ -109,7 +130,11 @@ function App() {
                   <Header />
                   
                   <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
-                    <BillingManagement />
+                    <AOSWrapper>
+                      <div data-aos="fade-up" className="shadow-3d">
+                        <BillingManagement />
+                      </div>
+                    </AOSWrapper>
                   </main>
                 </div>
               </div>
@@ -124,7 +149,11 @@ function App() {
                   <Header />
                   
                   <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
-                    <PaymentManagement />
+                    <AOSWrapper>
+                      <div data-aos="fade-up" className="shadow-3d">
+                        <PaymentManagement />
+                      </div>
+                    </AOSWrapper>
                   </main>
                 </div>
               </div>
@@ -139,7 +168,11 @@ function App() {
                   <Header />
                   
                   <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
-                    <ReportsAnalytics />
+                    <AOSWrapper>
+                      <div data-aos="fade-up" className="shadow-3d">
+                        <ReportsAnalytics />
+                      </div>
+                    </AOSWrapper>
                   </main>
                 </div>
               </div>
@@ -154,7 +187,11 @@ function App() {
                   <Header />
                   
                   <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
-                    <UserManagement />
+                    <AOSWrapper>
+                      <div data-aos="fade-up" className="shadow-3d">
+                        <UserManagement />
+                      </div>
+                    </AOSWrapper>
                   </main>
                 </div>
               </div>
@@ -169,7 +206,11 @@ function App() {
                   <Header />
                   
                   <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
-                    <Notifications />
+                    <AOSWrapper>
+                      <div data-aos="fade-up" className="shadow-3d">
+                        <Notifications />
+                      </div>
+                    </AOSWrapper>
                   </main>
                 </div>
               </div>
@@ -184,7 +225,11 @@ function App() {
                   <Header />
                   
                   <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
-                    <CurrencyRates />
+                    <AOSWrapper>
+                      <div data-aos="fade-up" className="shadow-3d">
+                        <CurrencyRates />
+                      </div>
+                    </AOSWrapper>
                   </main>
                 </div>
               </div>

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authApi } from '../api.js';
+import api from '../api.js';
 
 const AuthContext = createContext();
 
@@ -19,12 +20,11 @@ export const AuthProvider = ({ children }) => {
     // Check if user is logged in by checking for auth token
     const token = localStorage.getItem('authToken');
     if (token) {
-      // In a real app, you would validate the token by making an API call
-      // For now, we'll just assume the user is valid if they have a token
-      // Set a basic user object if token exists
-      setUser({ id: 'temp', name: 'Loading...', email: 'loading...' }); // Placeholder user object
+      // Validate the token and fetch user details
+      fetchUserDetails();
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
     
     // Listen for auth-expired event
     const handleAuthExpired = () => {
@@ -38,6 +38,25 @@ export const AuthProvider = ({ children }) => {
       window.removeEventListener('auth-expired', handleAuthExpired);
     };
   }, []);
+
+  const fetchUserDetails = async () => {
+    try {
+      setLoading(true);
+      // Make an API call to get user details using the stored token
+      const response = await api.get('/user');
+      if (response.data && response.data.user) {
+        setUser(response.data.user);
+      }
+    } catch (error) {
+      console.error('Error fetching user details:', error);
+      // If the token is invalid, remove it
+      localStorage.removeItem('authToken');
+      delete api.defaults.headers.common['Authorization'];
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const login = async (credentials) => {
     try {

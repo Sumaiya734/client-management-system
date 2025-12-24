@@ -7,6 +7,7 @@ Route::post('/register', [\App\Http\Controllers\Api\AuthController::class, 'regi
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [\App\Http\Controllers\Api\AuthController::class, 'logout']);
+    Route::get('/user', [\App\Http\Controllers\Api\AuthController::class, 'me']);
 });
 
 Route::get('/test', function () {

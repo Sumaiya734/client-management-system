@@ -1,8 +1,9 @@
 /* Global color variables */
 :root {
-  --soft-purple: #e2efff;
+  --soft-purple: #f5f6f8;
   --light-soft-purple: #e8f5ff;
   --dark-soft-purple: #d9e2ff;
+  --shadow-color: rgba(0, 0, 0, 0.1);
 }
 
 /* Apply soft purple background to all pages */
@@ -10,4 +11,61 @@ body {
   background-color: var(--light-soft-purple);
   margin: 0;
   min-height: 100vh;
+}
+
+/* 3D Shadow effect */
+/* .shadow-3d {
+  box-shadow: 0 10px 20px var(--shadow-color),
+              0 6px 6px var(--shadow-color);
+  transition: all 0.3s ease;
+}
+
+.shadow-3d:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 14px 28px var(--shadow-color),
+              0 10px 10px var(--shadow-color);
+} */
+
+/* Variations of 3D shadows */
+/* .shadow-3d-lg {
+  box-shadow: 0 20px 25px -5px var(--shadow-color),
+              0 10px 10px -5px var(--shadow-color);
+  transition: all 0.3s ease;
+}
+
+.shadow-3d-lg:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 25px 50px -12px var(--shadow-color);
+}
+
+.shadow-3d-sm {
+  box-shadow: 0 4px 6px var(--shadow-color);
+  transition: all 0.3s ease;
+}
+
+.shadow-3d-sm:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 12px var(--shadow-color);
+} */
+
+/* Card-specific 3D effect */
+/* .card-3d {
+  transform-style: preserve-3d;
+  perspective: 1000px;
+  transition: all 0.3s ease;
+}
+
+.card-3d:hover {
+  transform: translateY(-5px) translateZ(20px);
+  box-shadow: 0 20px 30px var(--shadow-color);
+} */
+
+/* AOS Animation base styles */
+[data-aos] {
+  pointer-events: auto;
+  visibility: hidden;
+}
+
+[data-aos].aos-animate {
+  visibility: visible;
 }
