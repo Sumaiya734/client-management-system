@@ -18,9 +18,19 @@ api.interceptors.request.use(
   }
 );
 
-// Add response interceptor to handle auth errors
+// Add response interceptor to handle auth errors and normalize responses
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // If the response has our standard format {success: true, data: ...}, normalize it
+    if (response.data && response.data.hasOwnProperty('success') && response.data.data !== undefined) {
+      // Create a new response object with the data property replaced by the inner data
+      return {
+        ...response,
+        data: response.data.data
+      };
+    }
+    return response;
+  },
   (error) => {
     if (error.response?.status === 401) {
       // Remove auth token

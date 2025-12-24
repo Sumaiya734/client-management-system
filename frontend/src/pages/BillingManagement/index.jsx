@@ -38,51 +38,50 @@ export default function BillingManagement() {
       
       // Fetch bills
       const billsResponse = await billingManagementApi.getAll();
-      if (billsResponse.data.success) {
-        setBills(billsResponse.data.data);
-      }
+      // After response interceptor normalization, response.data is the array of bills
+      setBills(billsResponse.data);
       
       // Fetch summary
       const summaryResponse = await billingManagementApi.summary();
-      if (summaryResponse.data.success) {
-        const summary = summaryResponse.data.data;
-        
-        // Calculate percentage for amount collected
-        const totalRevenue = summary.totalRevenue || 0;
-        const amountCollected = summary.amountCollected || 0;
-        const percentage = totalRevenue > 0 ? ((amountCollected / totalRevenue) * 100).toFixed(1) : 0;
-        
-        setSummaryStats([
-          { 
-            title: 'Total Bills', 
-            value: summary.totalBills?.toString() || '0', 
-            subtext: `${summary.paidBills || 0} paid, ${summary.unpaidBills || 0} unpaid`, 
-            icon: FileText, 
-            color: 'blue' 
-          },
-          { 
-            title: 'Total Revenue', 
-            value: `$${totalRevenue.toFixed(2)}`, 
-            subtext: 'All billed amounts', 
-            icon: DollarSign, 
-            color: 'green' 
-          },
-          { 
-            title: 'Amount Collected', 
-            value: `$${amountCollected.toFixed(2)}`, 
-            subtext: `${percentage}% of total revenue`, 
-            icon: DollarSign, 
-            color: 'blue' 
-          },
-          { 
-            title: 'Outstanding', 
-            value: `$${summary.outstandingAmount?.toFixed(2) || '0.00'}`, 
-            subtext: 'Pending collection', 
-            icon: Calendar, 
-            color: 'orange' 
-          },
-        ]);
-      }
+      // After response interceptor normalization, response.data contains the summary
+      const summary = summaryResponse.data;
+      
+      // Calculate percentage for amount collected
+      const totalRevenue = summary.totalRevenue || 0;
+      const amountCollected = summary.amountCollected || 0;
+      const percentage = totalRevenue > 0 ? ((amountCollected / totalRevenue) * 100).toFixed(1) : 0;
+      
+      setSummaryStats([
+        { 
+          title: 'Total Bills', 
+          value: summary.totalBills?.toString() || '0', 
+          subtext: `${summary.paidBills || 0} paid, ${summary.unpaidBills || 0} unpaid`, 
+          icon: FileText, 
+          color: 'blue' 
+        },
+        { 
+          title: 'Total Revenue', 
+          value: `$${totalRevenue.toFixed(2)}`, 
+          subtext: 'All billed amounts', 
+          icon: DollarSign, 
+          color: 'green' 
+        },
+        { 
+          title: 'Amount Collected', 
+          value: `$${amountCollected.toFixed(2)}`, 
+          subtext: `${percentage}% of total revenue`, 
+          icon: DollarSign, 
+          color: 'blue' 
+        },
+        { 
+          title: 'Outstanding', 
+          value: `$${summary.outstandingAmount?.toFixed(2) || '0.00'}`, 
+          subtext: 'Pending collection', 
+          icon: Calendar, 
+          color: 'orange' 
+        },
+      ]);
+      
     } catch (error) {
       console.error('Error fetching billing data:', error);
     } finally {
@@ -125,9 +124,8 @@ export default function BillingManagement() {
       };
       
       const response = await billingManagementApi.search(searchParams);
-      if (response.data.success) {
-        setSearchResults(response.data.data);
-      }
+      // After response interceptor normalization, response.data is the array of search results
+      setSearchResults(response.data);
     } catch (error) {
       console.error('Error searching bills:', error);
       setSearchResults([]); // Reset to show all bills in case of error

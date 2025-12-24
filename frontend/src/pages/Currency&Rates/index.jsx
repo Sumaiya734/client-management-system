@@ -33,8 +33,15 @@ export default function CurrencyRates() {
         setLoading(true);
         const response = await currencyRatesApi.getAll();
         
+        // Check if response has the expected structure (after axios interceptor normalizes it)
+        if (!response.data || !Array.isArray(response.data)) {
+          console.error('API response does not have expected structure:', response);
+          setExchangeRates([]);
+          return;
+        }
+        
         // Transform the API response to match frontend format
-        const transformedRates = response.data.data.map(rate => ({
+        const transformedRates = response.data.map(rate => ({
           id: rate.id,
           currencyPair: `${rate.currency} / USD`,
           rate: rate.rate.toString(),

@@ -30,27 +30,26 @@ export default function PaymentManagement() {
     try {
       setLoading(true);
       const response = await api.get('/payment-managements');
-      if (response.data.success) {
-        // Transform the API response to match the expected format
-        const transformedPayments = response.data.data.map(payment => {
-          return {
-            id: payment.id,
-            poNumber: payment.po_number,
-            client_id: payment.client_id,
-            client: {
-              company: payment.client?.company || payment.client || 'N/A',
-              contact: payment.client?.contact || 'N/A'
-            },
-            date: payment.date || 'N/A',
-            amount: `$${typeof payment.amount === 'number' ? payment.amount.toFixed(2) : parseFloat(payment.amount || 0).toFixed(2)}`,
-            method: payment.method || 'N/A',
-            transactionId: payment.transaction_id || 'N/A',
-            status: payment.status || 'N/A',
-            receipt: payment.receipt || 'Not Generated'
-          };
-        });
-        setPayments(transformedPayments);
-      }
+      // After response interceptor normalization, response.data is the array of payments
+      // Transform the API response to match the expected format
+      const transformedPayments = response.data.map(payment => {
+        return {
+          id: payment.id,
+          poNumber: payment.po_number,
+          client_id: payment.client_id,
+          client: {
+            company: payment.client?.company || payment.client || 'N/A',
+            contact: payment.client?.contact || 'N/A'
+          },
+          date: payment.date || 'N/A',
+          amount: `$${typeof payment.amount === 'number' ? payment.amount.toFixed(2) : parseFloat(payment.amount || 0).toFixed(2)}`,
+          method: payment.method || 'N/A',
+          transactionId: payment.transaction_id || 'N/A',
+          status: payment.status || 'N/A',
+          receipt: payment.receipt || 'Not Generated'
+        };
+      });
+      setPayments(transformedPayments);
     } catch (error) {
       console.error('Error fetching payments:', error);
     } finally {
@@ -171,19 +170,17 @@ export default function PaymentManagement() {
       if (isEditMode) {
         // Update existing payment
         response = await api.put(`/payment-managements/${paymentData.id}`, paymentPayload);
-        if (response.data.success) {
-          console.log('Updated payment:', response.data.data);
-          // Refresh the payments list
-          fetchPayments();
-        }
+        // After response interceptor normalization, response.data contains the updated payment
+        console.log('Updated payment:', response.data);
+        // Refresh the payments list
+        fetchPayments();
       } else {
         // Create new payment
         response = await api.post('/payment-managements', paymentPayload);
-        if (response.data.success) {
-          console.log('Recorded new payment:', response.data.data);
-          // Refresh the payments list
-          fetchPayments();
-        }
+        // After response interceptor normalization, response.data contains the created payment
+        console.log('Recorded new payment:', response.data);
+        // Refresh the payments list
+        fetchPayments();
       }
       
       handleClosePaymentPopup();
@@ -212,13 +209,10 @@ export default function PaymentManagement() {
     if (window.confirm(`Are you sure you want to delete payment ${payment.transactionId}?`)) {
       try {
         const response = await api.delete(`/payment-managements/${payment.id}`);
-        if (response.data.success) {
-          // Refresh the payments list
-          fetchPayments();
-          console.log('Deleted payment:', payment);
-        } else {
-          console.error('Failed to delete payment:', response.data.message);
-        }
+        // After response interceptor normalization, response.data contains the result
+        // Refresh the payments list
+        fetchPayments();
+        console.log('Deleted payment:', payment);
       } catch (error) {
         console.error('Error deleting payment:', error);
         let errorMessage = 'Failed to delete payment';
