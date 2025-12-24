@@ -3,7 +3,7 @@ import { TrendingUp } from 'lucide-react';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
-import { api } from '../../api'; // Assuming you have an API module
+import api from '../../api'; // Assuming you have an API module
 
 const ReportsAnalytics = () => {
   const [activeTab, setActiveTab] = useState('Revenue Analysis');

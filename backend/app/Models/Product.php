@@ -17,6 +17,7 @@ class Product extends Model
         'description',
         'category',
         'vendor',
+        'vendor_website',
         'type',
         'profit_margin',
         'currencies'
