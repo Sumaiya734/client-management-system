@@ -13,35 +13,184 @@ import CurrencyRates from './pages/Currency&Rates/index';
 import ReportsAnalytics from './pages/Reports&Analytics/index';
 import UserManagement from './pages/UserManagement/index';
 import Notifications from './pages/Notifications/index';
+import Login from './pages/Auth/Login';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   return (
-    <Router>
-      <div className="flex h-screen bg-gray-50">
-        <Sidebar />
-        
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <Header />
+      <Router>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/login" element={<Login />} />
           
-          <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/clients" element={<Clients />} />
-              <Route path="/products" element={<Products />} />
-              <Route path="/orders" element={<PurchaseOrders />} />
-              <Route path="/subscriptions" element={<Subscriptions />} />
-              <Route path="/billing" element={<BillingManagement />} />
-              <Route path="/payments" element={<PaymentManagement />} />
-              <Route path="/reports" element={<ReportsAnalytics />} />
-              <Route path="/users" element={<UserManagement />} />
-              <Route path="/notifications" element={<Notifications />} />
-              <Route path="/currency" element={<CurrencyRates />} />
-              {/* Add other routes as needed */}
-            </Routes>
-          </main>
-        </div>
-      </div>
-    </Router>
+          {/* Protected routes */}
+          <Route path="/" element={
+            <ProtectedRoute>
+              <div className="flex h-screen bg-gray-50">
+                <Sidebar />
+                
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <Header />
+                  
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                    <Dashboard />
+                  </main>
+                </div>
+              </div>
+            </ProtectedRoute>
+          } />
+          <Route path="/clients" element={
+            <ProtectedRoute>
+              <div className="flex h-screen bg-gray-50">
+                <Sidebar />
+                
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <Header />
+                  
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                    <Clients />
+                  </main>
+                </div>
+              </div>
+            </ProtectedRoute>
+          } />
+          <Route path="/products" element={
+            <ProtectedRoute>
+              <div className="flex h-screen bg-gray-50">
+                <Sidebar />
+                
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <Header />
+                  
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                    <Products />
+                  </main>
+                </div>
+              </div>
+            </ProtectedRoute>
+          } />
+          <Route path="/orders" element={
+            <ProtectedRoute>
+              <div className="flex h-screen bg-gray-50">
+                <Sidebar />
+                
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <Header />
+                  
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                    <PurchaseOrders />
+                  </main>
+                </div>
+              </div>
+            </ProtectedRoute>
+          } />
+          <Route path="/subscriptions" element={
+            <ProtectedRoute>
+              <div className="flex h-screen bg-gray-50">
+                <Sidebar />
+                
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <Header />
+                  
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                    <Subscriptions />
+                  </main>
+                </div>
+              </div>
+            </ProtectedRoute>
+          } />
+          <Route path="/billing" element={
+            <ProtectedRoute>
+              <div className="flex h-screen bg-gray-50">
+                <Sidebar />
+                
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <Header />
+                  
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                    <BillingManagement />
+                  </main>
+                </div>
+              </div>
+            </ProtectedRoute>
+          } />
+          <Route path="/payments" element={
+            <ProtectedRoute>
+              <div className="flex h-screen bg-gray-50">
+                <Sidebar />
+                
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <Header />
+                  
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                    <PaymentManagement />
+                  </main>
+                </div>
+              </div>
+            </ProtectedRoute>
+          } />
+          <Route path="/reports" element={
+            <ProtectedRoute>
+              <div className="flex h-screen bg-gray-50">
+                <Sidebar />
+                
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <Header />
+                  
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                    <ReportsAnalytics />
+                  </main>
+                </div>
+              </div>
+            </ProtectedRoute>
+          } />
+          <Route path="/users" element={
+            <ProtectedRoute>
+              <div className="flex h-screen bg-gray-50">
+                <Sidebar />
+                
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <Header />
+                  
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                    <UserManagement />
+                  </main>
+                </div>
+              </div>
+            </ProtectedRoute>
+          } />
+          <Route path="/notifications" element={
+            <ProtectedRoute>
+              <div className="flex h-screen bg-gray-50">
+                <Sidebar />
+                
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <Header />
+                  
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                    <Notifications />
+                  </main>
+                </div>
+              </div>
+            </ProtectedRoute>
+          } />
+          <Route path="/currency" element={
+            <ProtectedRoute>
+              <div className="flex h-screen bg-gray-50">
+                <Sidebar />
+                
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <Header />
+                  
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                    <CurrencyRates />
+                  </main>
+                </div>
+              </div>
+            </ProtectedRoute>
+          } />
+        </Routes>
+      </Router>
   );
 }
 

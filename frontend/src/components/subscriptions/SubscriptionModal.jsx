@@ -12,7 +12,7 @@ const SubscriptionModal = ({ isOpen, onRequestClose, product, quantity, totalAmo
   const calculateUnitPrice = () => {
     if (!totalAmount || !quantity) return '0.00';
     // Extract numeric value from string like "৳4143.75 BDT"
-    const numericValue = totalAmount.replace(/[^\d.]/g, '');
+    const numericValue = totalAmount ? totalAmount.replace(/[^\d.]/g, '') : '0';
     const total = parseFloat(numericValue) || 0;
     const unitPrice = quantity > 0 ? (total / quantity).toFixed(2) : '0.00';
     return unitPrice;

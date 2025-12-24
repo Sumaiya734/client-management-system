@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Home, 
   Users, 
@@ -14,9 +14,12 @@ import {
   Bell, 
   LogOut 
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export default function Sidebar() {
   const location = useLocation();
+  const { logout } = useAuth();
+  const navigate = useNavigate();
   
   const navigation = [
     { name: 'Dashboard', href: '/', icon: Home },
@@ -31,6 +34,17 @@ export default function Sidebar() {
     { name: 'User Management', href: '/users', icon: UserCog },
     { name: 'Notifications', href: '/notifications', icon: Bell },
   ];
+  
+  const handleLogout = async () => {
+    if (window.confirm('Are you sure you want to log out?')) {
+      try {
+        await logout();
+        navigate('/login');
+      } catch (error) {
+        console.error('Logout failed:', error);
+      }
+    }
+  };
 
   return (
     <div className="w-64 bg-white shadow-sm border-r border-gray-200 min-h-screen flex flex-col">
@@ -66,7 +80,10 @@ export default function Sidebar() {
 
       {/* Bottom Section - Logout */}
       <div className="p-4 border-t border-gray-200">
-        <button className="w-full flex items-center px-3 py-3 text-sm font-medium text-red-600 rounded-lg hover:bg-red-50 transition-colors">
+        <button 
+          onClick={handleLogout}
+          className="w-full flex items-center px-3 py-3 text-sm font-medium text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+        >
           <LogOut className="mr-3 h-5 w-5" />
           Logout
         </button>
