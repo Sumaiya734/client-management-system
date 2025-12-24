@@ -78,26 +78,41 @@ export default function Products() {
       }
       
       const response = await api.get(url);
-      if (response.data.success) {
-        // Transform the API response to match the expected format
-        const transformedProducts = response.data.data.map(product => ({
-          id: product.id,
-          name: product.product_name || product.name,
-          description: product.description,
-          category: product.category,
-          vendor: product.vendor,
-          type: product.vendor_type || product.type,
-          basePrice: product.base_price || 0,
-          profit: product.profit_margin || 0,
-          bdtPrice: `৳${product.bdt_price || 0}`,
-          bdtLabel: 'BDT (final price)',
-          currencies: product.multi_currency ? JSON.parse(product.multi_currency) : [],
-          status: product.status
-        }));
-        setProducts(transformedProducts);
-      }
+      // After response interceptor normalization, response.data is the array of products
+      // Transform the API response to match the expected format
+      const transformedProducts = response.data.map(product => ({
+        id: product.id,
+        name: product.product_name || product.name,
+        description: product.description,
+        category: product.category,
+        vendor: product.vendor,
+        type: product.vendor_type || product.type,
+        basePrice: product.base_price || 0,
+        profit: product.profit_margin || 0,
+        bdtPrice: `৳${product.bdt_price || 0}`,
+        bdtLabel: 'BDT (final price)',
+        currencies: product.multi_currency ? JSON.parse(product.multi_currency) : [],
+        status: product.status
+      }));
+      setProducts(transformedProducts);
     } catch (error) {
       console.error('Error fetching products:', error);
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        console.error('Response data:', error.response.data);
+        console.error('Response status:', error.response.status);
+        console.error('Response headers:', error.response.headers);
+        alert('Error: ' + (error.response.data.message || 'API request failed') + ' (Status: ' + error.response.status + ')');
+      } else if (error.request) {
+        // The request was made but no response was received
+        console.error('Request data:', error.request);
+        alert('Network error: No response from server');
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        console.error('Error message:', error.message);
+        alert('Error: ' + error.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -199,31 +214,28 @@ export default function Products() {
         };
         
         const response = await api.put(`/products/${productId}`, formattedData);
-        if (response.data.success) {
-          // Update the product in the local state
-          setProducts(prevProducts => 
-            prevProducts.map(product => 
-              product.id === productId ? {
-                ...product,
-                id: response.data.data.id,
-                name: response.data.data.product_name || response.data.data.name,
-                description: response.data.data.description,
-                category: response.data.data.category,
-                vendor: response.data.data.vendor,
-                type: response.data.data.vendor_type || response.data.data.type,
-                basePrice: response.data.data.base_price || 0,
-                profit: response.data.data.profit_margin || 0,
-                bdtPrice: `৳${response.data.data.bdt_price || 0}`,
-                bdtLabel: 'BDT (final price)',
-                currencies: response.data.data.multi_currency ? JSON.parse(response.data.data.multi_currency) : [],
-                status: response.data.data.status
-              } : product
-            )
-          );
-          alert('Product updated successfully');
-        } else {
-          alert('Failed to update product: ' + response.data.message);
-        }
+        // After response interceptor normalization, response.data contains the updated product
+        // Update the product in the local state
+        setProducts(prevProducts => 
+          prevProducts.map(product => 
+            product.id === productId ? {
+              ...product,
+              id: response.data.id,
+              name: response.data.product_name || response.data.name,
+              description: response.data.description,
+              category: response.data.category,
+              vendor: response.data.vendor,
+              type: response.data.vendor_type || response.data.type,
+              basePrice: response.data.base_price || 0,
+              profit: response.data.profit_margin || 0,
+              bdtPrice: `৳${response.data.bdt_price || 0}`,
+              bdtLabel: 'BDT (final price)',
+              currencies: response.data.multi_currency ? JSON.parse(response.data.multi_currency) : [],
+              status: response.data.status
+            } : product
+          )
+        );
+        alert('Product updated successfully');
       } else {
         // Add new product
         const formattedData = {
@@ -236,28 +248,25 @@ export default function Products() {
         };
         
         const response = await api.post('/products', formattedData);
-        if (response.data.success) {
-          const newProduct = {
-            id: response.data.data.id,
-            name: response.data.data.product_name || response.data.data.name,
-            description: response.data.data.description,
-            category: response.data.data.category,
-            vendor: response.data.data.vendor,
-            type: response.data.data.vendor_type || response.data.data.type,
-            basePrice: response.data.data.base_price || 0,
-            profit: response.data.data.profit_margin || 0,
-            bdtPrice: `৳${response.data.data.bdt_price || 0}`,
-            bdtLabel: 'BDT (final price)',
-            currencies: response.data.data.multi_currency ? JSON.parse(response.data.data.multi_currency) : [],
-            status: response.data.data.status
-          };
-          
-          // Add the new product to the local state
-          setProducts(prevProducts => [...prevProducts, newProduct]);
-          alert('Product created successfully');
-        } else {
-          alert('Failed to create product: ' + response.data.message);
-        }
+        // After response interceptor normalization, response.data contains the created product
+        const newProduct = {
+          id: response.data.id,
+          name: response.data.product_name || response.data.name,
+          description: response.data.description,
+          category: response.data.category,
+          vendor: response.data.vendor,
+          type: response.data.vendor_type || response.data.type,
+          basePrice: response.data.base_price || 0,
+          profit: response.data.profit_margin || 0,
+          bdtPrice: `৳${response.data.bdt_price || 0}`,
+          bdtLabel: 'BDT (final price)',
+          currencies: response.data.multi_currency ? JSON.parse(response.data.multi_currency) : [],
+          status: response.data.status
+        };
+        
+        // Add the new product to the local state
+        setProducts(prevProducts => [...prevProducts, newProduct]);
+        alert('Product created successfully');
       }
       
       handleCloseProductPopup();
@@ -286,14 +295,11 @@ export default function Products() {
         }
         
         const response = await api.delete(`/products/${productId}`);
-        if (response.data.success) {
-          // Remove the product from the local state
-          setProducts(prevProducts => prevProducts.filter(p => p.id !== productId));
-          alert('Product deleted successfully');
-          fetchProducts(); // Refresh the list
-        } else {
-          alert('Failed to delete product: ' + response.data.message);
-        }
+        // After response interceptor normalization, response.data contains the result
+        // Remove the product from the local state
+        setProducts(prevProducts => prevProducts.filter(p => p.id !== productId));
+        alert('Product deleted successfully');
+        fetchProducts(); // Refresh the list
       } catch (error) {
         console.error('Error deleting product:', error);
         alert('Error deleting product: ' + error.response?.data?.message || error.message);

@@ -16,6 +16,34 @@ Route::get('/test', function () {
     ]);
 });
 
+// Test routes to check data
+Route::get('test-clients', function () {
+    $clients = App\Models\Client::all();
+    return response()->json([
+        'success' => true,
+        'data' => $clients,
+        'count' => $clients->count()
+    ]);
+});
+
+Route::get('test-products', function () {
+    $products = App\Models\Product::all();
+    return response()->json([
+        'success' => true,
+        'data' => $products,
+        'count' => $products->count()
+    ]);
+});
+
+Route::get('test-purchases', function () {
+    $purchases = App\Models\Purchase::with(['client', 'product'])->get();
+    return response()->json([
+        'success' => true,
+        'data' => $purchases,
+        'count' => $purchases->count()
+    ]);
+});
+
 // Dashboard/Home Routes
 Route::get('dashboard', [\App\Http\Controllers\Api\HomeController::class, 'index']);
 Route::get('dashboard-stats', [\App\Http\Controllers\Api\HomeController::class, 'getStats']);

@@ -59,11 +59,26 @@ export default function Clients() {
       }
       
       const response = await api.get(url);
-      if (response.data.success) {
-        setClients(response.data.data);
-      }
+      // After response interceptor normalization, response.data is the array of clients
+      setClients(response.data);
     } catch (error) {
       console.error('Error fetching clients:', error);
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        console.error('Response data:', error.response.data);
+        console.error('Response status:', error.response.status);
+        console.error('Response headers:', error.response.headers);
+        alert('Error: ' + (error.response.data.message || 'API request failed') + ' (Status: ' + error.response.status + ')');
+      } else if (error.request) {
+        // The request was made but no response was received
+        console.error('Request data:', error.request);
+        alert('Network error: No response from server');
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        console.error('Error message:', error.message);
+        alert('Error: ' + error.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -113,23 +128,17 @@ export default function Clients() {
         }
         
         const response = await api.put(`/clients/${clientId}`, clientData);
-        if (response.data.success) {
-          // Update the client in the local state
-          setClients(prev => prev.map(c => c.id === clientId ? response.data.data : c));
-          alert('Client updated successfully');
-        } else {
-          alert('Failed to update client: ' + response.data.message);
-        }
+        // After response interceptor normalization, response.data contains the updated client
+        // Update the client in the local state
+        setClients(prev => prev.map(c => c.id === clientId ? response.data : c));
+        alert('Client updated successfully');
       } else {
         // Create new client
         const response = await api.post('/clients', clientData);
-        if (response.data.success) {
-          // Add the new client to the local state
-          setClients(prev => [...prev, response.data.data]);
-          alert('Client created successfully');
-        } else {
-          alert('Failed to create client: ' + response.data.message);
-        }
+        // After response interceptor normalization, response.data contains the created client
+        // Add the new client to the local state
+        setClients(prev => [...prev, response.data]);
+        alert('Client created successfully');
       }
       
       handleClosePopup();
@@ -158,14 +167,11 @@ export default function Clients() {
         }
         
         const response = await api.delete(`/clients/${clientId}`);
-        if (response.data.success) {
-          // Remove the client from the local state
-          setClients(prev => prev.filter(c => c.id !== clientId));
-          alert('Client deleted successfully');
-          fetchClients(); // Refresh the list
-        } else {
-          alert('Failed to delete client: ' + response.data.message);
-        }
+        // After response interceptor normalization, response.data contains the result
+        // Remove the client from the local state
+        setClients(prev => prev.filter(c => c.id !== clientId));
+        alert('Client deleted successfully');
+        fetchClients(); // Refresh the list
       } catch (error) {
         console.error('Error deleting client:', error);
         alert('Error deleting client: ' + error.response?.data?.message || error.message);

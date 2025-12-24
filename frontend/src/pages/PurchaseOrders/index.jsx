@@ -28,11 +28,26 @@ export default function PurchaseOrders() {
     try {
       setLoading(true);
       const response = await api.get('/purchases');
-      if (response.data.success) {
-        setPurchaseOrders(response.data.data);
-      }
+      // After response interceptor normalization, response.data is the array of purchases
+      setPurchaseOrders(response.data);
     } catch (error) {
       console.error('Error fetching purchase orders:', error);
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        console.error('Response data:', error.response.data);
+        console.error('Response status:', error.response.status);
+        console.error('Response headers:', error.response.headers);
+        alert('Error: ' + (error.response.data.message || 'API request failed') + ' (Status: ' + error.response.status + ')');
+      } else if (error.request) {
+        // The request was made but no response was received
+        console.error('Request data:', error.request);
+        alert('Network error: No response from server');
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        console.error('Error message:', error.message);
+        alert('Error: ' + error.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -115,13 +130,9 @@ export default function PurchaseOrders() {
       
       const response = await api.post('/purchases', purchaseData);
       
-      if (response.data.success) {
-        // Refresh the purchase orders list
-        fetchPurchaseOrders();
-        console.log('Created new purchase order:', response.data.data);
-      } else {
-        console.error('Failed to create purchase order:', response.data.message);
-      }
+      // After response interceptor normalization, response.data contains the created purchase
+      fetchPurchaseOrders();
+      console.log('Created new purchase order:', response.data);
     } catch (error) {
       console.error('Error creating purchase order:', error);
       alert('Failed to create purchase order');
@@ -133,13 +144,9 @@ export default function PurchaseOrders() {
     if (window.confirm(`Are you sure you want to delete ${po.po_number || po.poNumber}?`)) {
       try {
         const response = await api.delete(`/purchases/${po.id}`);
-        if (response.data.success) {
-          // Refresh the purchase orders list
-          fetchPurchaseOrders();
-          console.log('Deleted purchase order:', po);
-        } else {
-          console.error('Failed to delete purchase order:', response.data.message);
-        }
+        // After response interceptor normalization, response.data contains the result
+        fetchPurchaseOrders();
+        console.log('Deleted purchase order:', po);
       } catch (error) {
         console.error('Error deleting purchase order:', error);
         alert('Failed to delete purchase order');

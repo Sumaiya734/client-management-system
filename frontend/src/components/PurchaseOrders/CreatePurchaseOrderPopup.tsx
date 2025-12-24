@@ -4,8 +4,10 @@ import api from '../../api';
 
 interface Product {
   id: number;
-  name: string;
-  price: string;
+  name?: string;
+  product_name?: string;
+  price?: string;
+  base_price?: string;
 }
 
 interface Client {
@@ -66,13 +68,9 @@ const CreatePurchaseOrderPopup: React.FC<CreatePurchaseOrderPopupProps> = ({
         api.get('/products')
       ]);
       
-      if (clientsResponse.data.success) {
-        setClients(clientsResponse.data.data);
-      }
-      
-      if (productsResponse.data.success) {
-        setProducts(productsResponse.data.data);
-      }
+      // After response interceptor normalization, response.data is the array of clients/products
+      setClients(clientsResponse.data);
+      setProducts(productsResponse.data);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {

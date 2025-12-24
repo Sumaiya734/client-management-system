@@ -2,205 +2,89 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
+use App\Http\Controllers\BaseAPIController;
 use App\Models\User;
+use App\Services\UserService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
+use App\Helpers\ResponseHelper;
+use App\Helpers\ValidationHelper;
 
-class UserManagementController extends Controller
+class UserManagementController extends BaseAPIController
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    protected $resourceName = 'User';
+    
+    public function __construct(UserService $userService)
     {
-        try {
-            $users = User::select('id', 'name', 'email', 'role', 'status', 'last_login_at', 'created_at', 'updated_at')
-                ->get()
-                ->map(function ($user) {
-                    return [
-                        'id' => $user->id,
-                        'name' => $user->name,
-                        'email' => $user->email,
-                        'role' => ucfirst($user->role),
-                        'status' => $user->status ?? 'Active',
-                        'lastLogin' => $user->last_login_at ? $user->last_login_at->format('Y-m-d H:i') : 'Never',
-                        'createdAt' => $user->created_at ? $user->created_at->format('Y-m-d H:i') : null,
-                        'updatedAt' => $user->updated_at ? $user->updated_at->format('Y-m-d H:i') : null,
-                    ];
-                });
-
-            return response()->json($users);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to retrieve users',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        $this->service = $userService;
+        $this->storeRules = [
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users',
+            'password' => 'required|string|min:8',
+            'role' => 'required|string|in:admin,user,accountant,sales,support',
+        ];
     }
-
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        try {
-            $validator = Validator::make($request->all(), [
-                'name' => 'required|string|max:255',
-                'email' => 'required|string|email|max:255|unique:users',
-                'password' => 'required|string|min:8',
-                'role' => 'required|string|in:admin,user,accountant,sales,support',
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json($validator->errors(), 400);
-            }
-
-            $user = User::create([
-                'name' => $request->name,
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
-                'role' => $request->role,
-                'status' => $request->status ?? 'Active',
-            ]);
-
-            return response()->json([
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'role' => ucfirst($user->role),
-                'status' => $user->status,
-                'lastLogin' => 'Never',
-                'createdAt' => $user->created_at ? $user->created_at->format('Y-m-d H:i') : null,
-                'updatedAt' => $user->updated_at ? $user->updated_at->format('Y-m-d H:i') : null,
-            ], 201);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to create user',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        try {
-            $user = User::find($id);
-
-            if (!$user) {
-                return response()->json(['message' => 'User not found'], 404);
-            }
-
-            return response()->json([
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'role' => ucfirst($user->role),
-                'status' => $user->status ?? 'Active',
-                'lastLogin' => $user->last_login_at ? $user->last_login_at->format('Y-m-d H:i') : 'Never',
-                'createdAt' => $user->created_at ? $user->created_at->format('Y-m-d H:i') : null,
-                'updatedAt' => $user->updated_at ? $user->updated_at->format('Y-m-d H:i') : null,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to retrieve user',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
+    
     public function update(Request $request, string $id)
     {
         try {
-            $user = User::find($id);
+            $resource = $this->service->getById($id);
 
-            if (!$user) {
-                return response()->json(['message' => 'User not found'], 404);
+            if (!$resource) {
+                return ResponseHelper::notFound($this->resourceName . ' not found');
             }
 
-            $validator = Validator::make($request->all(), [
+            // Define update rules with unique validation that excludes the current record
+            $updateRules = [
                 'name' => 'string|max:255',
                 'email' => 'string|email|max:255|unique:users,email,' . $id,
                 'password' => 'nullable|string|min:8',
                 'role' => 'string|in:admin,user,accountant,sales,support',
                 'status' => 'string|in:Active,Inactive',
-            ]);
+            ];
 
-            if ($validator->fails()) {
-                return response()->json($validator->errors(), 400);
+            $validationResult = ValidationHelper::validate($request->all(), $updateRules);
+            
+            if (!$validationResult['valid']) {
+                return ResponseHelper::validationError($validationResult['errors']);
             }
 
+            // Handle password hashing specifically for users
             $data = $request->only(['name', 'email', 'role', 'status']);
-            if ($request->has('password') && $request->password) {
-                $data['password'] = Hash::make($request->password);
+            if (isset($validationResult['validated_data']['password']) && $validationResult['validated_data']['password']) {
+                $data['password'] = Hash::make($validationResult['validated_data']['password']);
             }
 
-            $user->update($data);
+            $updatedResource = $this->service->update($id, $data);
 
-            return response()->json([
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'role' => ucfirst($user->role),
-                'status' => $user->status,
-                'lastLogin' => $user->last_login_at ? $user->last_login_at->format('Y-m-d H:i') : 'Never',
-                'createdAt' => $user->created_at ? $user->created_at->format('Y-m-d H:i') : null,
-                'updatedAt' => $user->updated_at ? $user->updated_at->format('Y-m-d H:i') : null,
-            ]);
+            // Format the response to match the original format
+            return ResponseHelper::success([
+                'id' => $updatedResource->id,
+                'name' => $updatedResource->name,
+                'email' => $updatedResource->email,
+                'role' => ucfirst($updatedResource->role),
+                'status' => $updatedResource->status,
+                'lastLogin' => $updatedResource->last_login_at ? $updatedResource->last_login_at->format('Y-m-d H:i') : 'Never',
+                'createdAt' => $updatedResource->created_at ? $updatedResource->created_at->format('Y-m-d H:i') : null,
+                'updatedAt' => $updatedResource->updated_at ? $updatedResource->updated_at->format('Y-m-d H:i') : null,
+            ], $this->resourceName . ' updated successfully');
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update user',
-                'error' => $e->getMessage()
-            ], 500);
+            return ResponseHelper::error('Failed to update ' . strtolower($this->resourceName), $e->getMessage());
         }
     }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        try {
-            $user = User::find($id);
-
-            if (!$user) {
-                return response()->json(['message' => 'User not found'], 404);
-            }
-
-            $user->delete();
-
-            return response()->json(['message' => 'User deleted successfully']);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to delete user',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
+    
     /**
      * Update user permissions
      */
     public function updatePermissions(Request $request, string $id)
     {
         try {
-            $user = User::find($id);
+            $user = $this->service->getById($id);
 
             if (!$user) {
-                return response()->json(['message' => 'User not found'], 404);
+                return ResponseHelper::notFound('User not found');
             }
 
             $permissions = $request->get('permissions', []);
@@ -216,13 +100,9 @@ class UserManagementController extends Controller
 
             $user->save();
 
-            return response()->json(['message' => 'Permissions updated successfully']);
+            return ResponseHelper::success(null, 'Permissions updated successfully');
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update permissions',
-                'error' => $e->getMessage()
-            ], 500);
+            return ResponseHelper::error('Failed to update permissions', $e->getMessage());
         }
     }
 
@@ -232,10 +112,10 @@ class UserManagementController extends Controller
     public function getPermissions(string $id)
     {
         try {
-            $user = User::find($id);
+            $user = $this->service->getById($id);
 
             if (!$user) {
-                return response()->json(['message' => 'User not found'], 404);
+                return ResponseHelper::notFound('User not found');
             }
 
             $isAdministrator = $user->role === 'admin';
@@ -246,17 +126,13 @@ class UserManagementController extends Controller
                 $permissions = $this->getRoleBasedPermissions($user->role);
             }
 
-            return response()->json([
+            return ResponseHelper::success([
                 'isAdministrator' => $isAdministrator,
                 'permissions' => $permissions,
                 'role' => $user->role
             ]);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to retrieve permissions',
-                'error' => $e->getMessage()
-            ], 500);
+            return ResponseHelper::error('Failed to retrieve permissions', $e->getMessage());
         }
     }
 

@@ -29,44 +29,43 @@ export default function Subscriptions() {
     try {
       setLoading(true);
       const response = await api.get('/subscriptions');
-      if (response.data.success) {
-        // Transform the API response to match the expected format, but keep original data for creation
-        const transformedSubscriptions = response.data.data.map(sub => {
-          // For now, we'll create a simplified structure
-          // In a real app, you'd structure this based on your API response
-          return {
-            id: sub.id,
-            poNumber: sub.po_number,
-            createdDate: sub.start_date || 'N/A',
-            client: {
-              company: sub.client?.company || sub.client || 'N/A',
-              contact: sub.client?.contact || 'N/A'
-            },
-            products: [
-              {
-                name: sub.product?.product_name || sub.product?.name || 'N/A',
-                quantity: sub.quantity || 1,
-                status: sub.status || 'Pending',
-                dateRange: sub.start_date && sub.end_date ? `${sub.start_date} to ${sub.end_date}` : 'N/A',
-                action: sub.status === 'Pending' ? 'Subscribe' : 'Edit'
-              }
-            ],
-            progress: {
+      // After response interceptor normalization, response.data is the array of subscriptions
+      // Transform the API response to match the expected format, but keep original data for creation
+      const transformedSubscriptions = response.data.map(sub => {
+        // For now, we'll create a simplified structure
+        // In a real app, you'd structure this based on your API response
+        return {
+          id: sub.id,
+          poNumber: sub.po_number,
+          createdDate: sub.start_date || 'N/A',
+          client: {
+            company: sub.client?.company || sub.client || 'N/A',
+            contact: sub.client?.contact || 'N/A'
+          },
+          products: [
+            {
+              name: sub.product?.product_name || sub.product?.name || 'N/A',
+              quantity: sub.quantity || 1,
               status: sub.status || 'Pending',
-              completed: sub.status === 'Active' ? 1 : 0,
-              total: 1,
-              percentage: sub.status === 'Active' ? 100 : sub.status === 'Pending' ? 0 : 50
-            },
-            totalAmount: `৳${sub.total_amount !== null && sub.total_amount !== undefined ? (typeof sub.total_amount === 'number' ? sub.total_amount.toFixed(2) : (typeof sub.total_amount === 'string' ? parseFloat(sub.total_amount).toFixed(2) : '0.00')) : '0.00'} BDT`,
-            canGenerateBill: sub.status === 'Active',
-            // Store original data needed for creating new subscriptions
-            client_id: sub.client_id,
-            product_id: sub.product_id,
-            total_amount: sub.total_amount
-          };
-        });
-        setSubscriptions(transformedSubscriptions);
-      }
+              dateRange: sub.start_date && sub.end_date ? `${sub.start_date} to ${sub.end_date}` : 'N/A',
+              action: sub.status === 'Pending' ? 'Subscribe' : 'Edit'
+            }
+          ],
+          progress: {
+            status: sub.status || 'Pending',
+            completed: sub.status === 'Active' ? 1 : 0,
+            total: 1,
+            percentage: sub.status === 'Active' ? 100 : sub.status === 'Pending' ? 0 : 50
+          },
+          totalAmount: `৳${sub.total_amount !== null && sub.total_amount !== undefined ? (typeof sub.total_amount === 'number' ? sub.total_amount.toFixed(2) : (typeof sub.total_amount === 'string' ? parseFloat(sub.total_amount).toFixed(2) : '0.00')) : '0.00'} BDT`,
+          canGenerateBill: sub.status === 'Active',
+          // Store original data needed for creating new subscriptions
+          client_id: sub.client_id,
+          product_id: sub.product_id,
+          total_amount: sub.total_amount
+        };
+      });
+      setSubscriptions(transformedSubscriptions);
     } catch (error) {
       console.error('Error fetching subscriptions:', error);
     } finally {
@@ -174,14 +173,10 @@ export default function Subscriptions() {
       
       const response = await api.post('/subscriptions', subscriptionData);
       
-      if (response.data.success) {
-        console.log('Subscription created:', response.data.data);
-        // Refresh the subscriptions list
-        fetchSubscriptions();
-      } else {
-        console.error('Failed to create subscription:', response.data.message);
-        alert(`Failed to create subscription: ${response.data.message || 'Validation failed'}`);
-      }
+      // After response interceptor normalization, response.data contains the created subscription
+      console.log('Subscription created:', response.data);
+      // Refresh the subscriptions list
+      fetchSubscriptions();
     } catch (error) {
       console.error('Error creating subscription:', error);
       if (error.response) {

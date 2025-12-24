@@ -96,14 +96,13 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
       // Update the bill via API
       const response = await billingManagementApi.update(bill.id, updateData);
       
-      if (response.data.success) {
-        // Update the bill in the parent component
-        if (onUpdate) {
-          onUpdate(response.data.data);
-        }
-        // Close the popup after successful update
-        onClose();
+      // After response interceptor normalization, response.data contains the updated bill
+      // Update the bill in the parent component
+      if (onUpdate) {
+        onUpdate(response.data);
       }
+      // Close the popup after successful update
+      onClose();
     } catch (error) {
       console.error('Error updating bill:', error);
     } finally {
