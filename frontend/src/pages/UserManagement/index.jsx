@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Shield, Edit, Trash2, Clock } from 'lucide-react';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/ui/Button';
@@ -7,6 +7,8 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '.
 import { Badge } from '../../components/ui/Badge';
 import ManagePermissionsModal from '../../components/userManagement/ManagePermissionsModal';
 import EditUserModal from '../../components/userManagement/EditUserModal';
+import { userManagementApi } from '../../api';
+import { useAuth } from '../../context/AuthContext';
 
 const UserManagement = () => {
   const [activeTab, setActiveTab] = useState('Users');
@@ -16,13 +18,10 @@ const UserManagement = () => {
   const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [isAddMode, setIsAddMode] = useState(false);
-
-  const users = [
-    { name: 'John Admin', email: 'admin@company.com', role: 'Administrator', status: 'Active', lastLogin: '2025-01-20 10:30' },
-    { name: 'Sarah Accountant', email: 'sarah@company.com', role: 'Accountant', status: 'Active', lastLogin: '2025-01-19 15:45' },
-    { name: 'Mike Sales', email: 'mike@company.com', role: 'Sales', status: 'Active', lastLogin: '2025-01-18 09:15' },
-    { name: 'Lisa Support', email: 'lisa@company.com', role: 'Support', status: 'Inactive', lastLogin: '2024-12-15 14:20' },
-  ];
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  const { user: currentUser } = useAuth();
 
   const tabs = ['Users', 'Roles & Permissions', 'Audit Log'];
 
@@ -48,6 +47,72 @@ const UserManagement = () => {
     { value: 'Sales', label: 'Sales' },
     { value: 'Support', label: 'Support' },
   ];
+
+  // Fetch users from API
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await userManagementApi.getAll();
+        setUsers(response.data);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        // If it's a 401 error, it might be an authentication issue
+        if (error.response?.status === 401) {
+          // The axios interceptor should handle this, but we log it for debugging
+          console.log('Authentication error when fetching users');
+        }
+        setLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
+  const handleSaveUser = async (userData) => {
+    try {
+      if (isAddMode) {
+        // Create new user
+        const response = await userManagementApi.create(userData);
+        setUsers([...users, response.data]);
+      } else {
+        // Update existing user
+        const response = await userManagementApi.update(selectedUser.id, userData);
+        setUsers(users.map(user => user.id === selectedUser.id ? response.data : user));
+      }
+      setIsEditUserModalOpen(false);
+    } catch (error) {
+      console.error('Error saving user:', error);
+    }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    if (window.confirm('Are you sure you want to delete this user?')) {
+      try {
+        await userManagementApi.delete(userId);
+        setUsers(users.filter(user => user.id !== userId));
+      } catch (error) {
+        console.error('Error deleting user:', error);
+      }
+    }
+  };
+
+  const handleUpdatePermissions = async (userId, permissionsData) => {
+    try {
+      await userManagementApi.updatePermissions(userId, permissionsData);
+      setIsPermissionsModalOpen(false);
+    } catch (error) {
+      console.error('Error updating permissions:', error);
+    }
+  };
+
+  // Filter users based on search term and role filter
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = roleFilter === 'All Roles' || user.role === roleFilter;
+    return matchesSearch && matchesRole;
+  });
 
   return (
     <div className="space-y-6">
@@ -126,7 +191,7 @@ const UserManagement = () => {
           {/* Users Table */}
           <Card>
             <CardHeader>
-              <CardTitle>Users ({users.length})</CardTitle>
+              <CardTitle>Users ({filteredUsers.length})</CardTitle>
               <CardDescription>Manage user accounts and access</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
@@ -142,54 +207,69 @@ const UserManagement = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((user, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium">{user.name}</TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(user.role)}`}>
-                          {user.role}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusBadgeVariant(user.status)}>
-                          {user.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{user.lastLogin}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setIsPermissionsModalOpen(true);
-                            }}
-                            className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                            title="Permissions"
-                          >
-                            <Shield className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setIsAddMode(false);
-                              setIsEditUserModalOpen(true);
-                            }}
-                            className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                            title="Edit"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
-                          <button
-                            className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan="6" className="text-center py-8">
+                        Loading users...
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : filteredUsers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan="6" className="text-center py-8 text-gray-500">
+                        No users found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredUsers.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">{user.name}</TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(user.role)}`}>
+                            {user.role}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusBadgeVariant(user.status)}>
+                            {user.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{user.lastLogin}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setIsPermissionsModalOpen(true);
+                              }}
+                              className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                              title="Permissions"
+                            >
+                              <Shield className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setIsAddMode(false);
+                                setIsEditUserModalOpen(true);
+                              }}
+                              className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                              title="Edit"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(user.id)}
+                              className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -378,9 +458,9 @@ const UserManagement = () => {
         onRequestClose={() => setIsPermissionsModalOpen(false)}
         user={selectedUser}
         onUpdate={(data) => {
-          // Handle update permissions logic here
-          console.log('Updating permissions:', data);
-          // You can add API call or state update here
+          if (selectedUser) {
+            handleUpdatePermissions(selectedUser.id, data);
+          }
         }}
       />
 
@@ -390,11 +470,7 @@ const UserManagement = () => {
         onRequestClose={() => setIsEditUserModalOpen(false)}
         user={selectedUser}
         isAddMode={isAddMode}
-        onSave={(data) => {
-          // Handle save user logic here
-          console.log('Saving user:', data);
-          // You can add API call or state update here
-        }}
+        onSave={handleSaveUser}
       />
     </div>
   );

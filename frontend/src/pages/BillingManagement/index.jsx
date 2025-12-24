@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FileText, DollarSign, Calendar, Eye, Download, Send } from 'lucide-react';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { SearchFilter } from '../../components/ui/SearchFilter';
@@ -7,144 +7,88 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '.
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import BillDetailsPopup from '../../components/BillingManagement/BillDetailsPopup';
+import { billingManagementApi } from '../../api';
 
 export default function BillingManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
+  const [loading, setLoading] = useState(true);
   
   // Bill details popup state
   const [isBillDetailsOpen, setIsBillDetailsOpen] = useState(false);
   const [selectedBill, setSelectedBill] = useState(null);
-
-  const summaryStats = [
-    {
-      title: 'Total Bills',
-      value: '3',
-      subtext: '1 paid, 1 unpaid',
-      icon: FileText,
-      color: 'blue'
-    },
-    {
-      title: 'Total Revenue',
-      value: '$1132.93',
-      subtext: 'All billed amounts',
-      icon: DollarSign,
-      color: 'green'
-    },
-    {
-      title: 'Amount Collected',
-      value: '$289.97',
-      subtext: '25.6% of total revenue',
-      icon: DollarSign,
-      color: 'blue'
-    },
-    {
-      title: 'Outstanding',
-      value: '$842.96',
-      subtext: 'Pending collection',
-      icon: Calendar,
-      color: 'orange'
+  
+  // Billing data state
+  const [bills, setBills] = useState([]);
+  const [summaryStats, setSummaryStats] = useState([
+    { title: 'Total Bills', value: '0', subtext: '0 paid, 0 unpaid', icon: FileText, color: 'blue' },
+    { title: 'Total Revenue', value: '$0.00', subtext: 'All billed amounts', icon: DollarSign, color: 'green' },
+    { title: 'Amount Collected', value: '$0.00', subtext: '0% of total revenue', icon: DollarSign, color: 'blue' },
+    { title: 'Outstanding', value: '$0.00', subtext: 'Pending collection', icon: Calendar, color: 'orange' },
+  ]);
+  
+  // Fetch billing data from API
+  useEffect(() => {
+    fetchBillingData();
+  }, []);
+  
+  const fetchBillingData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch bills
+      const billsResponse = await billingManagementApi.getAll();
+      if (billsResponse.data.success) {
+        setBills(billsResponse.data.data);
+      }
+      
+      // Fetch summary
+      const summaryResponse = await billingManagementApi.summary();
+      if (summaryResponse.data.success) {
+        const summary = summaryResponse.data.data;
+        
+        // Calculate percentage for amount collected
+        const totalRevenue = summary.totalRevenue || 0;
+        const amountCollected = summary.amountCollected || 0;
+        const percentage = totalRevenue > 0 ? ((amountCollected / totalRevenue) * 100).toFixed(1) : 0;
+        
+        setSummaryStats([
+          { 
+            title: 'Total Bills', 
+            value: summary.totalBills?.toString() || '0', 
+            subtext: `${summary.paidBills || 0} paid, ${summary.unpaidBills || 0} unpaid`, 
+            icon: FileText, 
+            color: 'blue' 
+          },
+          { 
+            title: 'Total Revenue', 
+            value: `$${totalRevenue.toFixed(2)}`, 
+            subtext: 'All billed amounts', 
+            icon: DollarSign, 
+            color: 'green' 
+          },
+          { 
+            title: 'Amount Collected', 
+            value: `$${amountCollected.toFixed(2)}`, 
+            subtext: `${percentage}% of total revenue`, 
+            icon: DollarSign, 
+            color: 'blue' 
+          },
+          { 
+            title: 'Outstanding', 
+            value: `$${summary.outstandingAmount?.toFixed(2) || '0.00'}`, 
+            subtext: 'Pending collection', 
+            icon: Calendar, 
+            color: 'orange' 
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error('Error fetching billing data:', error);
+    } finally {
+      setLoading(false);
     }
-  ];
-
-  const bills = [
-    {
-      id: 1,
-      billNumber: 'BILL-2025-001',
-      client: {
-        company: 'Acme Corp',
-        contact: 'John Smith',
-        email: 'john@acmecorp.com',
-        phone: '+1-234-567-8901'
-      },
-      poNumber: 'PO-2025-001',
-      billDate: '2025-01-20',
-      dueDate: '2025-02-19',
-      totalAmount: '$274.97',
-      paidAmount: '$274.97',
-      status: 'Paid',
-      paymentStatus: 'Completed',
-      products: [
-        {
-          description: 'Microsoft Teams License',
-          quantity: 5,
-          unitPrice: '$54.99',
-          total: '$274.95'
-        }
-      ],
-      subtotal: '$274.95',
-      tax: '$0.02',
-      notes: 'Payment received on time'
-    },
-    {
-      id: 2,
-      billNumber: 'BILL-2025-002',
-      client: {
-        company: 'Tech Solutions Inc',
-        contact: 'Sarah Johnson',
-        email: 'sarah@techsolutions.com',
-        phone: '+1-234-567-8902'
-      },
-      poNumber: 'PO-2025-002',
-      billDate: '2025-01-18',
-      dueDate: '2025-02-17',
-      totalAmount: '$32.98',
-      paidAmount: '$15.00',
-      status: 'Partially Paid',
-      paymentStatus: 'Pending',
-      products: [
-        {
-          description: 'Zoom Pro License',
-          quantity: 1,
-          unitPrice: '$29.99',
-          total: '$29.99'
-        },
-        {
-          description: 'Setup Fee',
-          quantity: 1,
-          unitPrice: '$2.99',
-          total: '$2.99'
-        }
-      ],
-      subtotal: '$32.98',
-      tax: '$0.00',
-      notes: 'Partial payment received'
-    },
-    {
-      id: 3,
-      billNumber: 'BILL-2025-003',
-      client: {
-        company: 'Global Dynamics',
-        contact: 'Mike Wilson',
-        email: 'mike@globaldynamics.com',
-        phone: '+1-234-567-8903'
-      },
-      poNumber: 'PO-2025-003',
-      billDate: '2025-01-15',
-      dueDate: '2025-02-14',
-      totalAmount: '$824.98',
-      paidAmount: '$0.00',
-      status: 'Unpaid',
-      paymentStatus: 'Overdue',
-      products: [
-        {
-          description: 'Office 365 Business Premium',
-          quantity: 10,
-          unitPrice: '$79.99',
-          total: '$799.90'
-        },
-        {
-          description: 'Implementation Fee',
-          quantity: 1,
-          unitPrice: '$25.08',
-          total: '$25.08'
-        }
-      ],
-      subtotal: '$824.98',
-      tax: '$0.00',
-      notes: 'Payment overdue - follow up required'
-    }
-  ];
+  };
 
   const statusOptions = [
     { value: 'All Status', label: 'All Status' },
@@ -160,6 +104,60 @@ export default function BillingManagement() {
       options: statusOptions,
     }
   ];
+  
+  // State for search
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  
+  // Function to search bills
+  const searchBills = async () => {
+    if (!searchTerm && statusFilter === 'All Status') {
+      // If no search term and default status, show all bills
+      setSearchResults([]); // Reset search results to show all bills
+      return;
+    }
+    
+    try {
+      setIsSearching(true);
+      const searchParams = {
+        search: searchTerm,
+        status: statusFilter !== 'All Status' ? statusFilter : undefined,
+      };
+      
+      const response = await billingManagementApi.search(searchParams);
+      if (response.data.success) {
+        setSearchResults(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error searching bills:', error);
+      setSearchResults([]); // Reset to show all bills in case of error
+    } finally {
+      setIsSearching(false);
+    }
+  };
+  
+  // Refresh data when search or filter changes
+  useEffect(() => {
+    const delayDebounce = setTimeout(() => {
+      searchBills();
+    }, 300); // Debounce search
+    
+    return () => clearTimeout(delayDebounce);
+  }, [searchTerm, statusFilter]);
+  
+  // Use search results if we have them, otherwise filter the bills
+  const filteredBills = searchResults.length > 0 ? searchResults : (
+    bills.filter(bill => {
+      const matchesSearch = !searchTerm || 
+        bill.bill_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        bill.client?.company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        bill.po_number?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = statusFilter === 'All Status' || bill.payment_status === statusFilter;
+      
+      return matchesSearch && matchesStatus;
+    })
+  );
 
   const getIconColor = (color) => {
     const colors = {
@@ -173,13 +171,17 @@ export default function BillingManagement() {
 
   const getStatusBadgeColor = (status) => {
     switch (status) {
-      case 'Paid': return 'bg-gray-900 text-white';
-      case 'Completed': return 'bg-gray-900 text-white';
-      case 'Partially Paid': return 'bg-gray-200 text-gray-700';
-      case 'Pending': return 'bg-gray-200 text-gray-700';
-      case 'Unpaid': return 'bg-red-100 text-red-800';
-      case 'Overdue': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'Paid':
+      case 'Completed':
+        return 'bg-gray-900 text-white';
+      case 'Partially Paid':
+      case 'Pending':
+        return 'bg-gray-200 text-gray-700';
+      case 'Unpaid':
+      case 'Overdue':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -187,6 +189,21 @@ export default function BillingManagement() {
   const handleViewBill = (bill) => {
     setSelectedBill(bill);
     setIsBillDetailsOpen(true);
+  };
+  
+  // Handle updating a bill
+  const handleUpdateBill = (updatedBill) => {
+    // Update the bill in the local state
+    setBills(prevBills => 
+      prevBills.map(bill => 
+        bill.id === updatedBill.id ? updatedBill : bill
+      )
+    );
+    
+    // Update the selected bill if it's the one being viewed
+    if (selectedBill && selectedBill.id === updatedBill.id) {
+      setSelectedBill(updatedBill);
+    }
   };
 
   // Handle closing bill details popup
@@ -253,7 +270,7 @@ export default function BillingManagement() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Bills ({bills.length})</CardTitle>
+          <CardTitle>Bills ({filteredBills.length})</CardTitle>
           <CardDescription>All generated bills and payment status</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -273,72 +290,86 @@ export default function BillingManagement() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {bills.map((bill) => (
-                <TableRow key={bill.id}>
-                  <TableCell>
-                    <div className="font-semibold text-gray-900">{bill.billNumber}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium text-gray-900">{bill.client.company}</div>
-                      <div className="text-sm text-gray-600">{bill.client.contact}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-medium text-gray-900">{bill.poNumber}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-gray-900">{bill.billDate}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-gray-900">{bill.dueDate}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-medium text-gray-900">{bill.totalAmount}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-medium text-gray-900">{bill.paidAmount}</div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={`text-xs ${getStatusBadgeColor(bill.status)}`}>
-                      {bill.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={`text-xs ${getStatusBadgeColor(bill.paymentStatus)}`}>
-                      {bill.paymentStatus}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="icon"
-                        title="View bill"
-                        onClick={() => handleViewBill(bill)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="icon"
-                        title="Download bill"
-                        onClick={() => handleDownloadBill(bill)}
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="icon"
-                        title="Send bill"
-                        onClick={() => handleSendEmail(bill)}
-                      >
-                        <Send className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {filteredBills.map((bill) => {
+                // Format data for display
+                const billNumber = bill.bill_number || bill.billNumber || 'N/A';
+                const clientCompany = typeof bill.client === 'object' ? bill.client?.company || 'N/A' : bill.client || 'N/A';
+                const clientContact = typeof bill.client === 'object' ? bill.client?.contact || 'N/A' : 'N/A';
+                const poNumber = bill.po_number || bill.poNumber || 'N/A';
+                const billDate = bill.bill_date || bill.billDate || 'N/A';
+                const dueDate = bill.due_date || bill.dueDate || 'N/A';
+                const totalAmount = `$${bill.total_amount?.toFixed(2) || '0.00'}`;
+                const paidAmount = `$${bill.paid_amount?.toFixed(2) || '0.00'}`;
+                const status = bill.status || 'N/A';
+                const paymentStatus = bill.payment_status || bill.paymentStatus || status;
+                
+                return (
+                  <TableRow key={bill.id}>
+                    <TableCell>
+                      <div className="font-semibold text-gray-900">{billNumber}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium text-gray-900">{clientCompany}</div>
+                        <div className="text-sm text-gray-600">{clientContact}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium text-gray-900">{poNumber}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-gray-900">{billDate}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-gray-900">{dueDate}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium text-gray-900">{totalAmount}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium text-gray-900">{paidAmount}</div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={`text-xs ${getStatusBadgeColor(status)}`}>
+                        {status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={`text-xs ${getStatusBadgeColor(paymentStatus)}`}>
+                        {paymentStatus}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="icon"
+                          title="View bill"
+                          onClick={() => handleViewBill(bill)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="icon"
+                          title="Download bill"
+                          onClick={() => handleDownloadBill(bill)}
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="icon"
+                          title="Send bill"
+                          onClick={() => handleSendEmail(bill)}
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
@@ -351,6 +382,7 @@ export default function BillingManagement() {
         onClose={handleCloseBillDetails}
         onDownload={handleDownloadBill}
         onSendEmail={handleSendEmail}
+        onUpdate={handleUpdateBill}
       />
     </div>
   );

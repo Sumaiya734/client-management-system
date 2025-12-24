@@ -3,7 +3,7 @@ import { TrendingUp } from 'lucide-react';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
-import { api } from '../../api'; // Assuming you have an API module
+import api from '../../api';
 
 const ReportsAnalytics = () => {
   const [activeTab, setActiveTab] = useState('Revenue Analysis');
@@ -45,7 +45,7 @@ const ReportsAnalytics = () => {
     const fetchOverview = async () => {
       try {
         setLoading(prev => ({ ...prev, overview: true }));
-        const response = await api.get('/api/reports-overview');
+        const response = await api.get('/reports-overview');
         const data = response.data;
         
         setMetrics([
@@ -90,7 +90,7 @@ const ReportsAnalytics = () => {
       const fetchRevenueData = async () => {
         try {
           setLoading(prev => ({ ...prev, revenue: true }));
-          const response = await api.get('/api/reports-revenue');
+          const response = await api.get('/reports-revenue');
           const data = response.data;
           
           // Process monthly revenue data
@@ -128,7 +128,7 @@ const ReportsAnalytics = () => {
       const fetchClientData = async () => {
         try {
           setLoading(prev => ({ ...prev, client: true }));
-          const response = await api.get('/api/reports-client');
+          const response = await api.get('/reports-client');
           setClientData(response.data);
         } catch (error) {
           console.error('Error fetching client data:', error);
@@ -147,7 +147,7 @@ const ReportsAnalytics = () => {
       const fetchSubscriptionData = async () => {
         try {
           setLoading(prev => ({ ...prev, subscription: true }));
-          const response = await api.get('/api/reports-subscription');
+          const response = await api.get('/reports-subscription');
           setSubscriptionData(response.data);
         } catch (error) {
           console.error('Error fetching subscription data:', error);
@@ -169,13 +169,13 @@ const ReportsAnalytics = () => {
       if (activeTab === 'Client Reports') reportType = 'client';
       if (activeTab === 'Subscriptions') reportType = 'subscription';
       
-      const response = await api.post('/api/reports-generate', {
+      const response = await api.post('/reports-generate', {
         type: reportType
       });
       
       // Refresh the data based on the active tab
       if (reportType === 'overview') {
-        const overviewResponse = await api.get('/api/reports-overview');
+        const overviewResponse = await api.get('/reports-overview');
         const data = overviewResponse.data;
         
         setMetrics([

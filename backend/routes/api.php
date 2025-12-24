@@ -2,6 +2,13 @@
 
 use Illuminate\Support\Facades\Route;
 
+Route::post('/login', [\App\Http\Controllers\Api\AuthController::class, 'login']);
+Route::post('/register', [\App\Http\Controllers\Api\AuthController::class, 'register']);
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/logout', [\App\Http\Controllers\Api\AuthController::class, 'logout']);
+});
+
 Route::get('/test', function () {
     return response()->json([
         'project' => 'Client Management System',
@@ -52,6 +59,13 @@ Route::apiResource('subscriptions', \App\Http\Controllers\Api\SubscriptionContro
 
 // Payment Management Routes
 Route::apiResource('payment-managements', \App\Http\Controllers\Api\PaymentManagementController::class);
+
+// User Management Routes
+Route::middleware('auth:sanctum')->group(function () {
+    Route::apiResource('users', \App\Http\Controllers\Api\UserManagementController::class);
+    Route::patch('users/{id}/permissions', [\App\Http\Controllers\Api\UserManagementController::class, 'updatePermissions']);
+    Route::get('users/{id}/permissions', [\App\Http\Controllers\Api\UserManagementController::class, 'getPermissions']);
+});
 
 // Report Management Routes
 Route::apiResource('reports', \App\Http\Controllers\Api\ReportController::class);

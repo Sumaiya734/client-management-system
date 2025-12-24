@@ -7,7 +7,7 @@ const EditUserModal = ({ isOpen, onRequestClose, user, onSave, isAddMode = false
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    role: 'Administrator',
+    role: 'admin',
     status: 'Active',
     password: '',
   });
@@ -19,7 +19,7 @@ const EditUserModal = ({ isOpen, onRequestClose, user, onSave, isAddMode = false
       setFormData({
         name: '',
         email: '',
-        role: 'Administrator',
+        role: 'admin',
         status: 'Active',
         password: '',
       });
@@ -28,7 +28,7 @@ const EditUserModal = ({ isOpen, onRequestClose, user, onSave, isAddMode = false
       setFormData({
         name: user.name || '',
         email: user.email || '',
-        role: user.role || 'Administrator',
+        role: user.role.toLowerCase() || 'admin',
         status: user.status || 'Active',
         password: '',
       });
@@ -40,8 +40,16 @@ const EditUserModal = ({ isOpen, onRequestClose, user, onSave, isAddMode = false
   };
 
   const handleSubmit = () => {
+    // Prepare the data for submission
+    const submitData = { ...formData };
+    
+    // If password is empty in edit mode, don't send it
+    if (!isAddMode && !submitData.password) {
+      delete submitData.password;
+    }
+    
     if (onSave) {
-      onSave(formData);
+      onSave(submitData);
     }
     onRequestClose();
   };
@@ -69,10 +77,11 @@ const EditUserModal = ({ isOpen, onRequestClose, user, onSave, isAddMode = false
   };
 
   const roleOptions = [
-    { value: 'Administrator', label: 'Administrator' },
-    { value: 'Accountant', label: 'Accountant' },
-    { value: 'Sales', label: 'Sales' },
-    { value: 'Support', label: 'Support' },
+    { value: 'admin', label: 'Administrator' },
+    { value: 'user', label: 'User' },
+    { value: 'accountant', label: 'Accountant' },
+    { value: 'sales', label: 'Sales' },
+    { value: 'support', label: 'Support' },
   ];
 
   const statusOptions = [

@@ -16,6 +16,7 @@ export default function Subscriptions() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedQuantity, setSelectedQuantity] = useState(0);
   const [selectedTotalAmount, setSelectedTotalAmount] = useState(null);
+  const [originalSubscription, setOriginalSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
   const [subscriptions, setSubscriptions] = useState([]);
 
@@ -29,7 +30,7 @@ export default function Subscriptions() {
       setLoading(true);
       const response = await api.get('/subscriptions');
       if (response.data.success) {
-        // Transform the API response to match the expected format
+        // Transform the API response to match the expected format, but keep original data for creation
         const transformedSubscriptions = response.data.data.map(sub => {
           // For now, we'll create a simplified structure
           // In a real app, you'd structure this based on your API response
@@ -56,8 +57,12 @@ export default function Subscriptions() {
               total: 1,
               percentage: sub.status === 'Active' ? 100 : sub.status === 'Pending' ? 0 : 50
             },
-            totalAmount: `৳${sub.total_amount?.toFixed(2) || '0.00'} BDT`,
-            canGenerateBill: sub.status === 'Active'
+            totalAmount: `৳${sub.total_amount !== null && sub.total_amount !== undefined ? (typeof sub.total_amount === 'number' ? sub.total_amount.toFixed(2) : (typeof sub.total_amount === 'string' ? parseFloat(sub.total_amount).toFixed(2) : '0.00')) : '0.00'} BDT`,
+            canGenerateBill: sub.status === 'Active',
+            // Store original data needed for creating new subscriptions
+            client_id: sub.client_id,
+            product_id: sub.product_id,
+            total_amount: sub.total_amount
           };
         });
         setSubscriptions(transformedSubscriptions);
@@ -142,22 +147,29 @@ export default function Subscriptions() {
     setSelectedProduct(product);
     setSelectedQuantity(quantity);
     setSelectedTotalAmount(subscription?.totalAmount || null);
+    setOriginalSubscription(subscription); // Store original subscription for client_id and product_id
     setIsModalOpen(true);
   };
 
   const handleModalSubmit = async (data) => {
     try {
+      // Validate required fields
+      if (!data.startDate || !data.endDate) {
+        alert('Please select both start and end dates');
+        return;
+      }
+      
       // Prepare subscription data for API
       const subscriptionData = {
-        po_number: data.poNumber || 'PO-DEFAULT-001', // In a real app, you'd get this from the purchase
-        client_id: 1, // You'd get the actual client ID from the purchase data
-        product_id: 1, // You'd get the actual product ID from the product selection
+        po_number: data.poNumber || originalSubscription?.poNumber || 'PO-DEFAULT-001',
+        client_id: originalSubscription?.client_id || 1, // Use the original client_id from the purchase
+        product_id: originalSubscription?.product_id || 1, // Use the original product_id from the purchase
         start_date: data.startDate,
         end_date: data.endDate,
         status: 'Active',
-        notes: data.notes,
-        quantity: data.quantity,
-        total_amount: 0 // This would be calculated based on the product and quantity
+        notes: data.notes || '',
+        quantity: data.quantity || originalSubscription?.quantity || 1,
+        total_amount: originalSubscription?.total_amount || 0.00 // Use the original total_amount
       };
       
       const response = await api.post('/subscriptions', subscriptionData);
@@ -168,10 +180,16 @@ export default function Subscriptions() {
         fetchSubscriptions();
       } else {
         console.error('Failed to create subscription:', response.data.message);
+        alert(`Failed to create subscription: ${response.data.message || 'Validation failed'}`);
       }
     } catch (error) {
       console.error('Error creating subscription:', error);
-      alert('Failed to create subscription');
+      if (error.response) {
+        console.error('Server response:', error.response.data);
+        alert(`Failed to create subscription: ${error.response.data.message || 'Validation failed'}`);
+      } else {
+        alert('Failed to create subscription');
+      }
     }
   };
 
@@ -332,7 +350,7 @@ export default function Subscriptions() {
         quantity={selectedQuantity}
         totalAmount={selectedTotalAmount}
         onSubmit={handleModalSubmit} 
-        poNumber={subscriptions.find(s => s.id === selectedProduct?.id)?.poNumber || 'PO-DEFAULT-001'}
+        poNumber={originalSubscription?.poNumber || 'PO-DEFAULT-001'}
       />
     </div>
   );

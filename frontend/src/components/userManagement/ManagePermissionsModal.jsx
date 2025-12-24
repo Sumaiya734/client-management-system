@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Modal from 'react-modal';
 import { X } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { userManagementApi } from '../../api';
 
 const ManagePermissionsModal = ({ isOpen, onRequestClose, user, onUpdate }) => {
   const [isAdministrator, setIsAdministrator] = useState(false);
@@ -15,38 +16,36 @@ const ManagePermissionsModal = ({ isOpen, onRequestClose, user, onUpdate }) => {
     userManagement: false,
     notifications: false,
   });
+  const [loading, setLoading] = useState(false);
 
   // Initialize permissions when user changes or modal opens
   useEffect(() => {
-    if (user) {
-      const isAdmin = user.role === 'Administrator';
-      setIsAdministrator(isAdmin);
-      if (isAdmin) {
-        setPermissions({
-          clientManagement: false,
-          productManagement: false,
-          purchaseOrders: false,
-          paymentManagement: false,
-          currencyManagement: false,
-          reportsAnalytics: false,
-          userManagement: false,
-          notifications: false,
-        });
-      } else {
-        // Set permissions based on role (for demo, all checked)
-        setPermissions({
-          clientManagement: true,
-          productManagement: true,
-          purchaseOrders: true,
-          paymentManagement: true,
-          currencyManagement: true,
-          reportsAnalytics: true,
-          userManagement: true,
-          notifications: true,
-        });
-      }
+    if (user && isOpen) {
+      loadUserPermissions();
     }
   }, [user, isOpen]);
+
+  const loadUserPermissions = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    try {
+      const response = await userManagementApi.getPermissions(user.id);
+      const { isAdministrator: admin, permissions: userPermissions } = response.data;
+      
+      setIsAdministrator(admin);
+      if (userPermissions) {
+        setPermissions(userPermissions);
+      }
+    } catch (error) {
+      console.error('Error loading permissions:', error);
+      // Default to current role if API fails
+      const isAdmin = user.role.toLowerCase() === 'admin';
+      setIsAdministrator(isAdmin);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAdministratorChange = (checked) => {
     setIsAdministrator(checked);
@@ -70,11 +69,26 @@ const ManagePermissionsModal = ({ isOpen, onRequestClose, user, onUpdate }) => {
     if (checked) setIsAdministrator(false);
   };
 
-  const handleUpdate = () => {
-    if (onUpdate) {
-      onUpdate({ isAdministrator, permissions });
+  const handleUpdate = async () => {
+    if (!user || !onUpdate) return;
+    
+    setLoading(true);
+    try {
+      const updateData = {
+        isAdministrator,
+        permissions,
+        role: isAdministrator ? 'admin' : user.role.toLowerCase(),
+      };
+      
+      await userManagementApi.updatePermissions(user.id, updateData);
+      onUpdate(updateData);
+      onRequestClose();
+    } catch (error) {
+      console.error('Error updating permissions:', error);
+      alert('Failed to update permissions. Please try again.');
+    } finally {
+      setLoading(false);
     }
-    onRequestClose();
   };
 
   const customStyles = {
@@ -129,6 +143,7 @@ const ManagePermissionsModal = ({ isOpen, onRequestClose, user, onUpdate }) => {
             onClick={onRequestClose}
             className="text-gray-400 hover:text-gray-600 transition-colors p-1"
             aria-label="Close"
+            disabled={loading}
           >
             <X className="h-5 w-5" />
           </button>
@@ -142,6 +157,7 @@ const ManagePermissionsModal = ({ isOpen, onRequestClose, user, onUpdate }) => {
               type="checkbox"
               checked={isAdministrator}
               onChange={(e) => handleAdministratorChange(e.target.checked)}
+              disabled={loading}
               className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
             />
             <span className="text-sm font-medium text-gray-900">Administrator (All Permissions)</span>
@@ -161,7 +177,7 @@ const ManagePermissionsModal = ({ isOpen, onRequestClose, user, onUpdate }) => {
                     type="checkbox"
                     checked={permissions[permission.key]}
                     onChange={(e) => handlePermissionChange(permission.key, e.target.checked)}
-                    disabled={isAdministrator}
+                    disabled={isAdministrator || loading}
                     className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900 mt-0.5"
                   />
                   <div>
@@ -179,14 +195,16 @@ const ManagePermissionsModal = ({ isOpen, onRequestClose, user, onUpdate }) => {
           <Button
             variant="outline"
             onClick={onRequestClose}
+            disabled={loading}
           >
             Cancel
           </Button>
           <Button
             variant="primary"
             onClick={handleUpdate}
+            disabled={loading}
           >
-            Update Permissions
+            {loading ? 'Updating...' : 'Update Permissions'}
           </Button>
         </div>
       </div>
@@ -195,4 +213,3 @@ const ManagePermissionsModal = ({ isOpen, onRequestClose, user, onUpdate }) => {
 };
 
 export default ManagePermissionsModal;
-

@@ -1,30 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Download, Mail } from 'lucide-react';
+import { billingManagementApi } from '../../api';
 
 interface Bill {
   id: number;
-  billNumber: string;
+  billNumber?: string;
+  bill_number?: string;
   client: {
-    company: string;
-    contact: string;
+    company?: string;
+    contact?: string;
     email?: string;
     phone?: string;
-  };
-  poNumber: string;
-  billDate: string;
-  dueDate: string;
-  totalAmount: string;
-  paidAmount: string;
+  } | string;
+  client_company?: string;
+  client_contact?: string;
+  poNumber?: string;
+  po_number?: string;
+  billDate?: string;
+  bill_date?: string;
+  dueDate?: string;
+  due_date?: string;
+  totalAmount?: string;
+  total_amount?: number;
+  paidAmount?: string;
+  paid_amount?: number;
   status: string;
-  paymentStatus: string;
+  paymentStatus?: string;
+  payment_status?: string;
   products?: Array<{
     description: string;
     quantity: number;
-    unitPrice: string;
+    unitPrice?: string;
+    unit_price?: number;
     total: string;
   }>;
-  subtotal?: string;
-  tax?: string;
+  subtotal?: string | number;
+  tax?: string | number;
   notes?: string;
 }
 
@@ -34,6 +45,7 @@ interface BillDetailsPopupProps {
   onClose: () => void;
   onDownload?: (bill: Bill) => void;
   onSendEmail?: (bill: Bill) => void;
+  onUpdate?: (bill: Bill) => void; // Callback when bill is updated
 }
 
 const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
@@ -42,14 +54,16 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
   onClose,
   onDownload,
   onSendEmail,
+  onUpdate,
 }) => {
   const [billStatus, setBillStatus] = useState('');
   const [notes, setNotes] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   // Update state when bill changes
   React.useEffect(() => {
     if (bill) {
-      setBillStatus(bill.status);
+      setBillStatus(bill.paymentStatus || bill.status || '');
       setNotes(bill.notes || '');
     }
   }, [bill]);
@@ -68,31 +82,75 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
     }
   };
 
+  const handleSaveChanges = async () => {
+    if (!bill) return;
+    
+    setIsSaving(true);
+    try {
+      // Prepare update data
+      const updateData = {
+        payment_status: billStatus,
+        notes: notes,
+      };
+      
+      // Update the bill via API
+      const response = await billingManagementApi.update(bill.id, updateData);
+      
+      if (response.data.success) {
+        // Update the bill in the parent component
+        if (onUpdate) {
+          onUpdate(response.data.data);
+        }
+        // Close the popup after successful update
+        onClose();
+      }
+    } catch (error) {
+      console.error('Error updating bill:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (!isOpen || !bill) return null;
 
-  // Mock product data if not provided
-  const products = bill.products || [
-    {
-      description: 'Premium Plan',
-      quantity: 2,
-      unitPrice: '$99.99',
-      total: '$199.98'
-    },
-    {
-      description: 'Setup Fee',
-      quantity: 1,
-      unitPrice: '$50.00',
-      total: '$50.00'
+  // Format client data (can be object or string)
+  const getClientData = () => {
+    if (typeof bill.client === 'object' && bill.client !== null) {
+      return bill.client;
+    } else if (typeof bill.client === 'string') {
+      // If client is stored as a string, try to extract company and contact
+      return {
+        company: bill.client,
+        contact: bill.client_contact || '',
+        email: '',
+        phone: '',
+      };
     }
-  ];
-
+    return {
+      company: bill.client_company || '',
+      contact: bill.client_contact || '',
+    };
+  };
+  
+  const clientData = getClientData();
+  
+  // Format bill data to handle both API and frontend field names
+  const billNumber = bill.billNumber || bill.bill_number || 'N/A';
+  const poNumber = bill.poNumber || bill.po_number || 'N/A';
+  const billDate = bill.billDate || bill.bill_date || 'N/A';
+  const dueDate = bill.dueDate || bill.due_date || 'N/A';
+  const totalAmount = bill.totalAmount || `$${bill.total_amount?.toFixed(2) || '0.00'}`;
+  const paidAmount = bill.paidAmount || `$${bill.paid_amount?.toFixed(2) || '0.00'}`;
+  
+  // Use products if available, otherwise show empty array
+  const products = bill.products || [];
+  
   // Calculate totals
-  const subtotal = bill.subtotal || '$249.98';
-  const tax = bill.tax || '$24.99';
-  const total = bill.totalAmount;
-  const paid = bill.paidAmount;
-  const paidNumeric = parseFloat(paid.replace('$', ''));
-  const totalNumeric = parseFloat(total.replace('$', ''));
+  const subtotal = bill.subtotal !== undefined ? (typeof bill.subtotal === 'string' ? bill.subtotal : `$${bill.subtotal?.toFixed(2) || '0.00'}`) : `$${(parseFloat(totalAmount.replace('$', '')) * 0.95).toFixed(2)}`;
+  const tax = bill.tax !== undefined ? (typeof bill.tax === 'string' ? bill.tax : `$${bill.tax?.toFixed(2) || '0.00'}`) : `$${(parseFloat(totalAmount.replace('$', '')) * 0.05).toFixed(2)}`;
+  
+  const paidNumeric = parseFloat(paidAmount.replace('$', ''));
+  const totalNumeric = parseFloat(totalAmount.replace('$', ''));
   const outstanding = (totalNumeric - paidNumeric).toFixed(2);
 
   return (
@@ -102,7 +160,7 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
             <h2 className="text-xl font-semibold text-gray-900">
-              Bill Details - {bill.billNumber}
+              Bill Details - {billNumber}
             </h2>
             <p className="text-sm text-gray-600 mt-1">
               Complete bill information and payment history
@@ -126,19 +184,19 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Bill Number:</label>
-                  <div className="text-sm text-gray-900">{bill.billNumber}</div>
+                  <div className="text-sm text-gray-900">{billNumber}</div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">PO Number:</label>
-                  <div className="text-sm text-gray-900">{bill.poNumber}</div>
+                  <div className="text-sm text-gray-900">{poNumber}</div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Bill Date:</label>
-                  <div className="text-sm text-gray-900">{bill.billDate}</div>
+                  <div className="text-sm text-gray-900">{billDate}</div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Due Date:</label>
-                  <div className="text-sm text-gray-900">{bill.dueDate}</div>
+                  <div className="text-sm text-gray-900">{dueDate}</div>
                 </div>
               </div>
             </div>
@@ -149,22 +207,22 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Client:</label>
-                  <div className="text-sm text-gray-900">{bill.client.company}</div>
+                  <div className="text-sm text-gray-900">{clientData.company}</div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Contact:</label>
-                  <div className="text-sm text-gray-900">{bill.client.contact}</div>
+                  <div className="text-sm text-gray-900">{clientData.contact}</div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Email:</label>
                   <div className="text-sm text-gray-900">
-                    {bill.client.email || `${bill.client.contact.toLowerCase().replace(' ', '')}@${bill.client.company.toLowerCase().replace(' ', '')}.com`}
+                    {clientData.email || `${clientData.contact?.toLowerCase().replace(' ', '')}@${clientData.company?.toLowerCase().replace(' ', '')}.com` || 'N/A'}
                   </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Phone:</label>
                   <div className="text-sm text-gray-900">
-                    {bill.client.phone || '+1-234-567-8901'}
+                    {clientData.phone || '+1-234-567-8901'}
                   </div>
                 </div>
               </div>
@@ -229,11 +287,11 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
                   </div>
                   <div className="flex justify-between py-2 border-t border-gray-200">
                     <span className="text-base font-semibold text-gray-900">Total:</span>
-                    <span className="text-base font-semibold text-gray-900">{total}</span>
+                    <span className="text-base font-semibold text-gray-900">{totalAmount}</span>
                   </div>
                   <div className="flex justify-between py-2">
                     <span className="text-sm font-medium text-gray-700">Paid:</span>
-                    <span className="text-sm font-semibold text-green-600">{paid}</span>
+                    <span className="text-sm font-semibold text-green-600">{paidAmount}</span>
                   </div>
                   <div className="flex justify-between py-2">
                     <span className="text-sm font-medium text-gray-700">Outstanding:</span>
@@ -290,6 +348,7 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
               type="button"
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              disabled={isSaving}
             >
               Close
             </button>
@@ -297,6 +356,7 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
               type="button"
               onClick={handleDownload}
               className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              disabled={isSaving}
             >
               <Download className="h-4 w-4 mr-2" />
               Download
@@ -305,9 +365,18 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
               type="button"
               onClick={handleSendEmail}
               className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-gray-900 border border-transparent rounded-md shadow-sm hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+              disabled={isSaving}
             >
               <Mail className="h-4 w-4 mr-2" />
               Send Email
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveChanges}
+              className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              disabled={isSaving}
+            >
+              {isSaving ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </div>
