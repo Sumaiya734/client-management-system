@@ -19,12 +19,14 @@ class Purchase extends Model
         'po_details',
         'client',
         'products_subscriptions',
-        'total_amount'
+        'total_amount',
+        'attachment',
     ];
     
     protected $casts = [
         'subscription_start' => 'date',
         'subscription_end' => 'date',
+        'attachment' => 'string',
         'subscription_active' => 'boolean',
         'total_amount' => 'decimal:2'
     ];
@@ -44,4 +46,5 @@ class Purchase extends Model
     {
         return $this->belongsTo(Product::class, 'product_id');
     }
+    
 }

@@ -86,7 +86,8 @@ export default function Products() {
         description: product.description,
         category: product.category,
         vendor: product.vendor,
-        type: product.vendor_type || product.type,
+        vendorWebsite: product.vendor_website,
+        type: product.subscription_type || product.type,
         basePrice: product.base_price || 0,
         profit: product.profit_margin || 0,
         bdtPrice: `৳${product.bdt_price || 0}`,
@@ -206,11 +207,16 @@ export default function Products() {
         
         const formattedData = {
           product_name: productData.name,
-          vendor_type: productData.type,
+          subscription_type: productData.type,
           base_price: parseFloat(productData.basePrice),
           bdt_price: parseFloat(productData.bdtPrice.replace('৳', '')),
           multi_currency: JSON.stringify(productData.currencies),
-          status: productData.status
+          status: productData.status,
+          category: productData.category,
+          vendor: productData.vendor,
+          vendor_website: productData.vendorWebsite,
+          profit_margin: parseFloat(productData.profit),
+          description: productData.description
         };
         
         const response = await api.put(`/products/${productId}`, formattedData);
@@ -225,7 +231,8 @@ export default function Products() {
               description: response.data.description,
               category: response.data.category,
               vendor: response.data.vendor,
-              type: response.data.vendor_type || response.data.type,
+              vendorWebsite: response.data.vendor_website,
+              type: response.data.subscription_type || response.data.type,
               basePrice: response.data.base_price || 0,
               profit: response.data.profit_margin || 0,
               bdtPrice: `৳${response.data.bdt_price || 0}`,
@@ -240,11 +247,16 @@ export default function Products() {
         // Add new product
         const formattedData = {
           product_name: productData.name,
-          vendor_type: productData.type,
+          subscription_type: productData.type,
           base_price: parseFloat(productData.basePrice),
           bdt_price: parseFloat(productData.bdtPrice.replace('৳', '')),
           multi_currency: JSON.stringify(productData.currencies),
-          status: productData.status
+          status: productData.status,
+          category: productData.category,
+          vendor: productData.vendor,
+          vendor_website: productData.vendorWebsite,
+          profit_margin: parseFloat(productData.profit),
+          description: productData.description
         };
         
         const response = await api.post('/products', formattedData);
@@ -255,7 +267,8 @@ export default function Products() {
           description: response.data.description,
           category: response.data.category,
           vendor: response.data.vendor,
-          type: response.data.vendor_type || response.data.type,
+          vendorWebsite: response.data.vendor_website,
+          type: response.data.subscription_type || response.data.type,
           basePrice: response.data.base_price || 0,
           profit: response.data.profit_margin || 0,
           bdtPrice: `৳${response.data.bdt_price || 0}`,

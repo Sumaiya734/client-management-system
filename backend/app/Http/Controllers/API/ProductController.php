@@ -3,60 +3,53 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\BaseAPIController;
-use App\Models\Product;
 use App\Services\ProductService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
-use App\Helpers\ValidationHelper;
-use App\Helpers\ResponseHelper;
 
 class ProductController extends BaseAPIController
 {
     protected $resourceName = 'Product';
-    
+
     public function __construct(ProductService $productService)
     {
         $this->service = $productService;
+
+        // Store (Create) Rules - সব নতুন ফিল্ড যোগ করা হয়েছে
         $this->storeRules = [
-            'product_name' => 'required|string|max:255',
-            'vendor_type' => 'nullable|string|max:255',
-            'base_price' => 'required|numeric|min:0',
-            'bdt_price' => 'nullable|numeric|min:0',
-            'multi_currency' => 'nullable|string',
-            'status' => 'required|string|in:Active,Inactive',
+            'product_name'     => 'required|string|max:255',
+            'vendor_type'      => 'nullable|string|max:255',
+            'base_price'       => 'required|numeric|min:0',
+            'bdt_price'        => 'nullable|numeric|min:0',
+            'multi_currency'   => 'nullable|json', // গুরুত্বপূর্ণ: array হলে json string পাঠাতে হবে
+            // অথবা যদি array accept করতে চাও: 'nullable|array'
+            'status'           => 'required|string|in:Active,Inactive',
+            'description'      => 'nullable|string',
+            'category'         => 'nullable|string|max:255',
+            'vendor'           => 'nullable|string|max:255',
+            'vendor_website'   => 'nullable|url|max:255',
+            'profit_margin'    => 'nullable|numeric|min:0',
+            'subscription_type'=> 'nullable|string|max:255', // নতুন কলাম যোগ করা
+            // যদি currencies নামে আলাদা কলাম থাকে তাহলে যোগ করো
+            // 'currencies'    => 'nullable|json',
+        ];
+
+        // Update Rules - সব ফিল্ড optional (sometimes বা nullable)
+        $this->updateRules = [
+            'product_name'     => 'sometimes|string|max:255',
+            'vendor_type'      => 'nullable|string|max:255',
+            'base_price'       => 'sometimes|numeric|min:0',
+            'bdt_price'        => 'nullable|numeric|min:0',
+            'multi_currency'   => 'nullable|json',
+            'status'           => 'sometimes|string|in:Active,Inactive',
+            'description'      => 'nullable|string',
+            'category'         => 'nullable|string|max:255',
+            'vendor'           => 'nullable|string|max:255',
+            'vendor_website'   => 'nullable|url|max:255',
+            'profit_margin'    => 'nullable|numeric|min:0',
+            'subscription_type'=> 'nullable|string|max:255',
         ];
     }
-    
-    public function update(Request $request, string $id)
-    {
-        try {
-            $resource = $this->service->getById($id);
 
-            if (!$resource) {
-                return ResponseHelper::notFound($this->resourceName . ' not found');
-            }
-
-            // Define update rules
-            $updateRules = [
-                'product_name' => 'sometimes|string|max:255',
-                'vendor_type' => 'nullable|string|max:255',
-                'base_price' => 'sometimes|numeric|min:0',
-                'bdt_price' => 'nullable|numeric|min:0',
-                'multi_currency' => 'nullable|string',
-                'status' => 'sometimes|string|in:Active,Inactive',
-            ];
-
-            $validationResult = ValidationHelper::validate($request->all(), $updateRules);
-            
-            if (!$validationResult['valid']) {
-                return ResponseHelper::validationError($validationResult['errors']);
-            }
-
-            $updatedResource = $this->service->update($id, $validationResult['validated_data']);
-
-            return ResponseHelper::success($updatedResource, $this->resourceName . ' updated successfully');
-        } catch (\Exception $e) {
-            return ResponseHelper::error('Failed to update ' . strtolower($this->resourceName), $e->getMessage());
-        }
-    }
+    // যদি দরকার হয় তাহলে শুধু update ওভাররাইড করতে পারো, কিন্তু বেসেরটা পারফেক্ট কাজ করে
+    // তাই কোনো মেথড ওভাররাইড করার দরকার নেই। index, show, destroy, paginate, search সব বেস থেকে আসবে।
 }

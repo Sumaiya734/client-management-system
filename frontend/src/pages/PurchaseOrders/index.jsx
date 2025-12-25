@@ -28,26 +28,10 @@ export default function PurchaseOrders() {
     try {
       setLoading(true);
       const response = await api.get('/purchases');
-      // After response interceptor normalization, response.data is the array of purchases
-      setPurchaseOrders(response.data);
+      setPurchaseOrders(response.data); // response.data is the array after interceptor
     } catch (error) {
       console.error('Error fetching purchase orders:', error);
-      if (error.response) {
-        // The request was made and the server responded with a status code
-        // that falls out of the range of 2xx
-        console.error('Response data:', error.response.data);
-        console.error('Response status:', error.response.status);
-        console.error('Response headers:', error.response.headers);
-        alert('Error: ' + (error.response.data.message || 'API request failed') + ' (Status: ' + error.response.status + ')');
-      } else if (error.request) {
-        // The request was made but no response was received
-        console.error('Request data:', error.request);
-        alert('Network error: No response from server');
-      } else {
-        // Something happened in setting up the request that triggered an Error
-        console.error('Error message:', error.message);
-        alert('Error: ' + error.message);
-      }
+      alert('Error loading purchase orders: ' + (error.response?.data?.message || error.message));
     } finally {
       setLoading(false);
     }
@@ -82,24 +66,16 @@ export default function PurchaseOrders() {
 
   const formatDateRange = (start, end) => {
     if (!start || !end) return 'N/A';
-    
     const startDate = new Date(start);
     const endDate = new Date(end);
-    
-    const startFormatted = startDate.toString() !== 'Invalid Date' ? startDate.toLocaleDateString() : 'Invalid Date';
-    const endFormatted = endDate.toString() !== 'Invalid Date' ? endDate.toLocaleDateString() : 'Invalid Date';
-    
+    const startFormatted = startDate.toString() !== 'Invalid Date' ? startDate.toLocaleDateString() : 'Invalid';
+    const endFormatted = endDate.toString() !== 'Invalid Date' ? endDate.toLocaleDateString() : 'Invalid';
     return `${startFormatted} to ${endFormatted}`;
   };
 
   const formatCurrency = (amount) => {
-    if (typeof amount === 'number') {
-      return amount.toFixed(2);
-    } else if (typeof amount === 'string') {
-      const parsed = parseFloat(amount);
-      return isNaN(parsed) ? '0.00' : parsed.toFixed(2);
-    }
-    return '0.00';
+    const num = typeof amount === 'number' ? amount : parseFloat(amount || 0);
+    return isNaN(num) ? '0.00' : num.toFixed(2);
   };
 
   // Handle opening create popup
@@ -112,44 +88,57 @@ export default function PurchaseOrders() {
     setIsCreatePopupOpen(false);
   };
 
-  // Handle creating new purchase order
+  // Handle creating new purchase order - FIXED VERSION
   const handleCreatePurchaseOrder = async (orderData) => {
     try {
-      // Format the data for the API
+      // Prepare data exactly as backend expects
       const purchaseData = {
-        po_number: orderData.poNumber,
+        // po_number পাঠাবে না → backend নিজেই generate করে
         status: orderData.status,
         client_id: orderData.clientId,
         product_id: orderData.productId,
-        quantity: orderData.quantity,
-        subscription_start: orderData.subscriptionStart,
-        subscription_end: orderData.subscriptionEnd,
-        subscription_active: orderData.subscriptionActive,
-        total_amount: 0 // Backend will calculate this
+        quantity: parseInt(orderData.quantity, 10), // নিশ্চিত integer
+        subscription_start: orderData.subscriptionStart, // YYYY-MM-DD format হতে হবে
+        subscription_end: orderData.subscriptionEnd,     // YYYY-MM-DD format হতে হবে
+        subscription_active: orderData.subscriptionActive ? 1 : 0, // boolean → 1/0
+        total_amount: 0 // backend calculate করে নেবে
+        // attachment যদি থাকে তাহলে যোগ করতে পারো
       };
-      
+
+      console.log('Sending purchase data:', purchaseData); // ডিবাগিংয়ের জন্য
+
       const response = await api.post('/purchases', purchaseData);
-      
-      // After response interceptor normalization, response.data contains the created purchase
+
+      // Success → refresh list
       fetchPurchaseOrders();
-      console.log('Created new purchase order:', response.data);
+      setIsCreatePopupOpen(false); // popup বন্ধ করো
+      alert('Purchase order created successfully!');
+      console.log('Created purchase:', response.data);
     } catch (error) {
       console.error('Error creating purchase order:', error);
-      alert('Failed to create purchase order');
+
+      // Validation error details দেখাও
+      if (error.response?.status === 422 && error.response?.data?.errors) {
+        const errors = error.response.data.errors;
+        console.log('Validation errors:', errors);
+        const errorMessages = Object.values(errors).flat().join(', ');
+        alert('Validation failed: ' + errorMessages);
+      } else {
+        alert('Failed to create purchase order: ' + (error.response?.data?.message || error.message));
+      }
     }
   };
 
   // Handle deleting purchase order
   const handleDeletePO = async (po) => {
-    if (window.confirm(`Are you sure you want to delete ${po.po_number || po.poNumber}?`)) {
+    if (window.confirm(`Are you sure you want to delete PO ${po.po_number || po.poNumber}?`)) {
       try {
-        const response = await api.delete(`/purchases/${po.id}`);
-        // After response interceptor normalization, response.data contains the result
+        await api.delete(`/purchases/${po.id}`);
         fetchPurchaseOrders();
-        console.log('Deleted purchase order:', po);
+        alert('Purchase order deleted successfully');
       } catch (error) {
-        console.error('Error deleting purchase order:', error);
-        alert('Failed to delete purchase order');
+        console.error('Error deleting:', error);
+        alert('Failed to delete: ' + (error.response?.data?.message || error.message));
       }
     }
   };
@@ -211,13 +200,15 @@ export default function PurchaseOrders() {
                   <TableRow key={po.id}>
                     <TableCell>
                       <div>
-                        <div className="font-semibold text-gray-900">{po.po_number || po.poNumber}</div>
-                        <div className="text-sm text-gray-600">Created: {po.created_at ? new Date(po.created_at).toLocaleDateString() : 'N/A'}</div>
+                        <div className="font-semibold text-gray-900">{po.po_number}</div>
+                        <div className="text-sm text-gray-600">
+                          Created: {po.created_at ? new Date(po.created_at).toLocaleDateString() : 'N/A'}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div>
-                        <div className="font-medium text-gray-900">{po.client?.company || po.client}</div>
+                        <div className="font-medium text-gray-900">{po.client?.company || 'N/A'}</div>
                         <div className="text-sm text-gray-600">{po.client?.contact || 'N/A'}</div>
                       </div>
                     </TableCell>
@@ -226,7 +217,9 @@ export default function PurchaseOrders() {
                         {po.product ? (
                           <div className="border-b border-gray-100 last:border-b-0 pb-2 last:pb-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium text-gray-900">{po.product?.product_name || po.product?.name || 'N/A'}</span>
+                              <span className="font-medium text-gray-900">
+                                {po.product?.product_name || 'N/A'}
+                              </span>
                               <span className="text-xs bg-gray-900 text-white px-2 py-1 rounded">
                                 x{po.quantity || 1}
                               </span>
@@ -241,29 +234,24 @@ export default function PurchaseOrders() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="font-semibold text-gray-900">৳{formatCurrency(po.total_amount || po.totalAmount)} BDT</div>
+                      <div className="font-semibold text-gray-900">
+                        ৳{formatCurrency(po.total_amount)} BDT
+                      </div>
                     </TableCell>
                     <TableCell>
-                      <Badge 
-                        className={`text-xs ${getStatusColor(po.status || 'Draft')}`}
-                      >
+                      <Badge className={`text-xs ${getStatusColor(po.status)}`}>
                         {po.status || 'Draft'}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          className="text-xs"
-                          icon={<FileText className="h-3 w-3" />}
-                        >
+                        <Button variant="outline" size="sm" className="text-xs" icon={<FileText className="h-3 w-3" />}>
                           Generate Bill
                         </Button>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="icon"
-                          title="Delete purchase order"
+                          title="Delete"
                           onClick={() => handleDeletePO(po)}
                         >
                           <Trash2 className="h-4 w-4" />

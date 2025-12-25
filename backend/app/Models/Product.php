@@ -8,18 +8,17 @@ class Product extends Model
 {
     protected $fillable = [
         'product_name',
-        'vendor_type',
+        'subscription_type', 
+        'vendor_type',        
         'base_price',
         'bdt_price',
         'multi_currency',
         'status',
-        'name',
-        'description',
-        'category',
-        'vendor',
-        'vendor_website',
-        'type',
-        'profit_margin',
+        'description',        
+        'category',          
+        'vendor',            
+        'vendor_website',    
+        'profit_margin',     
         'currencies'
     ];
     

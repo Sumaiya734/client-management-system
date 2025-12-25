@@ -195,6 +195,15 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
     onClose();
   };
 
+  const handleWebsiteBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    let value = e.target.value;
+    if (!value.startsWith('http://') && !value.startsWith('https://')) {
+      value = 'http://' + value;
+    }
+    handleInputChange('vendorWebsite', value);
+  };
+  
+
   const { isVisible, isAnimating } = useAnimationState(isOpen);
 
   if (!isVisible) return null;
@@ -214,10 +223,10 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <div>
             <h2 className="text-base font-semibold text-gray-900">
-              {isEditMode ? 'Edit Product' : 'Add Product'}
+              {isEditMode ? 'Edit Product' : 'Add New Product'}
             </h2>
             <p className="text-xs text-gray-600 mt-1">
-              {isEditMode ? 'Update product information' : 'Create a new product'}
+              {isEditMode ? 'Update product information' : 'Enter product details below'}
             </p>
           </div>
 
@@ -236,6 +245,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
               <input
                 type="text"
                 value={formData.name}
+                placeholder='Microsoft Teams, Zoom Pro,etc'
                 onChange={(e) => handleInputChange('name', e.target.value)}
                 className={`w-full px-2 py-1.5 border ${
                   errors.name ? 'border-red-500' : 'border-gray-300'
@@ -249,6 +259,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
               <input
                 type="text"
                 value={formData.vendor}
+                placeholder='Microsoft, Zoom, Google,etc'
                 onChange={(e) => handleInputChange('vendor', e.target.value)}
                 className={`w-full px-2 py-1.5 border ${
                   errors.vendor ? 'border-red-500' : 'border-gray-300'
@@ -262,11 +273,12 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Vendor Website</label>
             <input
-              type="url"
+              type="text"
               value={formData.vendorWebsite}
               onChange={(e) => handleInputChange('vendorWebsite', e.target.value)}
+              onBlur={handleWebsiteBlur}
               className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
-              placeholder="https://example.com"
+              placeholder="www.example.com"
             />
           </div>
 
@@ -342,6 +354,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
             <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
             <textarea
               value={formData.description}
+              placeholder=' Product description'
               onChange={(e) => handleInputChange('description', e.target.value)}
               rows={3}
               className={`w-full px-2 py-1.5 border ${

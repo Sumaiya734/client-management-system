@@ -31,7 +31,6 @@ class PurchaseController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'po_number' => 'required|string|unique:purchases',
             'status' => 'required|string',
             'client_id' => 'required|exists:clients,id',
             'product_id' => 'required|exists:products,id',
@@ -39,7 +38,8 @@ class PurchaseController extends Controller
             'subscription_start' => 'required|date',
             'subscription_end' => 'required|date|after:subscription_start',
             'subscription_active' => 'boolean',
-            'total_amount' => 'required|numeric|min:0'
+            'total_amount' => 'required|numeric|min:0',
+            'attachment' => 'nullable|string'
         ]);
         
         if ($validator->fails()) {
@@ -50,6 +50,20 @@ class PurchaseController extends Controller
             ], 422);
         }
         
+        // Generate PO number automatically in format PO-YYYY-xxxx
+        $year = date('Y');
+        $latestPO = Purchase::where('po_number', 'LIKE', "PO-$year-%")
+                           ->orderByRaw('CAST(SUBSTRING(po_number, -4) AS UNSIGNED) DESC')
+                           ->first();
+        
+        $sequenceNumber = 1;
+        if ($latestPO) {
+            $lastSequence = substr($latestPO->po_number, -4);
+            $sequenceNumber = (int)$lastSequence + 1;
+        }
+        
+        $poNumber = "PO-$year-" . str_pad($sequenceNumber, 4, '0', STR_PAD_LEFT);
+        
         // Calculate total amount based on product price and quantity if not provided
         $requestData = $request->all();
         if (!isset($requestData['total_amount']) || $requestData['total_amount'] == 0) {
@@ -59,6 +73,9 @@ class PurchaseController extends Controller
                 $requestData['total_amount'] = $price * $request->quantity;
             }
         }
+        
+        // Add the generated PO number to the request data
+        $requestData['po_number'] = $poNumber;
         
         $purchase = Purchase::create($requestData);
         
@@ -112,7 +129,8 @@ class PurchaseController extends Controller
             'subscription_start' => 'sometimes|date',
             'subscription_end' => 'sometimes|date|after:subscription_start',
             'subscription_active' => 'sometimes|boolean',
-            'total_amount' => 'sometimes|numeric|min:0'
+            'total_amount' => 'sometimes|numeric|min:0',
+            'attachment' => 'nullable|string'
         ]);
         
         if ($validator->fails()) {

@@ -40,7 +40,7 @@ export const ClientForm = ({
     if (!formData.name.trim()) newErrors.name = 'Name is required';
     if (!formData.company.trim()) newErrors.company = 'Company is required';
     if (!formData.email.trim()) newErrors.email = 'Email is required';
-    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email is invalid';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Email is invalid';
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
