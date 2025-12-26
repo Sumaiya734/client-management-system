@@ -29,43 +29,8 @@ export default function Subscriptions() {
     try {
       setLoading(true);
       const response = await api.get('/subscriptions');
-      // After response interceptor normalization, response.data is the array of subscriptions
-      // Transform the API response to match the expected format, but keep original data for creation
-      const transformedSubscriptions = response.data.map(sub => {
-        // For now, we'll create a simplified structure
-        // In a real app, you'd structure this based on your API response
-        return {
-          id: sub.id,
-          poNumber: sub.po_number,
-          createdDate: sub.start_date || 'N/A',
-          client: {
-            company: sub.client?.company || sub.client || 'N/A',
-            contact: sub.client?.contact || 'N/A'
-          },
-          products: [
-            {
-              name: sub.product?.product_name || sub.product?.name || 'N/A',
-              quantity: sub.quantity || 1,
-              status: sub.status || 'Pending',
-              dateRange: sub.start_date && sub.end_date ? `${sub.start_date} to ${sub.end_date}` : 'N/A',
-              action: sub.status === 'Pending' ? 'Subscribe' : 'Edit'
-            }
-          ],
-          progress: {
-            status: sub.status || 'Pending',
-            completed: sub.status === 'Active' ? 1 : 0,
-            total: 1,
-            percentage: sub.status === 'Active' ? 100 : sub.status === 'Pending' ? 0 : 50
-          },
-          totalAmount: `৳${sub.total_amount !== null && sub.total_amount !== undefined ? (typeof sub.total_amount === 'number' ? sub.total_amount.toFixed(2) : (typeof sub.total_amount === 'string' ? parseFloat(sub.total_amount).toFixed(2) : '0.00')) : '0.00'} BDT`,
-          canGenerateBill: sub.status === 'Active',
-          // Store original data needed for creating new subscriptions
-          client_id: sub.client_id,
-          product_id: sub.product_id,
-          total_amount: sub.total_amount
-        };
-      });
-      setSubscriptions(transformedSubscriptions);
+      // The backend now returns properly formatted data, so we can use it directly
+      setSubscriptions(response.data);
     } catch (error) {
       console.error('Error fetching subscriptions:', error);
     } finally {
@@ -143,8 +108,8 @@ export default function Subscriptions() {
   };
 
   const handleOpenModal = (product, quantity, subscription) => {
-    setSelectedProduct(product);
-    setSelectedQuantity(quantity);
+    setSelectedProduct(product?.name || product);
+    setSelectedQuantity(product?.quantity || quantity);
     setSelectedTotalAmount(subscription?.totalAmount || null);
     setOriginalSubscription(subscription); // Store original subscription for client_id and product_id
     setIsModalOpen(true);
@@ -167,8 +132,9 @@ export default function Subscriptions() {
         end_date: data.endDate,
         status: 'Active',
         notes: data.notes || '',
-        quantity: data.quantity || originalSubscription?.quantity || 1,
-        total_amount: originalSubscription?.total_amount || 0.00 // Use the original total_amount
+        quantity: originalSubscription?.quantity || 1,
+        total_amount: originalSubscription?.total_amount || 0.00, // Use the original total_amount
+        purchase_id: originalSubscription?.id // Link to the original purchase if available
       };
       
       const response = await api.post('/subscriptions', subscriptionData);
@@ -262,8 +228,8 @@ export default function Subscriptions() {
                     </TableCell>
                     <TableCell>
                       <div>
-                        <div className="font-medium text-gray-900">{subscription.client.company}</div>
-                        <div className="text-sm text-gray-600">{subscription.client.contact}</div>
+                        <div className="font-medium text-gray-900">{subscription.client?.company || 'N/A'}</div>
+                        <div className="text-sm text-gray-600">{subscription.client?.cli_name || subscription.client.contact || 'N/A'}</div>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -284,7 +250,7 @@ export default function Subscriptions() {
                                 variant={product.action === 'Subscribe' ? 'primary' : 'outline'}
                                 size="xs"
                                 className="text-xs"
-                                onClick={() => handleOpenModal(product.name, product.quantity, subscription)}
+                                onClick={() => handleOpenModal(product, product.quantity, subscription)}
                               >
                                 {product.action}
                               </Button>

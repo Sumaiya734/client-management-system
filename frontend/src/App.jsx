@@ -18,6 +18,7 @@ import Notifications from './pages/Notifications/index';
 import Login from './pages/Auth/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 
+
 function App() {
   return (
       <Router>
@@ -94,7 +95,7 @@ function App() {
                   <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
                     <AOSWrapper>
                       <div data-aos="fade-up" className="shadow-3d">
-                        <PurchaseOrders />
+                        <PurchaseOrders />  
                       </div>
                     </AOSWrapper>
                   </main>

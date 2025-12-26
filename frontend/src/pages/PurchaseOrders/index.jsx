@@ -43,6 +43,7 @@ export default function PurchaseOrders() {
     { value: 'In Progress', label: 'In Progress' },
     { value: 'Completed', label: 'Completed' },
     { value: 'Expired', label: 'Expired' },
+    { value: 'Expiring Soon', label: 'Expiring Soon' },
   ];
 
   const filters = [
@@ -91,24 +92,66 @@ export default function PurchaseOrders() {
   // Handle creating new purchase order - FIXED VERSION
   const handleCreatePurchaseOrder = async (orderData) => {
     try {
-      // Prepare data exactly as backend expects
-      const purchaseData = {
-        // po_number পাঠাবে না → backend নিজেই generate করে
-        status: orderData.status,
-        client_id: orderData.clientId,
-        product_id: orderData.productId,
-        quantity: parseInt(orderData.quantity, 10), // নিশ্চিত integer
-        subscription_start: orderData.subscriptionStart, // YYYY-MM-DD format হতে হবে
-        subscription_end: orderData.subscriptionEnd,     // YYYY-MM-DD format হতে হবে
-        subscription_active: orderData.subscriptionActive ? 1 : 0, // boolean → 1/0
-        total_amount: 0 // backend calculate করে নেবে
-        // attachment যদি থাকে তাহলে যোগ করতে পারো
-      };
-
-      console.log('Sending purchase data:', purchaseData); // ডিবাগিংয়ের জন্য
-
-      const response = await api.post('/purchases', purchaseData);
-
+      let response;
+      
+      if (orderData.attachment && orderData.attachment instanceof File) {
+        // Use FormData when there's an attachment
+        const formData = new FormData();
+        formData.append('status', orderData.status);
+        formData.append('client_id', orderData.clientId.toString());
+        
+        // Handle products - convert to the format expected by backend
+        if (orderData.products && Array.isArray(orderData.products) && orderData.products.length > 0) {
+          orderData.products.forEach((product, index) => {
+            formData.append(`products[${index}][productId]`, product.productId.toString());
+            formData.append(`products[${index}][quantity]`, product.quantity.toString());
+            formData.append(`products[${index}][subscription_start]`, product.subscriptionStart);
+            formData.append(`products[${index}][subscription_end]`, product.subscriptionEnd);
+          });
+        } else {
+          // Fallback to single product if no products array
+          formData.append('product_id', orderData.productId.toString());
+          formData.append('quantity', orderData.quantity.toString());
+          formData.append('subscription_start', orderData.subscriptionStart);
+          formData.append('subscription_end', orderData.subscriptionEnd);
+        }
+        
+        formData.append('subscription_active', orderData.subscriptionActive ? '1' : '0');
+        formData.append('total_amount', '0'); // backend calculate করে নেবে
+        if (orderData.attachment) {
+          formData.append('attachment', orderData.attachment, orderData.attachment.name);
+        }
+        
+        // Use axios with proper headers for file upload
+        response = await api.post('/purchases', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+      } else {
+        // Prepare data exactly as backend expects (no attachment)
+        const purchaseData = {
+          // po_number পাঠাবে না → backend নিজেই generate করে
+          status: orderData.status,
+          client_id: orderData.clientId,
+          products: orderData.products, // Send products array if available
+          subscription_active: orderData.subscriptionActive ? 1 : 0, // boolean → 1/0
+          total_amount: 0 // backend calculate করে নেবে
+        };
+        
+        // Only add single product fields if no products array is provided
+        if (!orderData.products || !Array.isArray(orderData.products) || orderData.products.length === 0) {
+          purchaseData.product_id = orderData.productId;
+          purchaseData.quantity = parseInt(orderData.quantity, 10); // নিশ্চিত integer
+          purchaseData.subscription_start = orderData.subscriptionStart; // YYYY-MM-DD format হতে হবে
+          purchaseData.subscription_end = orderData.subscriptionEnd;     // YYYY-MM-DD format হতে হবে
+        }
+        
+        console.log('Sending purchase data:', purchaseData); // ডিবাগিংয়ের জন্য
+        
+        response = await api.post('/purchases', purchaseData);
+      }
+      
       // Success → refresh list
       fetchPurchaseOrders();
       setIsCreatePopupOpen(false); // popup বন্ধ করো
@@ -209,25 +252,27 @@ export default function PurchaseOrders() {
                     <TableCell>
                       <div>
                         <div className="font-medium text-gray-900">{po.client?.company || 'N/A'}</div>
-                        <div className="text-sm text-gray-600">{po.client?.contact || 'N/A'}</div>
+                        <div className="text-sm text-gray-600">{po.cli_name || 'N/A'}</div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="space-y-2">
-                        {po.product ? (
-                          <div className="border-b border-gray-100 last:border-b-0 pb-2 last:pb-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium text-gray-900">
-                                {po.product?.product_name || 'N/A'}
-                              </span>
-                              <span className="text-xs bg-gray-900 text-white px-2 py-1 rounded">
-                                x{po.quantity || 1}
-                              </span>
+                        {po.products && po.products.length > 0 ? (
+                          po.products.map((product, index) => (
+                            <div key={index} className="border-b border-gray-100 last:border-b-0 pb-2 last:pb-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-medium text-gray-900">
+                                  {product.product_name || 'N/A'}
+                                </span>
+                                <span className="text-xs bg-gray-900 text-white px-2 py-1 rounded">
+                                  x{product.quantity || 1}
+                                </span>
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                {formatDateRange(product.subscription_start, product.subscription_end)}
+                              </div>
                             </div>
-                            <div className="text-sm text-gray-600">
-                              {formatDateRange(po.subscription_start, po.subscription_end)}
-                            </div>
-                          </div>
+                          ))
                         ) : (
                           <div>N/A</div>
                         )}

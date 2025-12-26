@@ -17,7 +17,7 @@ class Purchase extends Model
         'subscription_end',
         'subscription_active',
         'po_details',
-        'client',
+        'cli_name',
         'products_subscriptions',
         'total_amount',
         'attachment',

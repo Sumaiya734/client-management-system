@@ -20,9 +20,56 @@ class SubscriptionController extends Controller
     {
         $subscriptions = Subscription::with(['client', 'product', 'purchase'])->get();
         
+        // Transform the subscriptions to match the frontend expectations
+        $transformedSubscriptions = $subscriptions->map(function ($subscription) {
+            // Get the associated purchase to get additional information
+            $purchase = $subscription->purchase;
+            
+            // For single product subscriptions
+            $products = [];
+            if ($subscription->product) {
+                $products[] = [
+                    'name' => $subscription->product->product_name ?? $subscription->product->name ?? 'N/A',
+                    'quantity' => $subscription->quantity ?? 1,
+                    'status' => $subscription->status ?? 'Pending',
+                    'dateRange' => $subscription->start_date && $subscription->end_date ? 
+                        $subscription->start_date . ' to ' . $subscription->end_date : 'N/A',
+                    'action' => $subscription->status === 'Pending' ? 'Subscribe' : 'Edit'
+                ];
+            }
+            
+            // If purchase exists and has products_subscriptions (for multi-product support)
+            if ($purchase && $purchase->products_subscriptions) {
+                $products = $this->parseProductsFromPurchase($purchase->products_subscriptions);
+            }
+            
+            return [
+                'id' => $subscription->id,
+                'poNumber' => $subscription->po_number ?? $purchase->po_number ?? 'N/A',
+                'createdDate' => $subscription->start_date ?? $purchase->subscription_start ?? 'N/A',
+                'client' => [
+                    'company' => $subscription->client->company ?? $subscription->client->name ?? $purchase->cli_name ?? 'N/A',
+                    'contact' => $subscription->client->contact ?? 'N/A'
+                ],
+                'products' => $products,
+                'progress' => [
+                    'status' => $subscription->status ?? 'Pending',
+                    'completed' => $subscription->status === 'Active' ? 1 : 0,
+                    'total' => count($products),
+                    'percentage' => $subscription->status === 'Active' ? 100 : ($subscription->status === 'Pending' ? 0 : 50)
+                ],
+                'totalAmount' => '৳' . number_format($subscription->total_amount ?? $purchase->total_amount ?? 0, 2) . ' BDT',
+                'canGenerateBill' => $subscription->status === 'Active',
+                // Store original data needed for creating new subscriptions
+                'client_id' => $subscription->client_id ?? $purchase->client_id,
+                'product_id' => $subscription->product_id,
+                'total_amount' => $subscription->total_amount ?? $purchase->total_amount
+            ];
+        });
+        
         return response()->json([
             'success' => true,
-            'data' => $subscriptions
+            'data' => $transformedSubscriptions
         ]);
     }
 
@@ -145,5 +192,34 @@ class SubscriptionController extends Controller
             'success' => true,
             'message' => 'Subscription deleted successfully'
         ]);
+    }
+    
+    /**
+     * Parse products from purchase data
+     */
+    private function parseProductsFromPurchase($productsSubscriptions)
+    {
+        $products = [];
+        
+        // If products_subscriptions is a JSON string, decode it
+        if (is_string($productsSubscriptions)) {
+            $productsData = json_decode($productsSubscriptions, true);
+        } else {
+            $productsData = $productsSubscriptions;
+        }
+        
+        if (is_array($productsData)) {
+            foreach ($productsData as $productData) {
+                $products[] = [
+                    'name' => $productData['name'] ?? $productData['product_name'] ?? 'N/A',
+                    'quantity' => $productData['quantity'] ?? 1,
+                    'status' => $productData['status'] ?? 'Pending',
+                    'dateRange' => $productData['dateRange'] ?? $productData['subscription_start'] . ' to ' . $productData['subscription_end'] ?? 'N/A',
+                    'action' => $productData['status'] === 'Pending' ? 'Subscribe' : 'Edit'
+                ];
+            }
+        }
+        
+        return $products;
     }
 }
