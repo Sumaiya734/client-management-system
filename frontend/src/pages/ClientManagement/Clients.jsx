@@ -87,7 +87,7 @@ export default function Clients() {
   // Create empty client template for adding new clients
   const createEmptyClient = () => ({
     id: null,
-    name: '',
+    cli_name: '',
     company: '',
     email: '',
     phone: '',
@@ -158,7 +158,7 @@ export default function Clients() {
 
   // Handle client deletion
   const handleDeleteClient = async (client) => {
-    if (window.confirm(`Are you sure you want to delete ${client.name}?`)) {
+    if (window.confirm(`Are you sure you want to delete ${client.cli_name}?`)) {
       try {
         const clientId = client.id;
         if (!clientId) {
@@ -228,7 +228,7 @@ export default function Clients() {
               ) : clients.length > 0 ? (
                 clients.map((client) => (
                   <TableRow key={client.id}>
-                    <TableCell>{client.name}</TableCell>
+                    <TableCell>{client.cli_name}</TableCell>
                     <TableCell>{client.company}</TableCell>
                     <TableCell>{client.email}</TableCell>
                     <TableCell>{client.phone}</TableCell>

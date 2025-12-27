@@ -73,11 +73,23 @@ class PurchaseController extends Controller
                 'products.*.productId' => 'required|exists:products,id',
                 'products.*.quantity' => 'required|integer|min:1',
                 'products.*.subscription_start' => 'required|date',
-                'products.*.subscription_end' => 'required|date|after:products.*.subscription_start',
+                'products.*.subscription_end' => 'required|date',
                 'subscription_active' => 'boolean',
                 'total_amount' => 'required|numeric|min:0',
                 'attachment' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx,xls,xlsx|max:10240' // 10MB max
             ]);
+            
+            // Custom validation for date comparison
+            foreach ($request->products ?? [] as $index => $product) {
+                if (isset($product['subscription_start']) && isset($product['subscription_end'])) {
+                    $startDate = new \DateTime($product['subscription_start']);
+                    $endDate = new \DateTime($product['subscription_end']);
+                    
+                    if ($startDate >= $endDate) {
+                        $validator->errors()->add("products.$index.subscription_end", 'Subscription end date must be after subscription start date.');
+                    }
+                }
+            }
         } else {
             // Single product validation (backward compatibility)
             $validator = Validator::make($request->all(), [
@@ -86,11 +98,21 @@ class PurchaseController extends Controller
                 'product_id' => 'required|exists:products,id',
                 'quantity' => 'required|integer|min:1',
                 'subscription_start' => 'required|date',
-                'subscription_end' => 'required|date|after:subscription_start',
+                'subscription_end' => 'required|date',
                 'subscription_active' => 'boolean',
                 'total_amount' => 'required|numeric|min:0',
                 'attachment' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx,xls,xlsx|max:10240' // 10MB max
             ]);
+            
+            // Custom validation for single product date comparison
+            if ($request->subscription_start && $request->subscription_end) {
+                $startDate = new \DateTime($request->subscription_start);
+                $endDate = new \DateTime($request->subscription_end);
+                
+                if ($startDate >= $endDate) {
+                    $validator->errors()->add('subscription_end', 'Subscription end date must be after subscription start date.');
+                }
+            }
         }
         
         if ($validator->fails()) {
@@ -276,11 +298,23 @@ class PurchaseController extends Controller
                 'products.*.productId' => 'sometimes|exists:products,id',
                 'products.*.quantity' => 'sometimes|integer|min:1',
                 'products.*.subscription_start' => 'sometimes|date',
-                'products.*.subscription_end' => 'sometimes|date|after:products.*.subscription_start',
+                'products.*.subscription_end' => 'sometimes|date',
                 'subscription_active' => 'sometimes|boolean',
                 'total_amount' => 'sometimes|numeric|min:0',
                 'attachment' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx,xls,xlsx|max:10240' // 10MB max
             ]);
+            
+            // Custom validation for date comparison in update
+            foreach ($request->products ?? [] as $index => $product) {
+                if (isset($product['subscription_start']) && isset($product['subscription_end'])) {
+                    $startDate = new \DateTime($product['subscription_start']);
+                    $endDate = new \DateTime($product['subscription_end']);
+                    
+                    if ($startDate >= $endDate) {
+                        $validator->errors()->add("products.$index.subscription_end", 'Subscription end date must be after subscription start date.');
+                    }
+                }
+            }
         } else {
             // Single product validation (backward compatibility)
             $validator = Validator::make($request->all(), [
@@ -290,11 +324,21 @@ class PurchaseController extends Controller
                 'product_id' => 'sometimes|exists:products,id',
                 'quantity' => 'sometimes|integer|min:1',
                 'subscription_start' => 'sometimes|date',
-                'subscription_end' => 'sometimes|date|after:subscription_start',
+                'subscription_end' => 'sometimes|date',
                 'subscription_active' => 'sometimes|boolean',
                 'total_amount' => 'sometimes|numeric|min:0',
                 'attachment' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx,xls,xlsx|max:10240' // 10MB max
             ]);
+            
+            // Custom validation for single product date comparison in update
+            if ($request->subscription_start && $request->subscription_end) {
+                $startDate = new \DateTime($request->subscription_start);
+                $endDate = new \DateTime($request->subscription_end);
+                
+                if ($startDate >= $endDate) {
+                    $validator->errors()->add('subscription_end', 'Subscription end date must be after subscription start date.');
+                }
+            }
         }
         
         if ($validator->fails()) {

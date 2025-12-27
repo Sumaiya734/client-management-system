@@ -5,7 +5,7 @@ import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
 
 interface Client {
   id: string | number | null;
-  name: string;
+  cli_name: string;
   company: string;
   email: string;
   phone: string;
@@ -32,7 +32,7 @@ const EditClientPopup: React.FC<EditClientPopupProps> = ({
     // Initialize with default values to prevent undefined values
     return {
       id: client.id || null,
-      name: client.name || '',
+      cli_name: client.cli_name || '',
       company: client.company || '',
       email: client.email || '',
       phone: client.phone || '',
@@ -47,7 +47,7 @@ const EditClientPopup: React.FC<EditClientPopupProps> = ({
   useEffect(() => {
     setFormData({
       id: client.id || null,
-      name: client.name || '',
+      cli_name: client.cli_name || '',
       company: client.company || '',
       email: client.email || '',
       phone: client.phone || '',
@@ -75,8 +75,8 @@ const EditClientPopup: React.FC<EditClientPopupProps> = ({
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
     
-    if (!formData.name.trim()) {
-      newErrors.name = 'Name is required';
+    if (!formData.cli_name.trim()) {
+      newErrors.cli_name = 'Name is required';
     }
     
     if (!formData.email.trim()) {
@@ -140,18 +140,18 @@ const EditClientPopup: React.FC<EditClientPopupProps> = ({
           {/* Name and Company Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="name" className="block text-xs font-medium text-gray-700 mb-1">
+              <label htmlFor="cli_name" className="block text-xs font-medium text-gray-700 mb-1">
                 Name
               </label>
               <input
                 type="text"
-                id="name"
-                value={formData.name}
-                onChange={(e) => handleInputChange('name', e.target.value)}
-                className={`w-full px-2 py-1.5 border ${errors.name ? 'border-red-500' : 'border-gray-300'} rounded-md text-sm`}
+                id="cli_name"
+                value={formData.cli_name}
+                onChange={(e) => handleInputChange('cli_name', e.target.value)}
+                className={`w-full px-2 py-1.5 border ${errors.cli_name ? 'border-red-500' : 'border-gray-300'} rounded-md text-sm`}
                 required
               />
-              {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name}</p>}
+              {errors.cli_name && <p className="text-xs text-red-600 mt-1">{errors.cli_name}</p>}
             </div>
             <div>
               <label htmlFor="company" className="block text-xs font-medium text-gray-700 mb-1">

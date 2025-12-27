@@ -52,8 +52,9 @@ class SubscriptionController extends Controller
                     'contact' => $subscription->client->contact ?? 'N/A'
                 ],
                 'products' => $products,
+                'products_subscription_status' => $subscription->products_subscription_status,
                 'progress' => [
-                    'status' => $subscription->status ?? 'Pending',
+                    'status' => $subscription->progress ? $subscription->progress['status'] ?? $subscription->status ?? 'Pending' : $subscription->status ?? 'Pending',
                     'completed' => $subscription->status === 'Active' ? 1 : 0,
                     'total' => count($products),
                     'percentage' => $subscription->status === 'Active' ? 100 : ($subscription->status === 'Pending' ? 0 : 50)
@@ -63,7 +64,10 @@ class SubscriptionController extends Controller
                 // Store original data needed for creating new subscriptions
                 'client_id' => $subscription->client_id ?? $purchase->client_id,
                 'product_id' => $subscription->product_id,
-                'total_amount' => $subscription->total_amount ?? $purchase->total_amount
+                'total_amount' => $subscription->total_amount ?? $purchase->total_amount,
+                // Include the raw database fields
+                'raw_progress' => $subscription->progress,
+                'raw_products_subscription_status' => $subscription->products_subscription_status
             ];
         });
         
@@ -86,7 +90,9 @@ class SubscriptionController extends Controller
             'end_date' => 'required|date|after:start_date',
             'status' => 'required|string',
             'quantity' => 'required|integer|min:1',
-            'total_amount' => 'required|numeric|min:0'
+            'total_amount' => 'required|numeric|min:0',
+            'products_subscription_status' => 'sometimes|json',
+            'progress' => 'sometimes|json'
         ]);
         
         if ($validator->fails()) {
@@ -124,9 +130,57 @@ class SubscriptionController extends Controller
             ], 404);
         }
         
+        // Transform the single subscription to match the frontend expectations
+        $purchase = $subscription->purchase;
+        
+        // For single product subscriptions
+        $products = [];
+        if ($subscription->product) {
+            $products[] = [
+                'name' => $subscription->product->product_name ?? $subscription->product->name ?? 'N/A',
+                'quantity' => $subscription->quantity ?? 1,
+                'status' => $subscription->status ?? 'Pending',
+                'dateRange' => $subscription->start_date && $subscription->end_date ? 
+                    $subscription->start_date . ' to ' . $subscription->end_date : 'N/A',
+                'action' => $subscription->status === 'Pending' ? 'Subscribe' : 'Edit'
+            ];
+        }
+        
+        // If purchase exists and has products_subscriptions (for multi-product support)
+        if ($purchase && $purchase->products_subscriptions) {
+            $products = $this->parseProductsFromPurchase($purchase->products_subscriptions);
+        }
+        
+        $transformedSubscription = [
+            'id' => $subscription->id,
+            'poNumber' => $subscription->po_number ?? $purchase->po_number ?? 'N/A',
+            'createdDate' => $subscription->start_date ?? $purchase->subscription_start ?? 'N/A',
+            'client' => [
+                'company' => $subscription->client->company ?? $subscription->client->name ?? $purchase->cli_name ?? 'N/A',
+                'contact' => $subscription->client->contact ?? 'N/A'
+            ],
+            'products' => $products,
+            'products_subscription_status' => $subscription->products_subscription_status,
+            'progress' => [
+                'status' => $subscription->progress ? $subscription->progress['status'] ?? $subscription->status ?? 'Pending' : $subscription->status ?? 'Pending',
+                'completed' => $subscription->status === 'Active' ? 1 : 0,
+                'total' => count($products),
+                'percentage' => $subscription->status === 'Active' ? 100 : ($subscription->status === 'Pending' ? 0 : 50)
+            ],
+            'totalAmount' => '৳' . number_format($subscription->total_amount ?? $purchase->total_amount ?? 0, 2) . ' BDT',
+            'canGenerateBill' => $subscription->status === 'Active',
+            // Store original data needed for creating new subscriptions
+            'client_id' => $subscription->client_id ?? $purchase->client_id,
+            'product_id' => $subscription->product_id,
+            'total_amount' => $subscription->total_amount ?? $purchase->total_amount,
+            // Include the raw database fields
+            'raw_progress' => $subscription->progress,
+            'raw_products_subscription_status' => $subscription->products_subscription_status
+        ];
+        
         return response()->json([
             'success' => true,
-            'data' => $subscription
+            'data' => $transformedSubscription
         ]);
     }
 
@@ -152,7 +206,9 @@ class SubscriptionController extends Controller
             'end_date' => 'sometimes|date|after:start_date',
             'status' => 'sometimes|string',
             'quantity' => 'sometimes|integer|min:1',
-            'total_amount' => 'sometimes|numeric|min:0'
+            'total_amount' => 'sometimes|numeric|min:0',
+            'products_subscription_status' => 'sometimes|json',
+            'progress' => 'sometimes|json'
         ]);
         
         if ($validator->fails()) {

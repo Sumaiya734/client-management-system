@@ -16,11 +16,11 @@ class ClientRepository extends BaseRepository
     {
         $query = $this->model->newQuery();
 
-        // Search by name, company, or email
+        // Search by cli_name, company, or email
         if ($request->has('search') && !empty($request->get('search'))) {
             $search = $request->get('search');
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
+                $q->where('cli_name', 'like', "%{$search}%")
                   ->orWhere('company', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%");
             });
@@ -38,11 +38,11 @@ class ClientRepository extends BaseRepository
     {
         $query = $this->model->newQuery();
 
-        // Search by name, company, or email
+        // Search by cli_name, company, or email
         if ($request->has('search') && !empty($request->get('search'))) {
             $search = $request->get('search');
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
+                $q->where('cli_name', 'like', "%{$search}%")
                   ->orWhere('company', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%");
             });

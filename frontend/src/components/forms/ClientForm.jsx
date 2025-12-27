@@ -11,7 +11,7 @@ export const ClientForm = ({
   loading = false 
 }) => {
   const [formData, setFormData] = useState({
-    name: client?.name || '',
+    cli_name: client?.cli_name || '',
     company: client?.company || '',
     email: client?.email || '',
     phone: client?.phone || '',
@@ -37,7 +37,7 @@ export const ClientForm = ({
   const validateForm = () => {
     const newErrors = {};
     
-    if (!formData.name.trim()) newErrors.name = 'Name is required';
+    if (!formData.cli_name.trim()) newErrors.cli_name = 'Name is required';
     if (!formData.company.trim()) newErrors.company = 'Company is required';
     if (!formData.email.trim()) newErrors.email = 'Email is required';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Email is invalid';
@@ -63,9 +63,9 @@ export const ClientForm = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Input
               label="Full Name"
-              value={formData.name}
-              onChange={(e) => handleChange('name', e.target.value)}
-              error={errors.name}
+              value={formData.cli_name}
+              onChange={(e) => handleChange('cli_name', e.target.value)}
+              error={errors.cli_name}
               placeholder="Enter full name"
             />
             

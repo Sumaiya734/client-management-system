@@ -98,7 +98,7 @@ export default function PurchaseOrders() {
         // Use FormData when there's an attachment
         const formData = new FormData();
         formData.append('status', orderData.status);
-        formData.append('client_id', orderData.clientId.toString());
+        formData.append('client_id', parseInt(orderData.client_id).toString());
         
         // Handle products - convert to the format expected by backend
         if (orderData.products && Array.isArray(orderData.products) && orderData.products.length > 0) {
@@ -133,7 +133,7 @@ export default function PurchaseOrders() {
         const purchaseData = {
           // po_number পাঠাবে না → backend নিজেই generate করে
           status: orderData.status,
-          client_id: orderData.clientId,
+          client_id: orderData.client_id,
           products: orderData.products, // Send products array if available
           subscription_active: orderData.subscriptionActive ? 1 : 0, // boolean → 1/0
           total_amount: 0 // backend calculate করে নেবে

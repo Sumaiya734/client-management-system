@@ -23,7 +23,7 @@ interface FormData {
   attachment: File | null;
 }
 
-const CreatePurchaseOrderModal: React.FC<CreatePurchaseOrderPopupProps> = ({ isOpen, onClose, onCreate }) => {
+const CreatePurchaseOrderPopup: React.FC<CreatePurchaseOrderPopupProps> = ({ isOpen, onClose, onCreate }) => {
   const [formData, setFormData] = useState<FormData>({
     status: 'Pending',
     clientId: '',
@@ -123,14 +123,14 @@ const CreatePurchaseOrderModal: React.FC<CreatePurchaseOrderPopupProps> = ({ isO
       // Prepare data for API submission
       const orderData = {
         status: formData.status,
-        clientId: clientId,
+        client_id: clientId,
         products: formData.products.map(product => ({
           productId: parseInt(product.productId),
           quantity: product.quantity,
-          subscriptionStart: product.subscriptionStart,
-          subscriptionEnd: product.subscriptionEnd,
+          subscription_start: product.subscriptionStart,
+          subscription_end: product.subscriptionEnd,
         })),
-        subscriptionActive: formData.subscriptionActive,
+        subscription_active: formData.subscriptionActive,
         total_amount: 0, // Backend will calculate this
         attachment: formData.attachment, // Include attachment file
       };
@@ -149,45 +149,52 @@ const CreatePurchaseOrderModal: React.FC<CreatePurchaseOrderPopupProps> = ({ isO
   
   return (
     <div
-      className="modal fade show"
-      style={{ display: "block", backgroundColor: "rgba(0,0,0,.5)" }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
-      <div className="modal-dialog modal-lg modal-dialog-centered">
-        <div className="modal-content rounded-4">
+      <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-white rounded-xl shadow-2xl">
+        <div className="p-6">
           {/* Header */}
-          <div className="modal-header border-0">
+          <div className="flex justify-between items-start pb-4 mb-4 border-b border-gray-200">
             <div>
-              <h5 className="modal-title fw-bold">
+              <h5 className="text-xl font-bold text-gray-900">
                 Create New Purchase Order
               </h5>
-              <small className="text-muted">
+              <p className="text-sm text-gray-500">
                 Enter purchase order information below
-              </small>
+              </p>
             </div>
-            <button className="btn-close" onClick={onClose}></button>
+            <button 
+              className="text-gray-500 hover:text-gray-700 text-2xl font-light leading-none"
+              onClick={onClose}
+            >
+              &times;
+            </button>
           </div>
 
           {/* Body */}
-          <div className="modal-body">
+          <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
             {/* Basic Information */}
-            <h6 className="fw-bold mb-3">Basic Information</h6>
+            <h6 className="font-bold mb-3">Basic Information</h6>
 
-            <div className="row g-3 mb-4">
-              <div className="col-md-6">
-                <label className="form-label">PO Number</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="mb-4 md:mb-0">
+                <label className="block text-sm font-medium text-gray-700 mb-1">PO Number</label>
                 <input
                   type="text"
-                  className="form-control"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                   value="Auto-generated"
                   readOnly
                   placeholder="Will be auto-generated"
                 />
               </div>
 
-              <div className="col-md-6">
-                <label className="form-label">Status</label>
+              <div className="mb-4 md:mb-0">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select 
-                  className="form-select"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                   value={formData.status}
                   onChange={(e) => setFormData({...formData, status: e.target.value})}
                 >
@@ -196,17 +203,17 @@ const CreatePurchaseOrderModal: React.FC<CreatePurchaseOrderPopupProps> = ({ isO
                 </select>
               </div>
 
-              <div className="col-md-12">
-                <label className="form-label">Client</label>
+              <div className="mb-4 md:mb-0">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
                 <select 
-                  className="form-select"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                   value={formData.clientId}
                   onChange={(e) => setFormData({...formData, clientId: e.target.value})}
                 >
                   <option value="">Select client</option>
                   {clients.map((client) => (
                     <option key={client.id} value={client.id}>
-                      {client.company || client.name} ({client.contact || client.email})
+                      {client.company || client.cli_name} ({client.contact || client.email})
                     </option>
                   ))}
                 </select>
@@ -214,14 +221,14 @@ const CreatePurchaseOrderModal: React.FC<CreatePurchaseOrderPopupProps> = ({ isO
             </div>
 
             {/* Products & Subscriptions */}
-            <h6 className="fw-bold mb-3">Products & Subscriptions</h6>
+            <h6 className="font-bold mb-3">Products & Subscriptions</h6>
             
             {formData.products.map((product, index) => (
-              <div key={product.id} className="row g-3 mb-3 p-3 border rounded">
-                <div className="col-md-6">
-                  <label className="form-label">Product {index + 1}</label>
+              <div key={product.id} className="p-4 border border-gray-200 rounded-lg mb-4">
+                <div className="mb-4 md:mb-0 md:w-1/2 md:pr-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Product {index + 1}</label>
                   <select 
-                    className="form-select"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                     value={product.productId}
                     onChange={(e) => {
                       const updatedProducts = [...formData.products];
@@ -238,11 +245,11 @@ const CreatePurchaseOrderModal: React.FC<CreatePurchaseOrderPopupProps> = ({ isO
                   </select>
                 </div>
 
-                <div className="col-md-6">
-                  <label className="form-label">Quantity</label>
+                <div className="mb-4 md:mb-0 md:w-1/2 md:pl-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
                   <input 
                     type="number" 
-                    className="form-control" 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent" 
                     value={product.quantity} 
                     onChange={(e) => {
                       const updatedProducts = [...formData.products];
@@ -252,11 +259,11 @@ const CreatePurchaseOrderModal: React.FC<CreatePurchaseOrderPopupProps> = ({ isO
                   />
                 </div>
 
-                <div className="col-md-6">
-                  <label className="form-label">Subscription Start</label>
+                <div className="mb-4 md:mb-0 md:w-1/2 md:pr-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Subscription Start</label>
                   <input 
                     type="date" 
-                    className="form-control" 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent" 
                     value={product.subscriptionStart}
                     onChange={(e) => {
                       const updatedProducts = [...formData.products];
@@ -266,11 +273,11 @@ const CreatePurchaseOrderModal: React.FC<CreatePurchaseOrderPopupProps> = ({ isO
                   />
                 </div>
 
-                <div className="col-md-6">
-                  <label className="form-label">Subscription End</label>
+                <div className="mb-4 md:mb-0 md:w-1/2 md:pl-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Subscription End</label>
                   <input 
                     type="date" 
-                    className="form-control" 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent" 
                     value={product.subscriptionEnd}
                     onChange={(e) => {
                       const updatedProducts = [...formData.products];
@@ -281,10 +288,10 @@ const CreatePurchaseOrderModal: React.FC<CreatePurchaseOrderPopupProps> = ({ isO
                 </div>
                 
                 {formData.products.length > 1 && (
-                  <div className="col-md-12 mt-2">
+                  <div className="mt-2">
                     <button 
                       type="button" 
-                      className="btn btn-outline-danger btn-sm"
+                      className="px-3 py-1 text-sm text-red-600 border border-red-600 rounded-lg hover:bg-red-50 transition-colors"
                       onClick={() => {
                         const updatedProducts = formData.products.filter((_, i) => i !== index);
                         setFormData({ ...formData, products: updatedProducts });
@@ -298,10 +305,10 @@ const CreatePurchaseOrderModal: React.FC<CreatePurchaseOrderPopupProps> = ({ isO
             ))}
             
             {/* Add Product Button */}
-            <div className="d-flex align-items-center gap-3 mb-3">
+            <div className="flex items-center gap-3 mb-3">
               <button 
                 type="button" 
-                className="btn btn-outline-secondary btn-sm"
+                className="px-3 py-1 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                 onClick={() => {
                   const newProduct: ProductItem = {
                     id: Date.now().toString(),
@@ -321,16 +328,16 @@ const CreatePurchaseOrderModal: React.FC<CreatePurchaseOrderPopupProps> = ({ isO
             </div>
             
             {/* Subscription Active */}
-            <div className="d-flex align-items-center gap-3">
-              <div className="form-check">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center">
                 <input
-                  className="form-check-input"
+                  className="h-4 w-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
                   type="checkbox"
                   id="active"
                   checked={formData.subscriptionActive}
                   onChange={(e) => setFormData({...formData, subscriptionActive: e.target.checked})}
                 />
-                <label className="form-check-label" htmlFor="active">
+                <label className="ml-2 block text-sm text-gray-700" htmlFor="active">
                   Subscription Active
                 </label>
               </div>
@@ -338,30 +345,41 @@ const CreatePurchaseOrderModal: React.FC<CreatePurchaseOrderPopupProps> = ({ isO
             
             {/* Attachment Section */}
             <div className="mt-4">
-              <label className="form-label fw-bold">Attachment</label>
-              <div className="d-flex align-items-center gap-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1 font-bold">Attachment</label>
+              <div className="flex items-center gap-2">
                 <input 
                   type="file" 
-                  className="form-control" 
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent" 
                   onChange={handleFileChange}
                   accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
                 />
                 {formData.attachment && (
-                  <div className="text-success">
-                    <small>{formData.attachment.name}</small>
+                  <div className="text-green-600">
+                    <small className="text-sm">{formData.attachment.name}</small>
                   </div>
                 )}
               </div>
-              <div className="form-text">
+              <div className="text-sm text-gray-500 mt-1">
                 Upload supporting documents (images, PDFs, DOC, XLS)
               </div>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="modal-footer border-0">
-            <button className="btn btn-light" type="button" onClick={onClose}>Cancel</button>
-            <button className="btn btn-dark px-4" type="button" onClick={handleSubmit} disabled={loading}>
+          <div className="flex justify-end space-x-3 pt-6 mt-6 border-t border-gray-200">
+            <button 
+              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              type="button" 
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+            <button 
+              className="px-4 py-2 text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              type="button" 
+              onClick={handleSubmit} 
+              disabled={loading}
+            >
               {loading ? 'Creating...' : 'Create Purchase Order'}
             </button>
           </div>
@@ -371,4 +389,4 @@ const CreatePurchaseOrderModal: React.FC<CreatePurchaseOrderPopupProps> = ({ isO
   );
 };
 
-export default CreatePurchaseOrderModal;
+export default CreatePurchaseOrderPopup;

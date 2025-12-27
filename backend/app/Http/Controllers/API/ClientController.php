@@ -18,7 +18,7 @@ class ClientController extends BaseAPIController
     {
         $this->service = $clientService;
         $this->storeRules = [
-            'name' => 'required|string|max:255',
+            'cli_name' => 'required|string|max:255',
             'company' => 'nullable|string|max:255',
             'email' => 'required|email|unique:clients,email',
             'phone' => 'nullable|string|max:20',

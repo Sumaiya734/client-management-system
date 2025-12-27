@@ -14,7 +14,7 @@ class ClientFormRequest extends BaseFormRequest
         switch($method) {
             case 'POST': // Create
                 return [
-                    'name' => 'required|string|max:255',
+                    'cli_name' => 'required|string|max:255',
                     'company' => 'nullable|string|max:255',
                     'email' => 'required|email|unique:clients,email',
                     'phone' => 'nullable|string|max:20',
@@ -25,7 +25,7 @@ class ClientFormRequest extends BaseFormRequest
             case 'PATCH':
                 $id = $this->route('client'); // Get client ID from route parameter
                 return [
-                    'name' => 'sometimes|string|max:255',
+                    'cli_name' => 'sometimes|string|max:255',
                     'company' => 'nullable|string|max:255',
                     'email' => 'sometimes|email|unique:clients,email,' . $id,
                     'phone' => 'nullable|string|max:20',
@@ -44,7 +44,7 @@ class ClientFormRequest extends BaseFormRequest
     {
         return [
             'email.unique' => 'A client with this email already exists.',
-            'name.required' => 'Client name is required.',
+            'cli_name.required' => 'Client name is required.',
         ];
     }
 }
