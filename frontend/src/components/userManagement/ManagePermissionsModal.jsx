@@ -106,10 +106,12 @@ const ManagePermissionsModal = ({ isOpen, onRequestClose, user, onUpdate }) => {
       backgroundColor: 'white',
       borderRadius: '0.5rem',
       padding: '0',
-      maxWidth: '600px',
-      width: '90%',
+      maxWidth: '390px',
+      width: '40%',
+      maxHeight: '80vh',
       border: 'none',
       boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+      overflow: 'auto',
     },
   };
 
@@ -132,11 +134,11 @@ const ManagePermissionsModal = ({ isOpen, onRequestClose, user, onUpdate }) => {
       contentLabel="Manage Permissions"
       ariaHideApp={false}
     >
-      <div className="p-6">
+      <div className="p-5">
         {/* Header */}
-        <div className="flex items-start justify-between mb-6">
+        <div className="flex items-start justify-between mb-4">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-1">Manage Permissions</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">Manage Permissions</h2>
             <p className="text-sm text-gray-600">Set specific permissions for {user?.name || 'User'}</p>
           </div>
           <button
@@ -150,9 +152,9 @@ const ManagePermissionsModal = ({ isOpen, onRequestClose, user, onUpdate }) => {
         </div>
 
         {/* Content */}
-        <div className="space-y-4">
+        <div className="space-y-3">
           {/* Administrator Checkbox */}
-          <label className="flex items-center gap-3 cursor-pointer">
+          <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               checked={isAdministrator}
@@ -164,15 +166,15 @@ const ManagePermissionsModal = ({ isOpen, onRequestClose, user, onUpdate }) => {
           </label>
 
           {/* Separator */}
-          <div className="border-t border-gray-200 my-4"></div>
+          <div className="border-t border-gray-200 my-3"></div>
 
           {/* Specific Permissions */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <h3 className="text-sm font-medium text-gray-900">Or select specific permissions:</h3>
             
-            <div className="space-y-3">
+            <div className="space-y-2">
               {permissionList.map((permission) => (
-                <label key={permission.key} className="flex items-start gap-3 cursor-pointer">
+                <label key={permission.key} className="flex items-start gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={permissions[permission.key]}
@@ -191,11 +193,12 @@ const ManagePermissionsModal = ({ isOpen, onRequestClose, user, onUpdate }) => {
         </div>
 
         {/* Footer Buttons */}
-        <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-200">
+        <div className="flex justify-center gap-2 mt-4 pt-4 border-t border-gray-200">
           <Button
             variant="outline"
             onClick={onRequestClose}
             disabled={loading}
+            size="sm"
           >
             Cancel
           </Button>
@@ -203,8 +206,9 @@ const ManagePermissionsModal = ({ isOpen, onRequestClose, user, onUpdate }) => {
             variant="primary"
             onClick={handleUpdate}
             disabled={loading}
+            size="sm"
           >
-            {loading ? 'Updating...' : 'Update Permissions'}
+            {loading ? 'Updating...' : 'Update'}
           </Button>
         </div>
       </div>

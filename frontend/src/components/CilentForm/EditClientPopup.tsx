@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, ChevronDown } from 'lucide-react';
 import './EditClientPopup.css'; // Ensure this is imported
 import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
 
 interface Client {
   id: string | number | null;
-  cli_name: string;
+  name: string;
   company: string;
   email: string;
   phone: string;
@@ -32,7 +33,7 @@ const EditClientPopup: React.FC<EditClientPopupProps> = ({
     // Initialize with default values to prevent undefined values
     return {
       id: client.id || null,
-      cli_name: client.cli_name || '',
+      name: client.name || '',
       company: client.company || '',
       email: client.email || '',
       phone: client.phone || '',
@@ -47,7 +48,7 @@ const EditClientPopup: React.FC<EditClientPopupProps> = ({
   useEffect(() => {
     setFormData({
       id: client.id || null,
-      cli_name: client.cli_name || '',
+      name: client.name || '',
       company: client.company || '',
       email: client.email || '',
       phone: client.phone || '',
@@ -75,13 +76,13 @@ const EditClientPopup: React.FC<EditClientPopupProps> = ({
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
     
-    if (!formData.cli_name.trim()) {
-      newErrors.cli_name = 'Name is required';
+    if (!formData.name.trim()) {
+      newErrors.name = 'Name is required';
     }
     
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    } else if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(formData.email)) {
       newErrors.email = 'Email is invalid';
     }
     
@@ -113,8 +114,8 @@ const EditClientPopup: React.FC<EditClientPopupProps> = ({
 
   if (!isVisible) return null;
 
-  return (
-    <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose}>
+  return createPortal(
+    <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose}>
       <PopupAnimation animationType="zoomIn" duration="0.3s">
         <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
@@ -140,18 +141,18 @@ const EditClientPopup: React.FC<EditClientPopupProps> = ({
           {/* Name and Company Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="cli_name" className="block text-xs font-medium text-gray-700 mb-1">
+              <label htmlFor="name" className="block text-xs font-medium text-gray-700 mb-1">
                 Name
               </label>
               <input
                 type="text"
-                id="cli_name"
-                value={formData.cli_name}
-                onChange={(e) => handleInputChange('cli_name', e.target.value)}
-                className={`w-full px-2 py-1.5 border ${errors.cli_name ? 'border-red-500' : 'border-gray-300'} rounded-md text-sm`}
+                id="name"
+                value={formData.name}
+                onChange={(e) => handleInputChange('name', e.target.value)}
+                className={`w-full px-2 py-1.5 border ${errors.name ? 'border-red-500' : 'border-gray-300'} rounded-md text-sm`}
                 required
               />
-              {errors.cli_name && <p className="text-xs text-red-600 mt-1">{errors.cli_name}</p>}
+              {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name}</p>}
             </div>
             <div>
               <label htmlFor="company" className="block text-xs font-medium text-gray-700 mb-1">
@@ -272,7 +273,8 @@ const EditClientPopup: React.FC<EditClientPopupProps> = ({
         </form>
       </div>
       </PopupAnimation>
-    </div>
+    </div>,
+    document.body
   );
 };
 

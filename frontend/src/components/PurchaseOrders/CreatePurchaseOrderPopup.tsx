@@ -1,5 +1,24 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { X, ChevronDown, Calendar, Plus, Upload, X as XIcon } from 'lucide-react';
 import api from '../../api';
+import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
+
+
+interface Product {
+  id: number;
+  name?: string;
+  product_name?: string;
+  price?: string;
+  base_price?: string;
+  bdt_price?: number;
+}
+
+interface Client {
+  id: number;
+  company: string;
+  contact: string;
+}
 
 interface CreatePurchaseOrderPopupProps {
   isOpen: boolean;
@@ -7,372 +26,446 @@ interface CreatePurchaseOrderPopupProps {
   onCreate: (orderData: any) => void;
 }
 
-interface ProductItem {
-  id: string;
-  productId: string;
-  quantity: number;
-  subscriptionStart: string;
-  subscriptionEnd: string;
-}
-
-interface FormData {
-  status: string;
-  clientId: string;
-  products: ProductItem[];
-  subscriptionActive: boolean;
-  attachment: File | null;
-}
-
 const CreatePurchaseOrderPopup: React.FC<CreatePurchaseOrderPopupProps> = ({
   isOpen,
   onClose,
   onCreate,
 }) => {
-  const [formData, setFormData] = useState<FormData>({
-    status: 'Pending',
-    clientId: '',
-    products: [{
-      id: Date.now().toString(),
-      productId: '',
-      quantity: 1,
-      subscriptionStart: '',
-      subscriptionEnd: '',
-    }],
-    subscriptionActive: false,
-    attachment: null,
+  const [formData, setFormData] = useState({
+    poNumber: '',
+    status: 'Draft',
+    client: '',
+    clientId: 0,
+    product: '',
+    productId: 0,
+    quantity: 1,
+    subscriptionStart: '',
+    subscriptionEnd: '',
+    subscriptionActive: false
   });
 
-  const [clients, setClients] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [dropdownStates, setDropdownStates] = useState({
+    status: false,
+    client: false,
+    product: false
+  });
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFormData({ ...formData, attachment: e.target.files[0] });
-    }
-  };
+  const [loading, setLoading] = useState(false);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [attachments, setAttachments] = useState<File[]>([]);
+
+  const statusOptions = ['Draft', 'Active', 'In Progress', 'Completed'];
 
   useEffect(() => {
     if (isOpen) {
-      fetchClientsAndProducts();
+      fetchData();
     }
   }, [isOpen]);
 
-  const fetchClientsAndProducts = async () => {
+  const fetchData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const [clientsRes, productsRes] = await Promise.all([
+      const [clientsResponse, productsResponse] = await Promise.all([
         api.get('/clients'),
-        api.get('/products'),
+        api.get('/products')
       ]);
-      setClients(clientsRes.data || []);
-      setProducts(productsRes.data || []);
+      
+      // After response interceptor normalization, response.data is the array of clients/products
+      setClients(clientsResponse.data);
+      setProducts(productsResponse.data);
+
     } catch (error) {
       console.error('Error fetching data:', error);
-      alert('Failed to load clients and products');
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleInputChange = (field: string, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const toggleDropdown = (dropdown: string) => {
+    setDropdownStates(prev => ({
+      ...prev,
+      [dropdown]: !prev[dropdown as keyof typeof prev]
+    }));
+  };
+
+  const selectClient = (client: Client) => {
+    setFormData(prev => ({
+      ...prev,
+      client: `${client.company} - ${client.contact}`,
+      clientId: client.id
+    }));
+    setDropdownStates(prev => ({ ...prev, client: false }));
+  };
+
+  const selectProduct = (product: Product) => {
+    setFormData(prev => ({
+      ...prev,
+      product: product.product_name || product.name,
+      productId: product.id
+    }));
+    setDropdownStates(prev => ({ ...prev, product: false }));
+  };
+
+  const selectStatus = (status: string) => {
+    setFormData(prev => ({ ...prev, status }));
+    setDropdownStates(prev => ({ ...prev, status: false }));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.clientId) {
-      alert('Please select a client');
-      return;
-    }
+    const formattedData = {
+      ...formData
+    };
 
-    const clientId = parseInt(formData.clientId);
-    if (isNaN(clientId) || clientId <= 0) {
-      alert('Please select a valid client');
-      return;
-    }
-
-    if (formData.products.length === 0 || formData.products.every(p => !p.productId)) {
-      alert('Please add at least one product');
-      return;
-    }
-
-    for (const product of formData.products) {
-      const productId = parseInt(product.productId);
-      if (isNaN(productId) || productId <= 0) {
-        alert('Please select a valid product for each entry');
-        return;
-      }
-      if (!product.subscriptionStart || !product.subscriptionEnd) {
-        alert('Please fill in subscription dates for all products');
-        return;
-      }
-      if (new Date(product.subscriptionStart) >= new Date(product.subscriptionEnd)) {
-        alert('End date must be after start date');
-        return;
-      }
-    }
-
-    try {
-      setLoading(true);
-      const orderData = {
-        status: formData.status,
-        client_id: clientId,
-        products: formData.products.map(p => ({
-          productId: parseInt(p.productId),
-          quantity: p.quantity,
-          subscription_start: p.subscriptionStart,
-          subscription_end: p.subscriptionEnd,
-        })),
-        subscription_active: formData.subscriptionActive,
-        total_amount: 0,
-        attachment: formData.attachment,
-      };
-
-      await onCreate(orderData);
-      onClose(); // Optional: close on success
-    } catch (error) {
-      console.error('Error creating PO:', error);
-      alert('Failed to create purchase order');
-    } finally {
-      setLoading(false);
-    }
+    onCreate(formattedData);
+    onClose();
   };
 
-  const addProduct = () => {
-    const newProduct: ProductItem = {
-      id: Date.now().toString(),
-      productId: '',
+  const handleCancel = () => {
+    setFormData({
+      poNumber: '',
+      status: 'Draft',
+      client: '',
+      clientId: 0,
+      product: '',
+      productId: 0,
       quantity: 1,
       subscriptionStart: '',
       subscriptionEnd: '',
-    };
-    setFormData({ ...formData, products: [...formData.products, newProduct] });
-  };
-
-  const removeProduct = (index: number) => {
-    setFormData({
-      ...formData,
-      products: formData.products.filter((_, i) => i !== index),
+      subscriptionActive: false
     });
+    setAttachments([]);
+    onClose();
   };
 
-  const updateProduct = (index: number, field: keyof ProductItem, value: any) => {
-    const updated = [...formData.products];
-    updated[index] = { ...updated[index], [field]: value };
-    setFormData({ ...formData, products: updated });
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/zip',
+      'application/x-zip-compressed',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain',
+      'image/jpeg',
+      'image/png',
+      'image/gif'
+    ];
+
+    const validFiles = files.filter(file => {
+      if (!allowedTypes.includes(file.type)) {
+        alert(`File type ${file.type} is not allowed.`);
+        return false;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        alert(`File ${file.name} is too large.`);
+        return false;
+      }
+      return true;
+    });
+
+    setAttachments(prev => [...prev, ...validFiles]);
   };
 
-  if (!isOpen) return null;
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4">
-      <div
-        className="w-full max-w-4xl max-h-[90vh] overflow-hidden bg-white rounded-2xl shadow-2xl flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-8 py-6 border-b border-gray-200 bg-gray-50">
-          <div>
-            <h3 className="text-2xl font-semibold text-gray-900">Create Purchase Order</h3>
-            <p className="mt-1 text-sm text-gray-600">Fill in the details to generate a new PO</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors text-3xl leading-none"
-            aria-label="Close"
-          >
-            &times;
-          </button>
-        </div>
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
 
-        {/* Body - Scrollable */}
-        <div className="flex-1 overflow-y-auto px-8 py-6">
-          {loading && !clients.length && !products.length ? (
-            <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
-              <p className="mt-4 text-gray-600">Loading clients and products...</p>
+  const { isVisible, isAnimating } = useAnimationState(isOpen);
+
+  if (!isOpen && !isAnimating) return null;
+
+  return createPortal(
+    <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose}>
+      <PopupAnimation animationType="zoomIn" duration="0.3s">
+        <div className="bg-white rounded-lg shadow-lg w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+
+          {/* HEADER */}
+          <div className="flex items-center justify-between p-4 border-b border-gray-200">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Create Purchase Order</h2>
+              <p className="text-xs text-gray-500 mt-1">Fill the required information</p>
             </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-8">
-              {/* Basic Information */}
-              <section>
-                <h4 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">PO Number</label>
-                    <input
-                      type="text"
-                      readOnly
-                      value="Auto-generated"
-                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-gray-500 cursor-not-allowed"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Status</label>
-                    <select
-                      value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                    >
-                      <option value="Pending">Pending</option>
-                      <option value="Approved">Approved</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Client <span className="text-red-500">*</span></label>
-                    <select
-                      value={formData.clientId}
-                      onChange={(e) => setFormData({ ...formData, clientId: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                      required
-                    >
-                      <option value="">Select a client</option>
-                      {clients.map((client) => (
-                        <option key={client.id} value={client.id}>
-                          {client.company || client.cli_name} ({client.contact || client.email})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </section>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+              <X size={20} />
+            </button>
+          </div>
 
-              {/* Products Section */}
-              <section>
-                <h4 className="text-lg font-semibold text-gray-900 mb-4">Products & Subscriptions</h4>
-                <div className="space-y-5">
-                  {formData.products.map((product, index) => (
-                    <div key={product.id} className="p-6 bg-gray-50 border border-gray-200 rounded-xl">
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-                        <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                            Product {index + 1} <span className="text-red-500">*</span>
-                          </label>
-                          <select
-                            value={product.productId}
-                            onChange={(e) => updateProduct(index, 'productId', e.target.value)}
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            required
+          {/* FORM */}
+          <form onSubmit={handleSubmit} className="p-4 text-sm space-y-6">
+
+            {/* BASIC INFORMATION */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Basic Information</h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                {/* PO NUMBER */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">PO Number</label>
+                  <input
+                    type="text"
+                    value={formData.poNumber}
+                    onChange={(e) => handleInputChange('poNumber', e.target.value)}
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-gray-800"
+                    required
+                  />
+                </div>
+
+                {/* STATUS */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => toggleDropdown('status')}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded-md bg-white text-left flex items-center justify-between"
+                    >
+                      {formData.status}
+                      <ChevronDown size={14} />
+                    </button>
+
+                    {dropdownStates.status && (
+                      <div className="absolute w-full bg-white border border-gray-200 rounded-md shadow-md z-20 mt-1 text-xs">
+                        {statusOptions.map((option) => (
+                          <button
+                            key={option}
+                            type="button"
+                            onClick={() => selectStatus(option)}
+                            className="w-full px-2 py-1.5 text-left hover:bg-gray-50"
                           >
-                            <option value="">Select product</option>
-                            {products.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.product_name || p.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1.5">Quantity</label>
-                          <input
-                            type="number"
-                            min="1"
-                            value={product.quantity}
-                            onChange={(e) => updateProduct(index, 'quantity', parseInt(e.target.value) || 1)}
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                        <br />
-                        <div className="flex items-end gap-3">
-                          <div className="flex-1">
-                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Start Date</label>
-                            <input
-                              type="date"
-                              value={product.subscriptionStart}
-                              onChange={(e) => updateProduct(index, 'subscriptionStart', e.target.value)}
-                              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <label className="block text-sm font-medium text-gray-700 mb-1.5">End Date</label>
-                            <input
-                              type="date"
-                              value={product.subscriptionEnd}
-                              onChange={(e) => updateProduct(index, 'subscriptionEnd', e.target.value)}
-                              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                          </div>
-                          {formData.products.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => removeProduct(index)}
-                              className="mb-1 px-4 py-2.5 text-red-600 hover:bg-red-50 border border-red-300 rounded-xl transition"
-                            >
-                              Remove
-                            </button>
-                          )}
-                        </div>
+                            {option}
+                          </button>
+                        ))}
                       </div>
-                    </div>
-                  ))}
+                    )}
+                  </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={addProduct}
-                  className="mt-4 px-5 py-2.5 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl transition flex items-center gap-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Add Another Product
-                </button>
-              </section>
+                {/* CLIENT */}
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Client</label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => toggleDropdown('client')}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded-md bg-white text-left flex items-center justify-between"
+                    >
+                      {formData.client || 'Select client'}
+                      <ChevronDown size={14} />
+                    </button>
 
-              {/* Additional Options */}
-              <section className="space-y-6">
+                    {dropdownStates.client && (
+                      <div className="absolute w-full bg-white border border-gray-200 rounded-md shadow-md z-20 mt-1 max-h-40 overflow-auto text-xs">
+                        {loading ? (
+                          <div className="px-2 py-2 text-center text-gray-500">Loading...</div>
+                        ) : (
+                          clients.map((client) => (
+                            <button
+                              key={client.id}
+                              type="button"
+                              onClick={() => selectClient(client)}
+                              className="w-full px-2 py-1.5 text-left hover:bg-gray-50"
+                            >
+                              <div className="font-medium">{client.company}</div>
+                              <div className="text-[10px] text-gray-500">{client.contact}</div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* PRODUCTS */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Products & Subscription</h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                {/* PRODUCT */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Product</label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => toggleDropdown('product')}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded-md bg-white text-left flex items-center justify-between"
+                    >
+                      {formData.product || 'Select product'}
+                      <ChevronDown size={14} />
+                    </button>
+
+                    {dropdownStates.product && (
+                      <div className="absolute w-full bg-white border border-gray-200 rounded-md shadow-md z-20 mt-1 max-h-40 overflow-auto text-xs">
+                        {products.map((product) => (
+                          <button
+                            key={product.id}
+                            type="button"
+                            onClick={() => selectProduct(product)}
+                            className="w-full px-2 py-1.5 text-left hover:bg-gray-50"
+                          >
+                            <div>{product.product_name || product.name}</div>
+                            <div className="text-[10px] text-gray-500">৳{product.base_price || product.price}</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* QUANTITY */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={formData.quantity}
+                    onChange={(e) => handleInputChange('quantity', parseInt(e.target.value) || 1)}
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-gray-800"
+                  />
+                </div>
+              </div>
+
+              {/* DATES */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Subscription Start</label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={formData.subscriptionStart}
+                      onChange={(e) => handleInputChange('subscriptionStart', e.target.value)}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-gray-800"
+                    />
+                    <Calendar className="absolute right-2 top-2 h-3 w-3 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Subscription End</label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={formData.subscriptionEnd}
+                      onChange={(e) => handleInputChange('subscriptionEnd', e.target.value)}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-gray-800"
+                    />
+                    <Calendar className="absolute right-2 top-2 h-3 w-3 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+
+              {/* SUBSCRIPTION ACTIVE & ADD PRODUCT */}
+              <div className="flex items-center justify-between mt-3">
                 <div className="flex items-center">
                   <input
                     type="checkbox"
                     id="subscriptionActive"
                     checked={formData.subscriptionActive}
-                    onChange={(e) => setFormData({ ...formData, subscriptionActive: e.target.checked })}
-                    className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    onChange={(e) => handleInputChange('subscriptionActive', e.target.checked)}
+                    className="h-3 w-3 text-gray-900 focus:ring-gray-800 border-gray-300 rounded"
                   />
-                  <label htmlFor="subscriptionActive" className="ml-3 text-base font-medium text-gray-900">
-                    Mark subscription as active
+                  <label htmlFor="subscriptionActive" className="ml-2 text-xs font-medium text-gray-700">
+                    Subscription Active
                   </label>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Attachment (Optional)</label>
+                <button
+                  type="button"
+                  className="inline-flex items-center px-2 py-1 border border-gray-300 shadow-sm text-xs leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add Product
+                </button>
+              </div>
+            </div>
+
+            {/* ATTACHMENTS */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Attachments</h3>
+
+              <div className="border border-dashed border-gray-300 rounded-md p-3 text-center hover:border-gray-400 transition">
+                <Upload className="h-6 w-6 mx-auto text-gray-400 mb-1" />
+
+                <label className="text-xs cursor-pointer text-blue-600 hover:text-blue-500">
+                  <span>Upload files</span>
                   <input
                     type="file"
+                    multiple
+                    className="hidden"
                     onChange={handleFileChange}
-                    accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
-                    className="block w-full text-sm text-gray-600 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition"
+                    accept=".pdf,.doc,.docx,.zip,.xls,.xlsx,.txt,.png,.jpg,.jpeg,.gif"
                   />
-                  {formData.attachment && (
-                    <p className="mt-2 text-sm text-green-600">
-                      ✓ {formData.attachment.name}
-                    </p>
-                  )}
-                  <p className="mt-1 text-xs text-gray-500">Supported: Images, PDF, Word, Excel</p>
-                </div>
-              </section>
-            </form>
-          )}
-        </div>
+                </label>
 
-        {/* Footer */}
-        <div className="flex justify-end gap-4 px-8 py-6 bg-gray-50 border-t border-gray-200">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-6 py-3 text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition font-medium"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={loading}
-            className="px-8 py-3 text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed rounded-xl font-medium transition shadow-sm flex items-center gap-2"
-          >
-            {loading && <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
-            {loading ? 'Creating...' : 'Create Purchase Order'}
-          </button>
+                <p className="text-[10px] text-gray-400 mt-1">Up to 10MB each</p>
+              </div>
+
+              {/* Selected files */}
+              {attachments.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {attachments.map((file, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between bg-gray-50 p-2 rounded-md text-xs"
+                    >
+                      <div>
+                        <p className="font-medium">{file.name}</p>
+                        <p className="text-gray-500">{formatFileSize(file.size)}</p>
+                      </div>
+
+                      <button onClick={() => removeAttachment(index)}>
+                        <XIcon className="h-4 w-4 text-gray-500 hover:text-gray-700" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* FOOTER */}
+            <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                className="px-3 py-1.5 text-xs font-medium text-white bg-gray-900 rounded-md hover:bg-gray-800"
+              >
+                Create Purchase Order
+              </button>
+            </div>
+
+          </form>
         </div>
-      </div>
-    </div>
+      </PopupAnimation>
+    </div>,
+    document.body
   );
 };
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
 
@@ -89,10 +90,10 @@ const MultiCurrencyPricingPopup: React.FC<MultiCurrencyPricingPopupProps> = ({
 
   if (!isVisible || !product) return null;
 
-  return (
-    <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+  return createPortal(
+    <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose}>
       <PopupAnimation animationType="zoomIn" duration="0.3s">
-        <div className="bg-white rounded-lg shadow-xl w-full max-w-xl mx-4">
+        <div className="bg-white rounded-lg shadow-xl w-full max-w-xl mx-4" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
@@ -207,7 +208,8 @@ const MultiCurrencyPricingPopup: React.FC<MultiCurrencyPricingPopupProps> = ({
         </form>
       </div>
       </PopupAnimation>
-    </div>
+    </div>,
+    document.body
   );
 };
 

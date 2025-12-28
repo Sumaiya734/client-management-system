@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, ChevronDown, Upload, X as XIcon } from 'lucide-react';
 import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
 
@@ -195,22 +196,13 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
     onClose();
   };
 
-  const handleWebsiteBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    let value = e.target.value;
-    if (!value.startsWith('http://') && !value.startsWith('https://')) {
-      value = 'http://' + value;
-    }
-    handleInputChange('vendorWebsite', value);
-  };
-  
-
   const { isVisible, isAnimating } = useAnimationState(isOpen);
 
   if (!isVisible) return null;
 
-  return (
+  return createPortal(
     <div 
-      className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+      className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
       onClick={onClose}
     >
       <PopupAnimation animationType="zoomIn" duration="0.3s">
@@ -223,10 +215,10 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <div>
             <h2 className="text-base font-semibold text-gray-900">
-              {isEditMode ? 'Edit Product' : 'Add New Product'}
+              {isEditMode ? 'Edit Product' : 'Add Product'}
             </h2>
             <p className="text-xs text-gray-600 mt-1">
-              {isEditMode ? 'Update product information' : 'Enter product details below'}
+              {isEditMode ? 'Update product information' : 'Create a new product'}
             </p>
           </div>
 
@@ -245,7 +237,6 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
               <input
                 type="text"
                 value={formData.name}
-                placeholder='Microsoft Teams, Zoom Pro,etc'
                 onChange={(e) => handleInputChange('name', e.target.value)}
                 className={`w-full px-2 py-1.5 border ${
                   errors.name ? 'border-red-500' : 'border-gray-300'
@@ -259,7 +250,6 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
               <input
                 type="text"
                 value={formData.vendor}
-                placeholder='Microsoft, Zoom, Google,etc'
                 onChange={(e) => handleInputChange('vendor', e.target.value)}
                 className={`w-full px-2 py-1.5 border ${
                   errors.vendor ? 'border-red-500' : 'border-gray-300'
@@ -273,12 +263,11 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Vendor Website</label>
             <input
-              type="text"
+              type="url"
               value={formData.vendorWebsite}
               onChange={(e) => handleInputChange('vendorWebsite', e.target.value)}
-              onBlur={handleWebsiteBlur}
               className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
-              placeholder="www.example.com"
+              placeholder="https://example.com"
             />
           </div>
 
@@ -354,7 +343,6 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
             <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
             <textarea
               value={formData.description}
-              placeholder=' Product description'
               onChange={(e) => handleInputChange('description', e.target.value)}
               rows={3}
               className={`w-full px-2 py-1.5 border ${
@@ -483,7 +471,8 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
         </form>
       </div>
       </PopupAnimation>
-    </div>
+    </div>,
+    document.body
   );
 };
 
