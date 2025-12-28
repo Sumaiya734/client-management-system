@@ -21,13 +21,27 @@ api.interceptors.request.use(
 // Add response interceptor to handle auth errors and normalize responses
 api.interceptors.response.use(
   (response) => {
+    // Don't normalize login responses as they contain both user and token
+    if (response.config.url.endsWith('/login')) {
+      return response; // Return original response for login
+    }
+    
     // If the response has our standard format {success: true, data: ...}, normalize it
-    if (response.data && response.data.hasOwnProperty('success') && response.data.data !== undefined) {
-      // Create a new response object with the data property replaced by the inner data
-      return {
-        ...response,
-        data: response.data.data
-      };
+    if (response.data && response.data.hasOwnProperty('success')) {
+      // For responses with data property
+      if (response.data.data !== undefined) {
+        return {
+          ...response,
+          data: response.data.data
+        };
+      }
+      // For responses with user property (like /user endpoint)
+      if (response.data.user !== undefined && response.config.url.endsWith('/user')) {
+        return {
+          ...response,
+          data: response.data.user
+        };
+      }
     }
     return response;
   },
@@ -75,19 +89,22 @@ export const billingManagementApi = {
   delete: (id) => api.delete(`/billing-managements/${id}`),
   search: (params) => api.get('/billing-managements-search', { params }),
   summary: () => api.get('/billing-managements-summary'),
+  generateReport: (params) => api.post('/reports-generate', params),
 };
 
 // Authentication API functions
 export const authApi = {
   login: (credentials) => {
+    // For login, we need to handle token storage before response normalization
     return api.post('/login', credentials)
       .then(response => {
+        // Store token from the original response before normalization
         if (response.data.success && response.data.token) {
           localStorage.setItem('authToken', response.data.token);
           // Set the token in the default axios instance as well
           api.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
         }
-        return response;
+        return response; // Return as-is, the interceptor will normalize it
       });
   },
   logout: () => {

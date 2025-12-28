@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import './globals.css';
+import 'aos/dist/aos.css';
 import AOSWrapper from './hoc/AOSWrapper';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';

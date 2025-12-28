@@ -44,8 +44,10 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       // Make an API call to get user details using the stored token
       const response = await api.get('/user');
-      if (response.data && response.data.user) {
-        setUser(response.data.user);
+      // The response has been normalized by the API interceptor
+      // Check if response.data contains the user directly or if we need to handle the original format
+      if (response.data) {
+        setUser(response.data);
       }
     } catch (error) {
       console.error('Error fetching user details:', error);
@@ -61,11 +63,11 @@ export const AuthProvider = ({ children }) => {
   const login = async (credentials) => {
     try {
       const response = await authApi.login(credentials);
-      if (response.data.success && response.data.token) {
+      // Login response is not normalized, so response.data contains the full response
+      if (response.data.success && response.data.token && response.data.user) {
         // Set user info after successful login
-        const user = response.data.user;
-        setUser(user);
-        return { success: true, user };
+        setUser(response.data.user);
+        return { success: true, user: response.data.user };
       } else {
         return { success: false, message: 'Invalid login response' };
       }

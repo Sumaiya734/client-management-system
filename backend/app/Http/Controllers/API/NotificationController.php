@@ -3,19 +3,25 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Notification;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 
 class NotificationController extends Controller
 {
+    protected $notificationService;
+    
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
+
     /**
      * Display a listing of the resource.
      */
     public function index()
     {
         try {
-            $notifications = Notification::with('client', 'user')->orderBy('created_at', 'desc')->get();
+            $notifications = $this->notificationService->getAll();
             
             return response()->json([
                 'success' => true,
@@ -37,28 +43,7 @@ class NotificationController extends Controller
     public function store(Request $request)
     {
         try {
-            $validator = Validator::make($request->all(), [
-                'type' => 'required|string|max:255',
-                'recipient' => 'required|string|max:255',
-                'client' => 'required|string|max:255',
-                'subject' => 'required|string|max:255',
-                'message' => 'required|string',
-                'method' => 'required|string|in:Email,SMS,Push,In-App',
-                'status' => 'required|string|in:Pending,Sent,Failed,Read',
-                'sent_at' => 'nullable|date',
-                'client_id' => 'nullable|exists:clients,id',
-                'user_id' => 'nullable|exists:users,id',
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation error',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $notification = Notification::create($request->all());
+            $notification = $this->notificationService->create($request->all());
 
             return response()->json([
                 'success' => true,
@@ -67,6 +52,17 @@ class NotificationController extends Controller
             ], 201);
             
         } catch (\Exception $e) {
+            // Extract validation errors from the exception message if present
+            $errors = [];
+            if (strpos($e->getMessage(), 'Validation error') !== false) {
+                $errors = json_decode(substr($e->getMessage(), strpos($e->getMessage(), ':') + 1), true);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation error',
+                    'errors' => $errors
+                ], 422);
+            }
+            
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create notification',
@@ -81,7 +77,7 @@ class NotificationController extends Controller
     public function show(string $id)
     {
         try {
-            $notification = Notification::with('client', 'user')->find($id);
+            $notification = $this->notificationService->getById($id);
 
             if (!$notification) {
                 return response()->json([
@@ -111,36 +107,7 @@ class NotificationController extends Controller
     public function update(Request $request, string $id)
     {
         try {
-            $notification = Notification::find($id);
-
-            if (!$notification) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Notification not found'
-                ], 404);
-            }
-
-            $validator = Validator::make($request->all(), [
-                'type' => 'sometimes|string|max:255',
-                'recipient' => 'sometimes|string|max:255',
-                'client' => 'sometimes|string|max:255',
-                'subject' => 'sometimes|string|max:255',
-                'message' => 'sometimes|string',
-                'method' => 'sometimes|string|in:Email,SMS,Push,In-App',
-                'status' => 'sometimes|string|in:Pending,Sent,Failed,Read',
-                'sent_at' => 'nullable|date',
-                'client_id' => 'nullable|exists:clients,id',
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation error',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $notification->update($request->all());
+            $notification = $this->notificationService->update($id, $request->all());
 
             return response()->json([
                 'success' => true,
@@ -149,6 +116,24 @@ class NotificationController extends Controller
             ]);
             
         } catch (\Exception $e) {
+            // Extract validation errors from the exception message if present
+            $errors = [];
+            if (strpos($e->getMessage(), 'Validation error') !== false) {
+                $errors = json_decode(substr($e->getMessage(), strpos($e->getMessage(), ':') + 1), true);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation error',
+                    'errors' => $errors
+                ], 422);
+            }
+            
+            if (strpos($e->getMessage(), 'Notification not found') !== false) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Notification not found'
+                ], 404);
+            }
+            
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update notification',
@@ -163,16 +148,7 @@ class NotificationController extends Controller
     public function destroy(string $id)
     {
         try {
-            $notification = Notification::find($id);
-
-            if (!$notification) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Notification not found'
-                ], 404);
-            }
-
-            $notification->delete();
+            $result = $this->notificationService->delete($id);
 
             return response()->json([
                 'success' => true,
@@ -180,6 +156,13 @@ class NotificationController extends Controller
             ]);
             
         } catch (\Exception $e) {
+            if (strpos($e->getMessage(), 'Notification not found') !== false) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Notification not found'
+                ], 404);
+            }
+            
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete notification',
@@ -194,16 +177,7 @@ class NotificationController extends Controller
     public function markAsRead(string $id)
     {
         try {
-            $notification = Notification::find($id);
-
-            if (!$notification) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Notification not found'
-                ], 404);
-            }
-
-            $notification->update(['status' => 'Read']);
+            $notification = $this->notificationService->markAsRead($id);
 
             return response()->json([
                 'success' => true,
@@ -212,6 +186,13 @@ class NotificationController extends Controller
             ]);
             
         } catch (\Exception $e) {
+            if (strpos($e->getMessage(), 'Notification not found') !== false) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Notification not found'
+                ], 404);
+            }
+            
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to mark notification as read',
@@ -226,19 +207,7 @@ class NotificationController extends Controller
     public function getUserNotifications(Request $request, string $userId)
     {
         try {
-            $query = Notification::with('client', 'user')->where('user_id', $userId);
-            
-            // Filter by status
-            if ($request->has('status') && $request->get('status') !== 'All Status') {
-                $query->where('status', $request->get('status'));
-            }
-            
-            // Filter by type
-            if ($request->has('type')) {
-                $query->where('type', $request->get('type'));
-            }
-            
-            $notifications = $query->orderBy('created_at', 'desc')->get();
+            $notifications = $this->notificationService->getUserNotifications($userId, $request);
 
             return response()->json([
                 'success' => true,
@@ -261,22 +230,7 @@ class NotificationController extends Controller
     public function sendNotification(Request $request, string $id)
     {
         try {
-            $notification = Notification::find($id);
-
-            if (!$notification) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Notification not found'
-                ], 404);
-            }
-
-            // Here you would implement the actual notification sending logic
-            // based on the method (Email, SMS, Push, etc.)
-            
-            $notification->update([
-                'status' => 'Sent',
-                'sent_at' => now()
-            ]);
+            $notification = $this->notificationService->sendNotification($id);
 
             return response()->json([
                 'success' => true,
@@ -285,6 +239,13 @@ class NotificationController extends Controller
             ]);
             
         } catch (\Exception $e) {
+            if (strpos($e->getMessage(), 'Notification not found') !== false) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Notification not found'
+                ], 404);
+            }
+            
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to send notification',

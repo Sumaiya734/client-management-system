@@ -3,19 +3,25 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Currency_rate;
+use App\Services\CurrencyRateService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 
 class CurrencyRateController extends Controller
 {
+    protected $currencyRateService;
+    
+    public function __construct(CurrencyRateService $currencyRateService)
+    {
+        $this->currencyRateService = $currencyRateService;
+    }
+
     /**
      * Display a listing of the resource.
      */
     public function index()
     {
         try {
-            $currencyRates = Currency_rate::all();
+            $currencyRates = $this->currencyRateService->getAll();
             
             return response()->json([
                 'success' => true,
@@ -37,23 +43,7 @@ class CurrencyRateController extends Controller
     public function store(Request $request)
     {
         try {
-            $validator = Validator::make($request->all(), [
-                'currency' => 'required|string|max:255|unique:currency_rates,currency',
-                'rate' => 'required|numeric|min:0',
-                'last_updated' => 'nullable|date',
-                'change' => 'nullable|numeric',
-                'trend' => 'nullable|string|max:50',
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation error',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $currencyRate = Currency_rate::create($request->all());
+            $currencyRate = $this->currencyRateService->create($request->all());
 
             return response()->json([
                 'success' => true,
@@ -62,6 +52,17 @@ class CurrencyRateController extends Controller
             ], 201);
             
         } catch (\Exception $e) {
+            // Extract validation errors from the exception message if present
+            $errors = [];
+            if (strpos($e->getMessage(), 'Validation error') !== false) {
+                $errors = json_decode(substr($e->getMessage(), strpos($e->getMessage(), ':') + 1), true);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation error',
+                    'errors' => $errors
+                ], 422);
+            }
+            
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create currency rate',
@@ -76,7 +77,7 @@ class CurrencyRateController extends Controller
     public function show(string $id)
     {
         try {
-            $currencyRate = Currency_rate::find($id);
+            $currencyRate = $this->currencyRateService->getById($id);
 
             if (!$currencyRate) {
                 return response()->json([
@@ -106,32 +107,7 @@ class CurrencyRateController extends Controller
     public function update(Request $request, string $id)
     {
         try {
-            $currencyRate = Currency_rate::find($id);
-
-            if (!$currencyRate) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Currency rate not found'
-                ], 404);
-            }
-
-            $validator = Validator::make($request->all(), [
-                'currency' => 'sometimes|string|max:255|unique:currency_rates,currency,' . $id,
-                'rate' => 'sometimes|numeric|min:0',
-                'last_updated' => 'nullable|date',
-                'change' => 'nullable|numeric',
-                'trend' => 'nullable|string|max:50',
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation error',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $currencyRate->update($request->all());
+            $currencyRate = $this->currencyRateService->update($id, $request->all());
 
             return response()->json([
                 'success' => true,
@@ -140,6 +116,24 @@ class CurrencyRateController extends Controller
             ]);
             
         } catch (\Exception $e) {
+            // Extract validation errors from the exception message if present
+            $errors = [];
+            if (strpos($e->getMessage(), 'Validation error') !== false) {
+                $errors = json_decode(substr($e->getMessage(), strpos($e->getMessage(), ':') + 1), true);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation error',
+                    'errors' => $errors
+                ], 422);
+            }
+            
+            if (strpos($e->getMessage(), 'Currency rate not found') !== false) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Currency rate not found'
+                ], 404);
+            }
+            
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update currency rate',
@@ -154,16 +148,7 @@ class CurrencyRateController extends Controller
     public function destroy(string $id)
     {
         try {
-            $currencyRate = Currency_rate::find($id);
-
-            if (!$currencyRate) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Currency rate not found'
-                ], 404);
-            }
-
-            $currencyRate->delete();
+            $result = $this->currencyRateService->delete($id);
 
             return response()->json([
                 'success' => true,
@@ -171,6 +156,13 @@ class CurrencyRateController extends Controller
             ]);
             
         } catch (\Exception $e) {
+            if (strpos($e->getMessage(), 'Currency rate not found') !== false) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Currency rate not found'
+                ], 404);
+            }
+            
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete currency rate',
@@ -185,29 +177,7 @@ class CurrencyRateController extends Controller
     public function search(Request $request)
     {
         try {
-            $query = Currency_rate::query();
-
-            // Search by currency code
-            if ($request->has('search')) {
-                $search = $request->get('search');
-                $query->where('currency', 'like', "%{$search}%");
-            }
-
-            // Filter by trend
-            if ($request->has('trend') && $request->get('trend') !== 'All Trends') {
-                $query->where('trend', $request->get('trend'));
-            }
-
-            // Filter by date range
-            if ($request->has('start_date')) {
-                $query->where('last_updated', '>=', $request->get('start_date'));
-            }
-            
-            if ($request->has('end_date')) {
-                $query->where('last_updated', '<=', $request->get('end_date'));
-            }
-
-            $currencyRates = $query->get();
+            $currencyRates = $this->currencyRateService->search($request);
 
             return response()->json([
                 'success' => true,
@@ -230,24 +200,11 @@ class CurrencyRateController extends Controller
     public function summary()
     {
         try {
-            $totalRates = Currency_rate::count();
-            $highestRate = Currency_rate::max('rate');
-            $lowestRate = Currency_rate::min('rate');
-            
-            $increasingTrend = Currency_rate::where('trend', 'up')->count();
-            $decreasingTrend = Currency_rate::where('trend', 'down')->count();
-            $stableTrend = Currency_rate::where('trend', 'stable')->count();
+            $summary = $this->currencyRateService->getSummary();
 
             return response()->json([
                 'success' => true,
-                'data' => [
-                    'totalRates' => $totalRates,
-                    'highestRate' => $highestRate,
-                    'lowestRate' => $lowestRate,
-                    'increasingTrend' => $increasingTrend,
-                    'decreasingTrend' => $decreasingTrend,
-                    'stableTrend' => $stableTrend
-                ],
+                'data' => $summary,
                 'message' => 'Currency rates summary retrieved successfully'
             ]);
             
