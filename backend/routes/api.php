@@ -84,7 +84,7 @@ Route::post('notifications/{id}/send', [\App\Http\Controllers\Api\NotificationCo
 Route::apiResource('purchases', \App\Http\Controllers\Api\PurchaseController::class);
 
 // Subscription Management Routes
-Route::apiResource('subscriptions', \App\Http\Controllers\Api\SubscriptionController::class);
+Route::apiResource('subscriptions', \App\Http\Controllers\Api\SubscriptionController::class)->middleware('auth:sanctum');
 
 // Payment Management Routes
 Route::apiResource('payment-managements', \App\Http\Controllers\Api\PaymentManagementController::class);

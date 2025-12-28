@@ -38,7 +38,7 @@ class ClientController extends BaseAPIController
 
             // Define update rules with unique validation that excludes the current record
             $updateRules = [
-                'name' => 'sometimes|string|max:255',
+                'cli_name' => 'sometimes|string|max:255',
                 'company' => 'nullable|string|max:255',
                 'email' => 'sometimes|email|unique:clients,email,' . $id,
                 'phone' => 'nullable|string|max:20',

@@ -177,13 +177,13 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
           profit: parseFloat(formData.profitMargin),
           bdtPrice: `৳${pricePreview.bdtPrice}`,
           bdtLabel: 'BDT (final price)',
-          currencies: [],
+          currencies: product.currencies || [],
           status: formData.status,
           product_name: formData.name,
           vendor_type: formData.subscriptionType,
           base_price: parseFloat(formData.basePrice),
           bdt_price: parseFloat(pricePreview.bdtPrice),
-          multi_currency: JSON.stringify([]),
+          multi_currency: JSON.stringify(product.currencies || []),
         };
         onUpdate(productToSubmit);
       }

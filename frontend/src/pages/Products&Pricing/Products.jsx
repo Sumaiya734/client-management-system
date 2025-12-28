@@ -92,7 +92,7 @@ export default function Products() {
         profit: product.profit_margin || 0,
         bdtPrice: `৳${product.bdt_price || 0}`,
         bdtLabel: 'BDT (final price)',
-        currencies: product.multi_currency ? JSON.parse(product.multi_currency) : [],
+        currencies: product.multi_currency ? (typeof product.multi_currency === 'string' ? JSON.parse(product.multi_currency) : product.multi_currency) : [],
         status: product.status
       }));
       setProducts(transformedProducts);
@@ -237,7 +237,7 @@ export default function Products() {
               profit: response.data.profit_margin || 0,
               bdtPrice: `৳${response.data.bdt_price || 0}`,
               bdtLabel: 'BDT (final price)',
-              currencies: response.data.multi_currency ? JSON.parse(response.data.multi_currency) : [],
+              currencies: response.data.multi_currency ? (typeof response.data.multi_currency === 'string' ? JSON.parse(response.data.multi_currency) : response.data.multi_currency) : [],
               status: response.data.status
             } : product
           )
@@ -273,7 +273,7 @@ export default function Products() {
           profit: response.data.profit_margin || 0,
           bdtPrice: `৳${response.data.bdt_price || 0}`,
           bdtLabel: 'BDT (final price)',
-          currencies: response.data.multi_currency ? JSON.parse(response.data.multi_currency) : [],
+          currencies: response.data.multi_currency ? (typeof response.data.multi_currency === 'string' ? JSON.parse(response.data.multi_currency) : response.data.multi_currency) : [],
           status: response.data.status
         };
         

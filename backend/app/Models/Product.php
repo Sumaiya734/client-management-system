@@ -19,7 +19,6 @@ class Product extends Model
         'vendor',            
         'vendor_website',    
         'profit_margin',     
-        'currencies'
     ];
     
     protected $casts = [

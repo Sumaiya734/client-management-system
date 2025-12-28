@@ -67,7 +67,7 @@ class ReportService
             
             return [
                 'id' => $client->id,
-                'name' => $client->name,
+                'name' => $client->cli_name,
                 'company' => $client->company,
                 'totalSubscriptions' => $totalSubscriptions,
                 'activeSubscriptions' => $activeSubscriptions,

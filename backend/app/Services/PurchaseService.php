@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Purchase;
 use App\Models\Client;
 use App\Models\Product;
+use App\Models\Subscription;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
@@ -24,7 +25,9 @@ class PurchaseService extends BaseService
      */
     public function getAll()
     {
-        $purchases = $this->model->with(['client', 'product'])->get();
+        // Get purchases with valid client and product relationships to avoid errors
+        $purchases = $this->model->whereHas('client')->whereHas('product')
+                       ->with(['client', 'product'])->get();
         
         // Group purchases by PO number to handle multiple products per PO
         $groupedPurchases = [];
@@ -66,7 +69,8 @@ class PurchaseService extends BaseService
      */
     public function getById($id)
     {
-        $purchase = $this->model->with(['client', 'product'])->find($id);
+        $purchase = $this->model->whereHas('client')->whereHas('product')
+                       ->with(['client', 'product'])->find($id);
         
         if (!$purchase) {
             return null;
@@ -74,6 +78,7 @@ class PurchaseService extends BaseService
         
         // Find all purchases with the same PO number
         $relatedPurchases = $this->model->where('po_number', $purchase->po_number)
+                                    ->whereHas('client')->whereHas('product')
                                     ->with(['client', 'product'])
                                     ->get();
         
@@ -219,15 +224,32 @@ class PurchaseService extends BaseService
                     'quantity' => $quantity,
                     'subscription_start' => $subscriptionStart,
                     'subscription_end' => $subscriptionEnd,
-                    'subscription_active' => $requestData['subscription_active'] ?? false,
+                    'subscription_active' => $this->getBooleanValue($requestData['subscription_active'] ?? false),
                     'total_amount' => $totalAmount,
                     'attachment' => $attachmentPath,
                     'po_details' => $requestData['po_details'] ?? null,
-                    'products_subscriptions' => $requestData['products_subscriptions'] ?? null,
+                    'products_subscriptions' => $this->formatProductsSubscriptions($requestData['products'] ?? [], $data['client_id']),
                 ];
                 
                 $purchase = $this->model->create($purchaseData);
                 $purchases[] = $purchase;
+                
+                // Create subscription if subscription_active is true and subscription dates are provided
+                if (($this->getBooleanValue($requestData['subscription_active'] ?? false)) && $subscriptionStart && $subscriptionEnd) {
+                    $subscription = Subscription::create([
+                        'po_number' => $poNumber,
+                        'client_id' => $data['client_id'],
+                        'product_id' => $productId,
+                        'purchase_id' => $purchase->id,
+                        'start_date' => $subscriptionStart,
+                        'end_date' => $subscriptionEnd,
+                        'status' => 'Pending', // Default status
+                        'quantity' => $quantity,
+                        'total_amount' => $totalAmount,
+                        'next_billing_date' => $subscriptionEnd, // Set end date as next billing date initially
+                        'notes' => 'Auto-created from purchase order'
+                    ]);
+                }
             }
         } else {
             // Single product - backward compatibility
@@ -248,15 +270,32 @@ class PurchaseService extends BaseService
                 'quantity' => $data['quantity'],
                 'subscription_start' => $data['subscription_start'],
                 'subscription_end' => $data['subscription_end'],
-                'subscription_active' => $requestData['subscription_active'] ?? false,
+                'subscription_active' => $this->getBooleanValue($requestData['subscription_active'] ?? false),
                 'total_amount' => $totalAmount,
                 'attachment' => $attachmentPath,
                 'po_details' => $requestData['po_details'] ?? null,
-                'products_subscriptions' => $requestData['products_subscriptions'] ?? null,
+                'products_subscriptions' => null, // For single product, no products_subscriptions data to format
             ];
             
             $purchase = $this->model->create($purchaseData);
             $purchases[] = $purchase;
+            
+            // Create subscription if subscription_active is true and subscription dates are provided
+            if (($this->getBooleanValue($requestData['subscription_active'] ?? false)) && isset($data['subscription_start']) && isset($data['subscription_end'])) {
+                $subscription = Subscription::create([
+                    'po_number' => $poNumber,
+                    'client_id' => $data['client_id'],
+                    'product_id' => $data['product_id'],
+                    'purchase_id' => $purchase->id,
+                    'start_date' => $data['subscription_start'],
+                    'end_date' => $data['subscription_end'],
+                    'status' => 'Pending', // Default status
+                    'quantity' => $data['quantity'],
+                    'total_amount' => $totalAmount,
+                    'next_billing_date' => $data['subscription_end'], // Set end date as next billing date initially
+                    'notes' => 'Auto-created from purchase order'
+                ]);
+            }
         }
         
         return $purchases;
@@ -371,5 +410,56 @@ class PurchaseService extends BaseService
         }
         
         return $purchase->delete();
+    }
+
+    /**
+     * Format products subscriptions data for storage
+     */
+    private function formatProductsSubscriptions($products, $clientId)
+    {
+        if (empty($products) || !is_array($products)) {
+            return null;
+        }
+
+        $formattedProducts = [];
+        foreach ($products as $productData) {
+            $productId = $productData['productId'] ?? $productData['product_id'] ?? null;
+            if ($productId) {
+                $product = Product::find($productId);
+                $productName = $product ? ($product->product_name ?? $product->name ?? 'Unknown Product') : 'Unknown Product';
+                
+                $formattedProducts[] = [
+                    'id' => $productId,
+                    'name' => $productName,
+                    'quantity' => $productData['quantity'] ?? 1,
+                    'subscription_start' => $productData['subscription_start'] ?? null,
+                    'subscription_end' => $productData['subscription_end'] ?? null,
+                    'status' => 'Pending'
+                ];
+            }
+        }
+
+        return !empty($formattedProducts) ? json_encode($formattedProducts) : null;
+    }
+
+    /**
+     * Convert various input types to boolean value
+     */
+    private function getBooleanValue($value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+        
+        if (is_string($value)) {
+            $value = strtolower($value);
+            return $value === '1' || $value === 'true' || $value === 'on';
+        }
+        
+        if (is_numeric($value)) {
+            return (bool) $value;
+        }
+        
+        return (bool) $value;
     }
 }
