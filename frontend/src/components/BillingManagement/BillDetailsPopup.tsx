@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Download, Mail } from 'lucide-react';
 import { billingManagementApi } from '../../api';
 import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
@@ -97,14 +98,13 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
       // Update the bill via API
       const response = await billingManagementApi.update(bill.id, updateData);
       
-      if (response.data.success) {
-        // Update the bill in the parent component
-        if (onUpdate) {
-          onUpdate(response.data.data);
-        }
-        // Close the popup after successful update
-        onClose();
+      // After response interceptor normalization, response.data contains the updated bill
+      // Update the bill in the parent component
+      if (onUpdate) {
+        onUpdate(response.data);
       }
+      // Close the popup after successful update
+      onClose();
     } catch (error) {
       console.error('Error updating bill:', error);
     } finally {
@@ -156,8 +156,8 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
   const totalNumeric = parseFloat(totalAmount.replace('$', ''));
   const outstanding = (totalNumeric - paidNumeric).toFixed(2);
 
-  return (
-    <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+  return createPortal(
+    <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
       <PopupAnimation animationType="zoomIn" duration="0.3s">
         <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl mx-4 max-h-[90vh] overflow-y-auto">
         {/* Header */}
@@ -386,7 +386,8 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
         </div>
       </div>
       </PopupAnimation>
-    </div>
+    </div>,
+    document.body
   );
 };
 
