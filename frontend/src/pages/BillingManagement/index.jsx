@@ -47,9 +47,9 @@ export default function BillingManagement() {
       const summary = summaryResponse.data;
       
       // Calculate percentage for amount collected
-      const totalRevenue = summary.totalRevenue || 0;
-      const amountCollected = summary.amountCollected || 0;
-      const percentage = totalRevenue > 0 ? ((amountCollected / totalRevenue) * 100).toFixed(1) : 0;
+      const totalRevenue = parseFloat(summary.totalRevenue) || 0;
+      const amountCollected = parseFloat(summary.amountCollected) || 0;
+      const percentage = totalRevenue > 0 ? ((amountCollected / totalRevenue) * 100).toFixed(1) : '0';
       
       setSummaryStats([
         { 
@@ -75,7 +75,7 @@ export default function BillingManagement() {
         },
         { 
           title: 'Outstanding', 
-          value: `$${summary.outstandingAmount?.toFixed(2) || '0.00'}`, 
+          value: `$${typeof summary.outstandingAmount === 'number' ? summary.outstandingAmount.toFixed(2) : parseFloat(summary.outstandingAmount)?.toFixed(2) || '0.00'}`, 
           subtext: 'Pending collection', 
           icon: Calendar, 
           color: 'orange' 
@@ -212,14 +212,76 @@ export default function BillingManagement() {
 
   // Handle download bill
   const handleDownloadBill = (bill) => {
-    console.log('Downloading bill:', bill.billNumber);
+    // Extract bill number safely, handling both string and potential numeric formats
+    const billNumber = bill.bill_number || bill.billNumber || bill.id || 'Unknown';
+    console.log('Downloading bill:', billNumber);
     // TODO: Implement download logic
   };
 
   // Handle send email
   const handleSendEmail = (bill) => {
-    console.log('Sending email for bill:', bill.billNumber);
+    // Extract bill number safely, handling both string and potential numeric formats
+    const billNumber = bill.bill_number || bill.billNumber || bill.id || 'Unknown';
+    console.log('Sending email for bill:', billNumber);
     // TODO: Implement email sending logic
+  };
+
+  // Handle generate report
+  const handleGenerateReport = async () => {
+    try {
+      const response = await billingManagementApi.generateReport({ type: 'billing' });
+      console.log('Report generated:', response.data);
+      
+      // In a real implementation, you might want to show a modal with the report data
+      // or download a PDF/Excel file
+      alert('Billing report generated successfully! Check console for details.');
+    } catch (error) {
+      console.error('Error generating report:', error);
+      alert('Error generating report. Please try again.');
+    }
+  };
+
+  // Handle export bills
+  const handleExportBills = () => {
+    // Export bills as CSV
+    const headers = [
+      'Bill Number',
+      'Client',
+      'PO Number',
+      'Bill Date',
+      'Due Date',
+      'Total Amount',
+      'Paid Amount',
+      'Status',
+      'Payment Status'
+    ];
+    
+    const csvContent = [
+      headers.join(','),
+      ...filteredBills.map(bill => [
+        bill.bill_number || bill.billNumber || '',
+        typeof bill.client === 'object' ? bill.client?.company || bill.client || '' : bill.client || '',
+        bill.po_number || bill.poNumber || '',
+        bill.bill_date || bill.billDate || '',
+        bill.due_date || bill.dueDate || '',
+        typeof bill.total_amount === 'number' ? bill.total_amount.toFixed(2) : parseFloat(bill.total_amount)?.toFixed(2) || '',
+        typeof bill.paid_amount === 'number' ? bill.paid_amount.toFixed(2) : parseFloat(bill.paid_amount)?.toFixed(2) || '',
+        bill.status || '',
+        bill.payment_status || bill.paymentStatus || bill.status || ''
+      ].map(field => `"${String(field).replace(/"/g, '')}"`).join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `billing_export_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -229,10 +291,17 @@ export default function BillingManagement() {
         subtitle="Generate and manage bills from purchase orders"
         actions={
           <div className="flex items-center gap-3">
-            <Button variant="outline" icon={<Download className="h-4 w-4" />}>
+            <Button 
+              variant="outline" 
+              icon={<Download className="h-4 w-4" />}
+              onClick={handleExportBills}
+            >
               Export Bills
             </Button>
-            <Button icon={<FileText className="h-4 w-4" />}>
+            <Button 
+              icon={<FileText className="h-4 w-4" />}
+              onClick={handleGenerateReport}
+            >
               Generate Report
             </Button>
           </div>
@@ -292,12 +361,12 @@ export default function BillingManagement() {
                 // Format data for display
                 const billNumber = bill.bill_number || bill.billNumber || 'N/A';
                 const clientCompany = typeof bill.client === 'object' ? bill.client?.company || 'N/A' : bill.client || 'N/A';
-                const clientContact = typeof bill.client === 'object' ? bill.client?.contact || 'N/A' : 'N/A';
+                const clientContact = typeof bill.client === 'object' ? bill.client?.cli_name || bill.client?.contact || 'N/A' : 'N/A';
                 const poNumber = bill.po_number || bill.poNumber || 'N/A';
                 const billDate = bill.bill_date || bill.billDate || 'N/A';
                 const dueDate = bill.due_date || bill.dueDate || 'N/A';
-                const totalAmount = `$${bill.total_amount?.toFixed(2) || '0.00'}`;
-                const paidAmount = `$${bill.paid_amount?.toFixed(2) || '0.00'}`;
+                const totalAmount = `$${typeof bill.total_amount === 'number' ? bill.total_amount.toFixed(2) : parseFloat(bill.total_amount)?.toFixed(2) || '0.00'}`;
+                const paidAmount = `$${typeof bill.paid_amount === 'number' ? bill.paid_amount.toFixed(2) : parseFloat(bill.paid_amount)?.toFixed(2) || '0.00'}`;
                 const status = bill.status || 'N/A';
                 const paymentStatus = bill.payment_status || bill.paymentStatus || status;
                 

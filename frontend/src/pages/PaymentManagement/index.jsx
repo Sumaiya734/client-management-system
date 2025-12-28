@@ -39,7 +39,7 @@ export default function PaymentManagement() {
           client_id: payment.client_id,
           client: {
             company: payment.client?.company || payment.client || 'N/A',
-            contact: payment.client?.contact || 'N/A'
+            contact: payment.client?.cli_name || payment.client?.contact || 'N/A'
           },
           date: payment.date || 'N/A',
           amount: `$${typeof payment.amount === 'number' ? payment.amount.toFixed(2) : parseFloat(payment.amount || 0).toFixed(2)}`,

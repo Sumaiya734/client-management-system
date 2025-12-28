@@ -142,15 +142,15 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
   const poNumber = bill.poNumber || bill.po_number || 'N/A';
   const billDate = bill.billDate || bill.bill_date || 'N/A';
   const dueDate = bill.dueDate || bill.due_date || 'N/A';
-  const totalAmount = bill.totalAmount || `$${bill.total_amount?.toFixed(2) || '0.00'}`;
-  const paidAmount = bill.paidAmount || `$${bill.paid_amount?.toFixed(2) || '0.00'}`;
+  const totalAmount = bill.totalAmount || `$${typeof bill.total_amount === 'number' ? bill.total_amount.toFixed(2) : parseFloat(bill.total_amount as any)?.toFixed(2) || '0.00'}`;
+  const paidAmount = bill.paidAmount || `$${typeof bill.paid_amount === 'number' ? bill.paid_amount.toFixed(2) : parseFloat(bill.paid_amount as any)?.toFixed(2) || '0.00'}`;
   
   // Use products if available, otherwise show empty array
   const products = bill.products || [];
   
   // Calculate totals
-  const subtotal = bill.subtotal !== undefined ? (typeof bill.subtotal === 'string' ? bill.subtotal : `$${bill.subtotal?.toFixed(2) || '0.00'}`) : `$${(parseFloat(totalAmount.replace('$', '')) * 0.95).toFixed(2)}`;
-  const tax = bill.tax !== undefined ? (typeof bill.tax === 'string' ? bill.tax : `$${bill.tax?.toFixed(2) || '0.00'}`) : `$${(parseFloat(totalAmount.replace('$', '')) * 0.05).toFixed(2)}`;
+  const subtotal = bill.subtotal !== undefined ? (typeof bill.subtotal === 'string' ? bill.subtotal : `$${typeof bill.subtotal === 'number' ? bill.subtotal.toFixed(2) : parseFloat(bill.subtotal as any)?.toFixed(2) || '0.00'}`) : `$${(parseFloat(totalAmount.replace('$', '')) * 0.95).toFixed(2)}`;
+  const tax = bill.tax !== undefined ? (typeof bill.tax === 'string' ? bill.tax : `$${typeof bill.tax === 'number' ? bill.tax.toFixed(2) : parseFloat(bill.tax as any)?.toFixed(2) || '0.00'}`) : `$${(parseFloat(totalAmount.replace('$', '')) * 0.05).toFixed(2)}`;
   
   const paidNumeric = parseFloat(paidAmount.replace('$', ''));
   const totalNumeric = parseFloat(totalAmount.replace('$', ''));

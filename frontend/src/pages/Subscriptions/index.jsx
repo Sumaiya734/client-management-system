@@ -29,8 +29,16 @@ export default function Subscriptions() {
     try {
       setLoading(true);
       const response = await api.get('/subscriptions');
-      // The backend now returns properly formatted data, so we can use it directly
-      setSubscriptions(response.data);
+      // Transform the API response to ensure client data has proper structure
+      const transformedSubscriptions = response.data.map(subscription => ({
+        ...subscription,
+        client: {
+          ...subscription.client,
+          company: subscription.client?.company || subscription.client || 'N/A',
+          cli_name: subscription.client?.cli_name || subscription.client?.contact || 'N/A'
+        }
+      }));
+      setSubscriptions(transformedSubscriptions);
     } catch (error) {
       console.error('Error fetching subscriptions:', error);
     } finally {

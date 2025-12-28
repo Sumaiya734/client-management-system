@@ -5,7 +5,6 @@ import api from '../../api';
 import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
 
 
-
 interface Product {
   id: number;
   name?: string;
