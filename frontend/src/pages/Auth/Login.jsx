@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import GuestLayout from '../../components/GuestLayout';
 import { useAuth } from '../../context/AuthContext';
+import logo from '../../assets/nanosoft logo.png';
 
 const Login = () => {
   const [credentials, setCredentials] = useState({
@@ -41,15 +42,23 @@ const Login = () => {
 
   return (
     <GuestLayout>
-      {/* Full soft blue background */}
+      {/* Full soft blue background with logo */}
       <div className="relative min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-blue-100 via-blue-50 to-blue-200 overflow-hidden">
-
+        
         {/* Soft floating shapes */}
         <div className="absolute top-0 left-0 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
         <div className="absolute bottom-0 right-0 w-96 h-96 bg-indigo-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse animation-delay-2000"></div>
 
         {/* White Form Card */}
         <div className="relative z-10 w-full max-w-sm bg-white shadow-xl rounded-xl p-6 animate-[fadeIn_0.8s_ease]">
+          {/* Logo above the form */}
+          <div className="flex justify-center mb-6">
+            <img 
+              src={logo} 
+              alt="Nanosoft Logo" 
+              className="w-16 h-16 object-contain"
+            />
+          </div>
           <h2 className="text-center text-2xl font-bold text-gray-800 mb-1">
             Welcome Back
           </h2>

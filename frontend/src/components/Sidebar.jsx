@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Home, 
@@ -12,11 +12,14 @@ import {
   BarChart3, 
   UserCog, 
   Bell, 
-  LogOut 
+  LogOut,
+  Menu
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import logo from '../assets/nanosoft logo.png';
 
 export default function Sidebar() {
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -47,14 +50,22 @@ export default function Sidebar() {
   };
 
   return (
-    <div className="w-60 bg-white shadow-sm border-r border-gray-200 min-h-screen flex flex-col">
-      {/* Top Section */}
-      <div className="p-4 border-b border-gray-200">
-        <h1 className="text-lg font-bold text-gray-900 mb-1">Business Manager</h1>
-        <div className="text-sm">
-          <p className="text-blue-600 font-medium">John Admin</p>
-          <p className="text-gray-500">Administrator</p>
-        </div>
+    <div className={`${isCollapsed ? 'w-16' : 'w-60'} bg-white shadow-sm border-r border-gray-200 min-h-screen flex flex-col transition-all duration-300`}>
+      {/* Top Section - Logo and Toggle */}
+      <div className="p-3 border-b border-gray-200 flex items-center justify-between">
+        {!isCollapsed && (
+          <img 
+            src={logo} 
+            alt="Nanosoft Logo" 
+            className="w-40 h-10 object-contain"
+          />
+        )}
+        <button 
+          onClick={() => setIsCollapsed(!isCollapsed)} 
+          className="p-2 rounded-md hover:bg-gray-100 transition-colors"
+        >
+          <Menu size={20} />
+        </button>
       </div>
 
       {/* Navigation */}
@@ -71,8 +82,8 @@ export default function Sidebar() {
                   : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
               }`}
             >
-              <item.icon className="mr-2 h-4 w-4" />
-              {item.name}
+              <item.icon className="h-4 w-4" />
+              {!isCollapsed && <span className="ml-2 truncate">{item.name}</span>}
             </NavLink>
           );
         })}
@@ -84,8 +95,8 @@ export default function Sidebar() {
           onClick={handleLogout}
           className="w-full flex items-center px-2 py-2 text-sm font-medium text-red-600 rounded-md hover:bg-red-50 transition-colors"
         >
-          <LogOut className="mr-2 h-4 w-4" />
-          Logout
+          <LogOut className="h-4 w-4" />
+          {!isCollapsed && <span className="ml-2">Logout</span>}
         </button>
       </div>
     </div>
