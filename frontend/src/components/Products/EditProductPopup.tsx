@@ -12,6 +12,7 @@ interface Product {
   vendorWebsite: string;
   type: string;
   basePrice: string | number;
+  baseCurrency: string;
   profit: string | number;
   bdtPrice: string;
   bdtLabel: string;
@@ -68,7 +69,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
         subscriptionType: product.type || '',
         description: product.description || '',
         basePrice: typeof product.basePrice === 'string' ? product.basePrice.replace(' USD', '') : product.basePrice.toString(),
-        baseCurrency: 'USD',
+        baseCurrency: product.baseCurrency || 'USD',
         profitMargin: typeof product.profit === 'string' ? product.profit.replace('%', '') : product.profit.toString(),
         status: product.status || 'Active'
       });
@@ -175,6 +176,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
           vendorWebsite: formData.vendorWebsite,
           type: formData.subscriptionType,
           basePrice: parseFloat(formData.basePrice),
+          baseCurrency: formData.baseCurrency,
           profit: parseFloat(formData.profitMargin),
           bdtPrice: `৳${pricePreview.bdtPrice}`,
           bdtLabel: 'BDT (final price)',
@@ -183,6 +185,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
           product_name: formData.name,
           vendor_type: formData.subscriptionType,
           base_price: parseFloat(formData.basePrice),
+          base_currency: formData.baseCurrency,
           bdt_price: parseFloat(pricePreview.bdtPrice),
           multi_currency: JSON.stringify(product.currencies || []),
         };

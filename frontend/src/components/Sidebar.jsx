@@ -12,7 +12,8 @@ import {
   BarChart3, 
   UserCog, 
   Bell, 
-  LogOut 
+  LogOut,
+  Search
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -23,6 +24,7 @@ export default function Sidebar() {
   
   const navigation = [
     { name: 'Dashboard', href: '/', icon: Home },
+    // { name: 'Global Search', href: '/search', icon: Search },
     { name: 'Client Management', href: '/clients', icon: Users },
     { name: 'Products & Pricing', href: '/products', icon: Package },
     { name: 'Purchase Orders', href: '/orders', icon: FileText },

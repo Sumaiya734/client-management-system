@@ -11,6 +11,7 @@ class Product extends Model
         'subscription_type', 
         'vendor_type',        
         'base_price',
+        'base_currency',
         'bdt_price',
         'multi_currency',
         'status',
@@ -19,6 +20,7 @@ class Product extends Model
         'vendor',            
         'vendor_website',    
         'profit_margin',     
+        'profit',
     ];
     
     protected $casts = [

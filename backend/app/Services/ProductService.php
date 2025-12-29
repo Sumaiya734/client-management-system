@@ -17,14 +17,45 @@ class ProductService extends BaseService
      */
     public function create(array $data)
     {
+        // Store original base_price to ensure it's not overwritten during currency processing
+        $originalBasePrice = $data['base_price'] ?? null;
+        
         // Process currencies data first (if present, it takes precedence over multi_currency)
         if (isset($data['currencies'])) {
             $data['multi_currency'] = $this->processCurrenciesData($data['currencies']);
         }
         // Then handle multi_currency data if present (but only if currencies wasn't provided)
         elseif (isset($data['multi_currency'])) {
-            // Don't process it here, let Laravel's model casting handle it
-            // The frontend sends JSON string, and Laravel will handle the conversion
+            // If multi_currency is a JSON string from frontend, decode it to array
+            if (is_string($data['multi_currency'])) {
+                $decodedData = json_decode($data['multi_currency'], true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $data['multi_currency'] = $decodedData;
+                }
+            }
+        }
+        
+        // Ensure base_price is preserved after currency processing
+        if ($originalBasePrice !== null) {
+            $data['base_price'] = $originalBasePrice;
+        }
+        
+        // Ensure base_price is numeric and not a currency code
+        if (isset($data['base_price'])) {
+            $basePrice = $data['base_price'];
+            // If base_price looks like a currency code (non-numeric), preserve the original value
+            if (!is_numeric($basePrice)) {
+                $data['base_price'] = $originalBasePrice ?? 0;
+            } else {
+                $data['base_price'] = (float) $basePrice;
+            }
+        }
+
+        // Calculate profit if base_price and profit_margin are provided
+        if (isset($data['base_price']) && isset($data['profit_margin'])) {
+            $basePrice = (float) $data['base_price'];
+            $profitMargin = (float) $data['profit_margin'];
+            $data['profit'] = $basePrice * ($profitMargin / 100);
         }
 
         return $this->repository->create($data);
@@ -35,14 +66,45 @@ class ProductService extends BaseService
      */
     public function update($id, array $data)
     {
+        // Store original base_price to ensure it's not overwritten during currency processing
+        $originalBasePrice = $data['base_price'] ?? null;
+        
         // Process currencies data first (if present, it takes precedence over multi_currency)
         if (isset($data['currencies'])) {
             $data['multi_currency'] = $this->processCurrenciesData($data['currencies']);
         }
         // Then handle multi_currency data if present (but only if currencies wasn't provided)
         elseif (isset($data['multi_currency'])) {
-            // Don't process it here, let Laravel's model casting handle it
-            // The frontend sends JSON string, and Laravel will handle the conversion
+            // If multi_currency is a JSON string from frontend, decode it to array
+            if (is_string($data['multi_currency'])) {
+                $decodedData = json_decode($data['multi_currency'], true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $data['multi_currency'] = $decodedData;
+                }
+            }
+        }
+        
+        // Ensure base_price is preserved after currency processing
+        if ($originalBasePrice !== null) {
+            $data['base_price'] = $originalBasePrice;
+        }
+        
+        // Ensure base_price is numeric and not a currency code
+        if (isset($data['base_price'])) {
+            $basePrice = $data['base_price'];
+            // If base_price looks like a currency code (non-numeric), preserve the original value
+            if (!is_numeric($basePrice)) {
+                $data['base_price'] = $originalBasePrice ?? 0;
+            } else {
+                $data['base_price'] = (float) $basePrice;
+            }
+        }
+
+        // Calculate profit if base_price and profit_margin are provided
+        if (isset($data['base_price']) && isset($data['profit_margin'])) {
+            $basePrice = (float) $data['base_price'];
+            $profitMargin = (float) $data['profit_margin'];
+            $data['profit'] = $basePrice * ($profitMargin / 100);
         }
 
         return $this->repository->update($id, $data);

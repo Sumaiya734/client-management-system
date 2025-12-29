@@ -18,6 +18,7 @@ import UserManagement from './pages/UserManagement/index';
 import Notifications from './pages/Notifications/index';
 import Login from './pages/Auth/Login';
 import ProtectedRoute from './components/ProtectedRoute';
+import SearchPage from './pages/SearchPage';
 
 function App() {
   return (
@@ -187,6 +188,21 @@ function App() {
                   
                   <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
                     <CurrencyRates />
+                  </main>
+                </div>
+              </div>
+            </ProtectedRoute>
+          } />
+          <Route path="/search" element={
+            <ProtectedRoute>
+              <div className="flex h-screen bg-[var(--soft-purple)]">
+                <Sidebar />
+                
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <Header />
+                  
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
+                    <SearchPage />
                   </main>
                 </div>
               </div>

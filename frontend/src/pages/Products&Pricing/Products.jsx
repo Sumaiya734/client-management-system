@@ -89,7 +89,8 @@ export default function Products() {
         vendorWebsite: product.vendor_website,
         type: product.subscription_type || product.type,
         basePrice: product.base_price || 0,
-        profit: product.profit_margin || 0,
+        baseCurrency: product.base_currency || 'USD',
+        profit: product.profit || product.profit_margin || 0,
         bdtPrice: `৳${product.bdt_price || 0}`,
         bdtLabel: 'BDT (final price)',
         currencies: product.multi_currency ? (typeof product.multi_currency === 'string' ? JSON.parse(product.multi_currency) : product.multi_currency) : [],
@@ -128,6 +129,7 @@ export default function Products() {
     vendor: '',
     type: 'Per User',
     basePrice: 0,
+    baseCurrency: 'USD',
     profit: 0,
     bdtPrice: 0,
     bdtLabel: 'BDT (final price)',
@@ -209,6 +211,7 @@ export default function Products() {
           product_name: productData.name,
           subscription_type: productData.type,
           base_price: parseFloat(productData.basePrice),
+          base_currency: productData.baseCurrency || 'USD',
           bdt_price: parseFloat(productData.bdtPrice.replace('৳', '')),
           multi_currency: JSON.stringify(productData.currencies),
           status: productData.status,
@@ -234,6 +237,7 @@ export default function Products() {
               vendorWebsite: response.data.vendor_website,
               type: response.data.subscription_type || response.data.type,
               basePrice: response.data.base_price || 0,
+              baseCurrency: response.data.base_currency || 'USD',
               profit: response.data.profit_margin || 0,
               bdtPrice: `৳${response.data.bdt_price || 0}`,
               bdtLabel: 'BDT (final price)',
@@ -249,6 +253,7 @@ export default function Products() {
           product_name: productData.name,
           subscription_type: productData.type,
           base_price: parseFloat(productData.basePrice),
+          base_currency: productData.baseCurrency || 'USD',
           bdt_price: parseFloat(productData.bdtPrice.replace('৳', '')),
           multi_currency: JSON.stringify(productData.currencies),
           status: productData.status,
@@ -270,6 +275,7 @@ export default function Products() {
           vendorWebsite: response.data.vendor_website,
           type: response.data.subscription_type || response.data.type,
           basePrice: response.data.base_price || 0,
+          baseCurrency: response.data.base_currency || 'USD',
           profit: response.data.profit_margin || 0,
           bdtPrice: `৳${response.data.bdt_price || 0}`,
           bdtLabel: 'BDT (final price)',
@@ -390,7 +396,7 @@ export default function Products() {
                     </TableCell>
                     <TableCell>
                       <div>
-                        <div className="font-medium text-gray-900">{product.basePrice}</div>
+                        <div className="font-medium text-gray-900">{product.basePrice} {product.baseCurrency}</div>
                         <div className="text-sm text-gray-600">Profit: {product.profit}</div>
                       </div>
                     </TableCell>

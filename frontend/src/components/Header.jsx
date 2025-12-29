@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Search, Bell, Settings, User, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import GlobalSearch from './GlobalSearch';
 
 export default function Header() {
   const [showDropdown, setShowDropdown] = useState(false);
@@ -46,15 +47,11 @@ export default function Header() {
         {/* Right Controls */}
         <div className="flex items-center space-x-3">
 
-          {/* Search Bar */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <input
-              type="text"
-              placeholder="Search..."
-              className="pl-10 pr-3 py-1.5 h-[32px] w-60 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
+          {/* Global Search */}
+          <GlobalSearch 
+            placeholder="Search..." 
+            className="w-60"
+          />
 
           {/* Notifications */}
           <button className="relative p-2 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100">

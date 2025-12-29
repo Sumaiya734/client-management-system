@@ -27,21 +27,21 @@ class PurchaseService extends BaseService
     {
         // Get purchases with valid client and product relationships to avoid errors
         $purchases = $this->model->whereHas('client')->whereHas('product')
-                       ->with(['client', 'product'])->get();
-        
+            ->with(['client', 'product'])->get();
+
         // Group purchases by PO number to handle multiple products per PO
         $groupedPurchases = [];
         $processedPONumbers = [];
-        
+
         foreach ($purchases as $purchase) {
             if (!in_array($purchase->po_number, $processedPONumbers)) {
                 // Find all purchases with the same PO number
                 $relatedPurchases = $purchases->where('po_number', $purchase->po_number);
-                
+
                 // Create a consolidated purchase object
                 $consolidatedPurchase = $purchase->toArray();
                 $consolidatedPurchase['products'] = [];
-                
+
                 foreach ($relatedPurchases as $relatedPurchase) {
                     $productData = [
                         'id' => $relatedPurchase->product->id,
@@ -52,15 +52,15 @@ class PurchaseService extends BaseService
                     ];
                     $consolidatedPurchase['products'][] = $productData;
                 }
-                
+
                 $consolidatedPurchase['total_products'] = count($consolidatedPurchase['products']);
                 $consolidatedPurchase['total_amount'] = $relatedPurchases->sum('total_amount');
-                
+
                 $groupedPurchases[] = $consolidatedPurchase;
                 $processedPONumbers[] = $purchase->po_number;
             }
         }
-        
+
         return $groupedPurchases;
     }
 
@@ -70,22 +70,22 @@ class PurchaseService extends BaseService
     public function getById($id)
     {
         $purchase = $this->model->whereHas('client')->whereHas('product')
-                       ->with(['client', 'product'])->find($id);
-        
+            ->with(['client', 'product'])->find($id);
+
         if (!$purchase) {
             return null;
         }
-        
+
         // Find all purchases with the same PO number
         $relatedPurchases = $this->model->where('po_number', $purchase->po_number)
-                                    ->whereHas('client')->whereHas('product')
-                                    ->with(['client', 'product'])
-                                    ->get();
-        
+            ->whereHas('client')->whereHas('product')
+            ->with(['client', 'product'])
+            ->get();
+
         // Create a consolidated purchase object
         $consolidatedPurchase = $purchase->toArray();
         $consolidatedPurchase['products'] = [];
-        
+
         foreach ($relatedPurchases as $relatedPurchase) {
             $productData = [
                 'id' => $relatedPurchase->product->id,
@@ -96,10 +96,10 @@ class PurchaseService extends BaseService
             ];
             $consolidatedPurchase['products'][] = $productData;
         }
-        
+
         $consolidatedPurchase['total_products'] = count($consolidatedPurchase['products']);
         $consolidatedPurchase['total_amount'] = $relatedPurchases->sum('total_amount');
-        
+
         return $consolidatedPurchase;
     }
 
@@ -123,13 +123,13 @@ class PurchaseService extends BaseService
                 'total_amount' => 'required|numeric|min:0',
                 'attachment' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx,xls,xlsx|max:10240' // 10MB max
             ]);
-            
+
             // Custom validation for date comparison
             foreach ($data['products'] ?? [] as $index => $product) {
                 if (isset($product['subscription_start']) && isset($product['subscription_end'])) {
                     $startDate = new \DateTime($product['subscription_start']);
                     $endDate = new \DateTime($product['subscription_end']);
-                    
+
                     if ($startDate >= $endDate) {
                         $validator->errors()->add("products.$index.subscription_end", 'Subscription end date must be after subscription start date.');
                     }
@@ -148,36 +148,36 @@ class PurchaseService extends BaseService
                 'total_amount' => 'required|numeric|min:0',
                 'attachment' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx,xls,xlsx|max:10240' // 10MB max
             ]);
-            
+
             // Custom validation for single product date comparison
             if (isset($data['subscription_start']) && isset($data['subscription_end'])) {
                 $startDate = new \DateTime($data['subscription_start']);
                 $endDate = new \DateTime($data['subscription_end']);
-                
+
                 if ($startDate >= $endDate) {
                     $validator->errors()->add('subscription_end', 'Subscription end date must be after subscription start date.');
                 }
             }
         }
-        
+
         if ($validator->fails()) {
             throw new \Exception('Validation failed: ' . json_encode($validator->errors()));
         }
-        
+
         // Generate PO number automatically in format PO-YYYY-xxxx
         $year = date('Y');
         $latestPO = $this->model->where('po_number', 'LIKE', "PO-$year-%")
-                           ->orderByRaw('CAST(SUBSTRING(po_number, -4) AS UNSIGNED) DESC')
-                           ->first();
-        
+            ->orderByRaw('CAST(SUBSTRING(po_number, -4) AS UNSIGNED) DESC')
+            ->first();
+
         $sequenceNumber = 1;
         if ($latestPO) {
             $lastSequence = substr($latestPO->po_number, -4);
             $sequenceNumber = (int)$lastSequence + 1;
         }
-        
+
         $poNumber = "PO-$year-" . str_pad($sequenceNumber, 4, '0', STR_PAD_LEFT);
-        
+
         // Handle file upload if attachment is present
         if (isset($data['attachment']) && $data['attachment'] instanceof \Illuminate\Http\UploadedFile) {
             $file = $data['attachment'];
@@ -187,17 +187,17 @@ class PurchaseService extends BaseService
         } else {
             $attachmentPath = null;
         }
-        
+
         $purchases = [];
         $requestData = $data;
-        
+
         // Automatically populate cli_name from client if client_id is provided
         $client = Client::find($data['client_id']);
         $cliName = null;
         if ($client) {
             $cliName = $client->cli_name ?? $client->name;
         }
-        
+
         if (isset($requestData['products']) && is_array($requestData['products']) && count($requestData['products']) > 0) {
             // Multiple products - create separate purchase records for each
             foreach ($requestData['products'] as $productData) {
@@ -206,7 +206,7 @@ class PurchaseService extends BaseService
                 $quantity = $productData['quantity'] ?? 1;
                 $subscriptionStart = $productData['subscription_start'] ?? null;
                 $subscriptionEnd = $productData['subscription_end'] ?? null;
-                
+
                 $product = Product::find($productId);
                 if ($product) {
                     $price = $product->bdt_price ?? $product->base_price ?? 0;
@@ -214,7 +214,7 @@ class PurchaseService extends BaseService
                 } else {
                     $totalAmount = 0;
                 }
-                
+
                 $purchaseData = [
                     'po_number' => $poNumber,
                     'status' => $requestData['status'],
@@ -230,10 +230,10 @@ class PurchaseService extends BaseService
                     'po_details' => $requestData['po_details'] ?? null,
                     'products_subscriptions' => $this->formatProductsSubscriptions($requestData['products'] ?? [], $data['client_id']),
                 ];
-                
+
                 $purchase = $this->model->create($purchaseData);
                 $purchases[] = $purchase;
-                
+
                 // Create subscription if subscription_active is true and subscription dates are provided
                 if (($this->getBooleanValue($requestData['subscription_active'] ?? false)) && $subscriptionStart && $subscriptionEnd) {
                     $subscription = Subscription::create([
@@ -260,7 +260,7 @@ class PurchaseService extends BaseService
             } else {
                 $totalAmount = 0;
             }
-            
+
             $purchaseData = [
                 'po_number' => $poNumber,
                 'status' => $requestData['status'],
@@ -276,10 +276,10 @@ class PurchaseService extends BaseService
                 'po_details' => $requestData['po_details'] ?? null,
                 'products_subscriptions' => null, // For single product, no products_subscriptions data to format
             ];
-            
+
             $purchase = $this->model->create($purchaseData);
             $purchases[] = $purchase;
-            
+
             // Create subscription if subscription_active is true and subscription dates are provided
             if (($this->getBooleanValue($requestData['subscription_active'] ?? false)) && isset($data['subscription_start']) && isset($data['subscription_end'])) {
                 $subscription = Subscription::create([
@@ -297,7 +297,7 @@ class PurchaseService extends BaseService
                 ]);
             }
         }
-        
+
         return $purchases;
     }
 
@@ -307,11 +307,11 @@ class PurchaseService extends BaseService
     public function update($id, array $data)
     {
         $purchase = $this->model->find($id);
-        
+
         if (!$purchase) {
             throw new \Exception('Purchase not found');
         }
-        
+
         // Handle validation differently for single vs multiple products
         if (isset($data['products']) && is_array($data['products']) && count($data['products']) > 0) {
             // Multiple products validation
@@ -328,13 +328,13 @@ class PurchaseService extends BaseService
                 'total_amount' => 'sometimes|numeric|min:0',
                 'attachment' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx,xls,xlsx|max:10240' // 10MB max
             ]);
-            
+
             // Custom validation for date comparison in update
             foreach ($data['products'] ?? [] as $index => $product) {
                 if (isset($product['subscription_start']) && isset($product['subscription_end'])) {
                     $startDate = new \DateTime($product['subscription_start']);
                     $endDate = new \DateTime($product['subscription_end']);
-                    
+
                     if ($startDate >= $endDate) {
                         $validator->errors()->add("products.$index.subscription_end", 'Subscription end date must be after subscription start date.');
                     }
@@ -354,29 +354,29 @@ class PurchaseService extends BaseService
                 'total_amount' => 'sometimes|numeric|min:0',
                 'attachment' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx,xls,xlsx|max:10240' // 10MB max
             ]);
-            
+
             // Custom validation for single product date comparison in update
             if (isset($data['subscription_start']) && isset($data['subscription_end'])) {
                 $startDate = new \DateTime($data['subscription_start']);
                 $endDate = new \DateTime($data['subscription_end']);
-                
+
                 if ($startDate >= $endDate) {
                     $validator->errors()->add('subscription_end', 'Subscription end date must be after subscription start date.');
                 }
             }
         }
-        
+
         if ($validator->fails()) {
             throw new \Exception('Validation failed: ' . json_encode($validator->errors()));
         }
-        
+
         // Handle file upload if attachment is present
         if (isset($data['attachment']) && $data['attachment'] instanceof \Illuminate\Http\UploadedFile) {
             // Delete old attachment if exists
             if ($purchase->attachment) {
                 Storage::disk('public')->delete($purchase->attachment);
             }
-            
+
             $file = $data['attachment'];
             $fileName = time() . '_' . $file->getClientOriginalName();
             $filePath = $file->storeAs('purchase_attachments', $fileName, 'public');
@@ -384,7 +384,7 @@ class PurchaseService extends BaseService
         } else {
             $requestData = $data;
         }
-        
+
         // Automatically update cli_name from client if client_id is provided
         if (isset($requestData['client_id'])) {
             $client = Client::find($requestData['client_id']);
@@ -392,9 +392,9 @@ class PurchaseService extends BaseService
                 $requestData['cli_name'] = $client->cli_name ?? $client->name;
             }
         }
-        
+
         $purchase->update($requestData);
-        
+
         return $purchase;
     }
 
@@ -404,11 +404,11 @@ class PurchaseService extends BaseService
     public function delete($id)
     {
         $purchase = $this->model->find($id);
-        
+
         if (!$purchase) {
             throw new \Exception('Purchase not found');
         }
-        
+
         return $purchase->delete();
     }
 
@@ -427,7 +427,7 @@ class PurchaseService extends BaseService
             if ($productId) {
                 $product = Product::find($productId);
                 $productName = $product ? ($product->product_name ?? $product->name ?? 'Unknown Product') : 'Unknown Product';
-                
+
                 $formattedProducts[] = [
                     'id' => $productId,
                     'name' => $productName,
@@ -443,6 +443,75 @@ class PurchaseService extends BaseService
     }
 
     /**
+     * Determine purchase status based on start and end dates
+     * 
+     * @param string $startDate Start date in dd/mm/yyyy format
+     * @param string $endDate End date in dd/mm/yyyy format
+     * @return string Status of the purchase
+     */
+    public function getPurchaseStatus($startDate, $endDate)
+    {
+        // Parse dates from dd/mm/yyyy format
+        $start = null;
+        $end = null;
+        
+        if ($startDate) {
+            $start = \DateTime::createFromFormat('d/m/Y', $startDate);
+            if (!$start) {
+                // If dd/mm/yyyy format fails, try other common formats
+                $start = \DateTime::createFromFormat('Y-m-d', $startDate);
+                if (!$start) {
+                    $start = \DateTime::createFromFormat('m/d/Y', $startDate);
+                }
+            }
+        }
+        
+        if ($endDate) {
+            $end = \DateTime::createFromFormat('d/m/Y', $endDate);
+            if (!$end) {
+                // If dd/mm/yyyy format fails, try other common formats
+                $end = \DateTime::createFromFormat('Y-m-d', $endDate);
+                if (!$end) {
+                    $end = \DateTime::createFromFormat('m/d/Y', $endDate);
+                }
+            }
+        }
+        
+        $currentDate = new \DateTime();
+        
+        // If no start date, status is pending
+        if (!$start) {
+            return 'Pending';
+        }
+        
+        // If start date is in the future, status is pending
+        if ($start > $currentDate) {
+            return 'Pending';
+        }
+        
+        // If no end date but start date is in past, status is active
+        if (!$end) {
+            return 'Active';
+        }
+        
+        // Check if end date is coming up within 7 days but still in the future
+        $sevenDaysFromNow = clone $currentDate;
+        $sevenDaysFromNow->add(new \DateInterval('P7D')); // P7D = Period of 7 Days
+        
+        if ($end > $currentDate && $end <= $sevenDaysFromNow) {
+            return 'Expired soon';
+        }
+        
+        // If end date is in the future (more than 7 days), status is active
+        if ($end > $currentDate) {
+            return 'Active';
+        }
+        
+        // If end date is in the past, status is expired
+        return 'Expired';
+    }
+
+    /**
      * Convert various input types to boolean value
      */
     private function getBooleanValue($value): bool
@@ -450,16 +519,16 @@ class PurchaseService extends BaseService
         if (is_bool($value)) {
             return $value;
         }
-        
+
         if (is_string($value)) {
             $value = strtolower($value);
             return $value === '1' || $value === 'true' || $value === 'on';
         }
-        
+
         if (is_numeric($value)) {
             return (bool) $value;
         }
-        
+
         return (bool) $value;
     }
 }

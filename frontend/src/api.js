@@ -92,6 +92,18 @@ export const billingManagementApi = {
   generateReport: (params) => api.post('/reports-generate', params),
 };
 
+// Dashboard API functions
+export const dashboardApi = {
+  getDashboardData: () => api.get('/dashboard'),
+  getStats: (params) => api.get('/dashboard-stats', { params }),
+};
+
+// Search API functions
+export const searchApi = {
+  search: (params) => api.get('/search', { params }),
+  getSearchableModels: () => api.get('/searchable-models'),
+};
+
 // Authentication API functions
 export const authApi = {
   login: (credentials) => {

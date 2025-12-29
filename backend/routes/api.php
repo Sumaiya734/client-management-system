@@ -96,6 +96,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('users/{id}/permissions', [\App\Http\Controllers\Api\UserManagementController::class, 'getPermissions']);
 });
 
+// Search Routes
+Route::get('search', [\App\Http\Controllers\SearchController::class, 'search']);
+Route::post('search', [\App\Http\Controllers\SearchController::class, 'search']);
+Route::get('searchable-models', [\App\Http\Controllers\SearchController::class, 'getSearchableModels']);
+
 // Report Management Routes
 Route::apiResource('reports', \App\Http\Controllers\Api\ReportController::class);
 

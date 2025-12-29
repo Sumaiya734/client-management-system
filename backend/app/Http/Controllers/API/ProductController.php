@@ -19,6 +19,7 @@ class ProductController extends BaseAPIController
             'product_name'     => 'required|string|max:255',
             'vendor_type'      => 'nullable|string|max:255',
             'base_price'       => 'required|numeric|min:0',
+            'base_currency'    => 'nullable|string|max:10',
             'bdt_price'        => 'nullable|numeric|min:0',
             'multi_currency'   => 'nullable|json', 
            
@@ -28,6 +29,7 @@ class ProductController extends BaseAPIController
             'vendor'           => 'nullable|string|max:255',
             'vendor_website'   => 'nullable|url|max:255',
             'profit_margin'    => 'nullable|numeric|min:0',
+            'profit'           => 'nullable|numeric|min:0',
             'subscription_type'=> 'nullable|string|max:255',
             
         ];
@@ -37,6 +39,7 @@ class ProductController extends BaseAPIController
             'product_name'     => 'sometimes|string|max:255',
             'vendor_type'      => 'nullable|string|max:255',
             'base_price'       => 'sometimes|numeric|min:0',
+            'base_currency'    => 'nullable|string|max:10',
             'bdt_price'        => 'nullable|numeric|min:0',
             'multi_currency'   => 'nullable|json',
             'status'           => 'sometimes|string|in:Active,Inactive',
@@ -45,6 +48,7 @@ class ProductController extends BaseAPIController
             'vendor'           => 'nullable|string|max:255',
             'vendor_website'   => 'nullable|url|max:255',
             'profit_margin'    => 'nullable|numeric|min:0',
+            'profit'           => 'nullable|numeric|min:0',
             'subscription_type'=> 'nullable|string|max:255',
         ];
     }
