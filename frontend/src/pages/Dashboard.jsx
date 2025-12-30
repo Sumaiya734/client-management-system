@@ -5,6 +5,7 @@ import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../co
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { dashboardApi } from '../api';
+import { formatDate } from '../utils/dateUtils';
 
 export default function Dashboard() {
   const [dashboardData, setDashboardData] = useState(null);
@@ -67,7 +68,7 @@ export default function Dashboard() {
 
   const recentClients = recent.recentClients?.map(client => ({
     name: client.name || client.client_name || 'Unknown Client',
-    lastPayment: client.created_at ? new Date(client.created_at).toLocaleDateString() : 'N/A',
+    lastPayment: formatDate(client.created_at),
     status: client.status || 'Active'
   })) || [];
 

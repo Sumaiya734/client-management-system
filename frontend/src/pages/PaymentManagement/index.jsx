@@ -8,6 +8,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import EditPaymentPopup from '../../components/PaymentManagement/EditPaymentPopup';
 import api from '../../api';
+import { formatDate } from '../../utils/dateUtils';
 
 export default function PaymentManagement() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -41,7 +42,7 @@ export default function PaymentManagement() {
             company: payment.client?.company || payment.client || 'N/A',
             contact: payment.client?.cli_name || payment.client?.contact || 'N/A'
           },
-          date: payment.date || 'N/A',
+          date: formatDate(payment.date),
           amount: `$${typeof payment.amount === 'number' ? payment.amount.toFixed(2) : parseFloat(payment.amount || 0).toFixed(2)}`,
           method: payment.method || 'N/A',
           transactionId: payment.transaction_id || 'N/A',

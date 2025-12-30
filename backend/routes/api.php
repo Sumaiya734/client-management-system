@@ -82,6 +82,7 @@ Route::post('notifications/{id}/send', [\App\Http\Controllers\Api\NotificationCo
 
 // Purchase Management Routes
 Route::apiResource('purchases', \App\Http\Controllers\Api\PurchaseController::class);
+Route::get('purchases/generate-po-number', [\App\Http\Controllers\Api\PurchaseController::class, 'generatePoNumber']);
 
 // Subscription Management Routes
 Route::apiResource('subscriptions', \App\Http\Controllers\Api\SubscriptionController::class)->middleware('auth:sanctum');

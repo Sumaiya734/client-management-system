@@ -6,529 +6,357 @@ use App\Models\Purchase;
 use App\Models\Client;
 use App\Models\Product;
 use App\Models\Subscription;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Storage;
+use App\Models\Billing_management;
+use App\Models\Payment_management;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
-class PurchaseService extends BaseService
+class PurchaseService
 {
-    protected $model;
-
-    public function __construct(Purchase $model)
-    {
-        $this->model = $model;
-    }
-
     /**
-     * Get all purchases with relationships and group by PO number
+     * Get all purchases with relationships
      */
     public function getAll()
     {
-        // Get purchases with valid client and product relationships to avoid errors
-        $purchases = $this->model->whereHas('client')->whereHas('product')
-            ->with(['client', 'product'])->get();
-
-        // Group purchases by PO number to handle multiple products per PO
-        $groupedPurchases = [];
-        $processedPONumbers = [];
-
-        foreach ($purchases as $purchase) {
-            if (!in_array($purchase->po_number, $processedPONumbers)) {
-                // Find all purchases with the same PO number
-                $relatedPurchases = $purchases->where('po_number', $purchase->po_number);
-
-                // Create a consolidated purchase object
-                $consolidatedPurchase = $purchase->toArray();
-                $consolidatedPurchase['products'] = [];
-
-                foreach ($relatedPurchases as $relatedPurchase) {
-                    $productData = [
-                        'id' => $relatedPurchase->product->id,
-                        'product_name' => $relatedPurchase->product->product_name ?? $relatedPurchase->product->name,
-                        'quantity' => $relatedPurchase->quantity,
-                        'subscription_start' => $relatedPurchase->subscription_start,
-                        'subscription_end' => $relatedPurchase->subscription_end,
-                    ];
-                    $consolidatedPurchase['products'][] = $productData;
-                }
-
-                $consolidatedPurchase['total_products'] = count($consolidatedPurchase['products']);
-                $consolidatedPurchase['total_amount'] = $relatedPurchases->sum('total_amount');
-
-                $groupedPurchases[] = $consolidatedPurchase;
-                $processedPONumbers[] = $purchase->po_number;
+        $purchases = Purchase::with(['client', 'product'])->get();
+        
+        // Transform the data to match frontend expectations
+        return $purchases->map(function ($purchase) {
+            $purchaseArray = $purchase->toArray();
+            
+            // Create products array from single product
+            if ($purchase->product) {
+                $purchaseArray['products'] = [
+                    [
+                        'product_name' => $purchase->product->product_name ?? $purchase->product->name ?? 'N/A',
+                        'quantity' => $purchase->quantity ?? 1,
+                        'subscription_start' => $purchase->subscription_start,
+                        'subscription_end' => $purchase->subscription_end,
+                    ]
+                ];
+            } else {
+                $purchaseArray['products'] = [];
             }
-        }
-
-        return $groupedPurchases;
+            
+            return $purchaseArray;
+        });
     }
 
     /**
-     * Get purchase by ID with relationships
+     * Get purchase by ID
      */
     public function getById($id)
     {
-        $purchase = $this->model->whereHas('client')->whereHas('product')
-            ->with(['client', 'product'])->find($id);
-
+        $purchase = Purchase::with(['client', 'product'])->find($id);
+        
         if (!$purchase) {
             return null;
         }
-
-        // Find all purchases with the same PO number
-        $relatedPurchases = $this->model->where('po_number', $purchase->po_number)
-            ->whereHas('client')->whereHas('product')
-            ->with(['client', 'product'])
-            ->get();
-
-        // Create a consolidated purchase object
-        $consolidatedPurchase = $purchase->toArray();
-        $consolidatedPurchase['products'] = [];
-
-        foreach ($relatedPurchases as $relatedPurchase) {
-            $productData = [
-                'id' => $relatedPurchase->product->id,
-                'product_name' => $relatedPurchase->product->product_name ?? $relatedPurchase->product->name,
-                'quantity' => $relatedPurchase->quantity,
-                'subscription_start' => $relatedPurchase->subscription_start,
-                'subscription_end' => $relatedPurchase->subscription_end,
+        
+        // Transform the data to match frontend expectations
+        $purchaseArray = $purchase->toArray();
+        
+        // Create products array from single product
+        if ($purchase->product) {
+            $purchaseArray['products'] = [
+                [
+                    'product_name' => $purchase->product->product_name ?? $purchase->product->name ?? 'N/A',
+                    'quantity' => $purchase->quantity ?? 1,
+                    'subscription_start' => $purchase->subscription_start,
+                    'subscription_end' => $purchase->subscription_end,
+                ]
             ];
-            $consolidatedPurchase['products'][] = $productData;
+        } else {
+            $purchaseArray['products'] = [];
         }
-
-        $consolidatedPurchase['total_products'] = count($consolidatedPurchase['products']);
-        $consolidatedPurchase['total_amount'] = $relatedPurchases->sum('total_amount');
-
-        return $consolidatedPurchase;
+        
+        return $purchaseArray;
     }
 
     /**
-     * Create a new purchase
+     * Create new purchase(s)
      */
-    public function create(array $data)
+    public function create(array $requestData)
     {
-        // Handle validation differently for single vs multiple products
-        if (isset($data['products']) && is_array($data['products']) && count($data['products']) > 0) {
-            // Multiple products validation
-            $validator = Validator::make($data, [
-                'status' => 'required|string',
-                'client_id' => 'required|exists:clients,id',
-                'products' => 'required|array|min:1',
-                'products.*.productId' => 'required|exists:products,id',
-                'products.*.quantity' => 'required|integer|min:1',
-                'products.*.subscription_start' => 'required|date',
-                'products.*.subscription_end' => 'required|date',
-                'subscription_active' => 'boolean',
-                'total_amount' => 'required|numeric|min:0',
-                'attachment' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx,xls,xlsx|max:10240' // 10MB max
-            ]);
+        // Validate the request data
+        $this->validatePurchaseData($requestData);
 
-            // Custom validation for date comparison
-            foreach ($data['products'] ?? [] as $index => $product) {
-                if (isset($product['subscription_start']) && isset($product['subscription_end'])) {
-                    $startDate = new \DateTime($product['subscription_start']);
-                    $endDate = new \DateTime($product['subscription_end']);
-
-                    if ($startDate >= $endDate) {
-                        $validator->errors()->add("products.$index.subscription_end", 'Subscription end date must be after subscription start date.');
-                    }
-                }
-            }
-        } else {
-            // Single product validation (backward compatibility)
-            $validator = Validator::make($data, [
-                'status' => 'required|string',
-                'client_id' => 'required|exists:clients,id',
-                'product_id' => 'required|exists:products,id',
-                'quantity' => 'required|integer|min:1',
-                'subscription_start' => 'required|date',
-                'subscription_end' => 'required|date',
-                'subscription_active' => 'boolean',
-                'total_amount' => 'required|numeric|min:0',
-                'attachment' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx,xls,xlsx|max:10240' // 10MB max
-            ]);
-
-            // Custom validation for single product date comparison
-            if (isset($data['subscription_start']) && isset($data['subscription_end'])) {
-                $startDate = new \DateTime($data['subscription_start']);
-                $endDate = new \DateTime($data['subscription_end']);
-
-                if ($startDate >= $endDate) {
-                    $validator->errors()->add('subscription_end', 'Subscription end date must be after subscription start date.');
-                }
-            }
-        }
-
-        if ($validator->fails()) {
-            throw new \Exception('Validation failed: ' . json_encode($validator->errors()));
-        }
-
-        // Generate PO number automatically in format PO-YYYY-xxxx
-        $year = date('Y');
-        $latestPO = $this->model->where('po_number', 'LIKE', "PO-$year-%")
-            ->orderByRaw('CAST(SUBSTRING(po_number, -4) AS UNSIGNED) DESC')
-            ->first();
-
-        $sequenceNumber = 1;
-        if ($latestPO) {
-            $lastSequence = substr($latestPO->po_number, -4);
-            $sequenceNumber = (int)$lastSequence + 1;
-        }
-
-        $poNumber = "PO-$year-" . str_pad($sequenceNumber, 4, '0', STR_PAD_LEFT);
-
-        // Handle file upload if attachment is present
-        if (isset($data['attachment']) && $data['attachment'] instanceof \Illuminate\Http\UploadedFile) {
-            $file = $data['attachment'];
-            $fileName = time() . '_' . $file->getClientOriginalName();
-            $filePath = $file->storeAs('purchase_attachments', $fileName, 'public');
-            $attachmentPath = $filePath;
-        } else {
-            $attachmentPath = null;
-        }
-
-        $purchases = [];
-        $requestData = $data;
-
-        // Automatically populate cli_name from client if client_id is provided
-        $client = Client::find($data['client_id']);
-        $cliName = null;
-        if ($client) {
-            $cliName = $client->cli_name ?? $client->name;
-        }
-
-        if (isset($requestData['products']) && is_array($requestData['products']) && count($requestData['products']) > 0) {
-            // Multiple products - create separate purchase records for each
-            foreach ($requestData['products'] as $productData) {
-                // Handle case where productData might come from FormData
-                $productId = $productData['productId'] ?? $productData['product_id'] ?? null;
-                $quantity = $productData['quantity'] ?? 1;
-                $subscriptionStart = $productData['subscription_start'] ?? null;
-                $subscriptionEnd = $productData['subscription_end'] ?? null;
-
-                $product = Product::find($productId);
-                if ($product) {
-                    $price = $product->bdt_price ?? $product->base_price ?? 0;
-                    $totalAmount = $price * $quantity;
-                } else {
-                    $totalAmount = 0;
-                }
-
-                $purchaseData = [
-                    'po_number' => $poNumber,
-                    'status' => $requestData['status'],
-                    'client_id' => $data['client_id'],
-                    'cli_name' => $cliName,
-                    'product_id' => $productId,
-                    'quantity' => $quantity,
-                    'subscription_start' => $subscriptionStart,
-                    'subscription_end' => $subscriptionEnd,
-                    'subscription_active' => $this->getBooleanValue($requestData['subscription_active'] ?? false),
-                    'total_amount' => $totalAmount,
-                    'attachment' => $attachmentPath,
-                    'po_details' => $requestData['po_details'] ?? null,
-                    'products_subscriptions' => $this->formatProductsSubscriptions($requestData['products'] ?? [], $data['client_id']),
-                ];
-
-                $purchase = $this->model->create($purchaseData);
-                $purchases[] = $purchase;
-
-                // Create subscription if subscription_active is true and subscription dates are provided
-                if (($this->getBooleanValue($requestData['subscription_active'] ?? false)) && $subscriptionStart && $subscriptionEnd) {
-                    $subscription = Subscription::create([
-                        'po_number' => $poNumber,
-                        'client_id' => $data['client_id'],
-                        'product_id' => $productId,
-                        'purchase_id' => $purchase->id,
-                        'start_date' => $subscriptionStart,
-                        'end_date' => $subscriptionEnd,
-                        'status' => 'Pending', // Default status
-                        'quantity' => $quantity,
-                        'total_amount' => $totalAmount,
-                        'next_billing_date' => $subscriptionEnd, // Set end date as next billing date initially
-                        'notes' => 'Auto-created from purchase order'
+        DB::beginTransaction();
+        
+        try {
+            $purchases = [];
+            
+            // Check if we have multiple products or single product
+            if (isset($requestData['products']) && is_array($requestData['products']) && count($requestData['products']) > 0) {
+                // Multiple products - create separate purchase for each
+                foreach ($requestData['products'] as $productData) {
+                    $singlePurchaseData = array_merge($requestData, [
+                        'product_id' => $productData['productId'],
+                        'quantity' => $productData['quantity'],
+                        'subscription_start' => $productData['subscription_start'] ?? null,
+                        'subscription_end' => $productData['subscription_end'] ?? null,
                     ]);
+                    
+                    $purchases[] = $this->createSinglePurchase($singlePurchaseData, $requestData);
                 }
-            }
-        } else {
-            // Single product - backward compatibility
-            $product = Product::find($data['product_id']);
-            if ($product) {
-                $price = $product->bdt_price ?? $product->base_price ?? 0;
-                $totalAmount = $price * $data['quantity'];
             } else {
-                $totalAmount = 0;
+                // Single product
+                $purchases[] = $this->createSinglePurchase($requestData, $requestData);
             }
 
-            $purchaseData = [
-                'po_number' => $poNumber,
-                'status' => $requestData['status'],
-                'client_id' => $data['client_id'],
-                'cli_name' => $cliName,
-                'product_id' => $data['product_id'],
-                'quantity' => $data['quantity'],
-                'subscription_start' => $data['subscription_start'],
-                'subscription_end' => $data['subscription_end'],
-                'subscription_active' => $this->getBooleanValue($requestData['subscription_active'] ?? false),
-                'total_amount' => $totalAmount,
-                'attachment' => $attachmentPath,
-                'po_details' => $requestData['po_details'] ?? null,
-                'products_subscriptions' => null, // For single product, no products_subscriptions data to format
-            ];
-
-            $purchase = $this->model->create($purchaseData);
-            $purchases[] = $purchase;
-
-            // Create subscription if subscription_active is true and subscription dates are provided
-            if (($this->getBooleanValue($requestData['subscription_active'] ?? false)) && isset($data['subscription_start']) && isset($data['subscription_end'])) {
-                $subscription = Subscription::create([
-                    'po_number' => $poNumber,
-                    'client_id' => $data['client_id'],
-                    'product_id' => $data['product_id'],
-                    'purchase_id' => $purchase->id,
-                    'start_date' => $data['subscription_start'],
-                    'end_date' => $data['subscription_end'],
-                    'status' => 'Pending', // Default status
-                    'quantity' => $data['quantity'],
-                    'total_amount' => $totalAmount,
-                    'next_billing_date' => $data['subscription_end'], // Set end date as next billing date initially
-                    'notes' => 'Auto-created from purchase order'
-                ]);
-            }
+            DB::commit();
+            return $purchases;
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
         }
-
-        return $purchases;
     }
 
     /**
-     * Update an existing purchase
+     * Create a single purchase record
+     */
+    private function createSinglePurchase(array $data, array $originalRequestData)
+    {
+        // Get client and product information
+        $client = Client::find($data['client_id']);
+        $product = Product::find($data['product_id']);
+        
+        if (!$client) {
+            throw new \Exception('Client not found');
+        }
+        
+        if (!$product) {
+            throw new \Exception('Product not found');
+        }
+
+        // Calculate total amount
+        $quantity = intval($data['quantity'] ?? 1);
+        $unitPrice = floatval($product->bdt_price ?? $product->base_price ?? $product->price ?? 0);
+        $totalAmount = $quantity * $unitPrice;
+
+        // Handle file attachment
+        $attachmentPath = null;
+        if (isset($originalRequestData['attachment']) && $originalRequestData['attachment']) {
+            $file = $originalRequestData['attachment'];
+            $attachmentPath = $file->store('purchase_attachments', 'public');
+        }
+
+        // Create purchase record
+        $purchase = Purchase::create([
+            'po_number' => $data['po_number'],
+            'client_id' => $data['client_id'],
+            'product_id' => $data['product_id'],
+            'quantity' => $quantity,
+            'total_amount' => $totalAmount,
+            'status' => $data['status'] ?? 'Draft',
+            'subscription_active' => $this->getBooleanValue($data['subscription_active'] ?? false),
+            'subscription_start' => $data['subscription_start'] ?? null,
+            'subscription_end' => $data['subscription_end'] ?? null,
+            'attachment' => $attachmentPath,
+        ]);
+
+        // Create subscription if subscription_active is true and subscription dates are provided
+        if ($this->getBooleanValue($data['subscription_active'] ?? false) && 
+            isset($data['subscription_start']) && 
+            isset($data['subscription_end'])) {
+            
+            $subscription = Subscription::create([
+                'po_number' => $data['po_number'],
+                'client_id' => $data['client_id'],
+                'product_id' => $data['product_id'],
+                'purchase_id' => $purchase->id,
+                'start_date' => $data['subscription_start'],
+                'end_date' => $data['subscription_end'],
+                'status' => 'Pending',
+                'quantity' => $quantity,
+                'total_amount' => $totalAmount,
+                'next_billing_date' => $data['subscription_end'],
+                'notes' => 'Auto-created from purchase order'
+            ]);
+
+            // Create billing record for this subscription
+            $billNumber = 'BILL-' . $data['po_number'] . '-' . $data['product_id'];
+            $billing = Billing_management::create([
+                'bill_number' => $billNumber,
+                'client' => $client->company ?? $client->name,
+                'po_number' => $data['po_number'],
+                'bill_date' => date('Y-m-d'),
+                'due_date' => $data['subscription_end'],
+                'total_amount' => $totalAmount,
+                'paid_amount' => 0,
+                'status' => 'Pending',
+                'payment_status' => 'Unpaid',
+                'client_id' => $data['client_id'],
+                'subscription_id' => $subscription->id,
+                'purchase_id' => $purchase->id
+            ]);
+
+            // Create initial payment record
+            Payment_management::create([
+                'po_number' => $data['po_number'],
+                'client_id' => $data['client_id'],
+                'date' => date('Y-m-d'),
+                'amount' => 0,
+                'method' => 'Pending',
+                'transaction_id' => 'AUTO-' . $data['po_number'],
+                'status' => 'Pending',
+                'receipt' => 'Not Generated',
+                'billing_id' => $billing->id
+            ]);
+        }
+
+        // Load relationships and return
+        return $purchase->load(['client', 'product']);
+    }
+
+    /**
+     * Update purchase
      */
     public function update($id, array $data)
     {
-        $purchase = $this->model->find($id);
-
+        $purchase = Purchase::find($id);
+        
         if (!$purchase) {
             throw new \Exception('Purchase not found');
         }
 
-        // Handle validation differently for single vs multiple products
-        if (isset($data['products']) && is_array($data['products']) && count($data['products']) > 0) {
-            // Multiple products validation
-            $validator = Validator::make($data, [
-                'po_number' => 'sometimes|string|unique:purchases,po_number,' . $id,
-                'status' => 'sometimes|string',
-                'client_id' => 'sometimes|exists:clients,id',
-                'products' => 'sometimes|array|min:1',
-                'products.*.productId' => 'sometimes|exists:products,id',
-                'products.*.quantity' => 'sometimes|integer|min:1',
-                'products.*.subscription_start' => 'sometimes|date',
-                'products.*.subscription_end' => 'sometimes|date',
-                'subscription_active' => 'sometimes|boolean',
-                'total_amount' => 'sometimes|numeric|min:0',
-                'attachment' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx,xls,xlsx|max:10240' // 10MB max
-            ]);
+        // Validate update data
+        $this->validatePurchaseData($data, $id);
 
-            // Custom validation for date comparison in update
-            foreach ($data['products'] ?? [] as $index => $product) {
-                if (isset($product['subscription_start']) && isset($product['subscription_end'])) {
-                    $startDate = new \DateTime($product['subscription_start']);
-                    $endDate = new \DateTime($product['subscription_end']);
-
-                    if ($startDate >= $endDate) {
-                        $validator->errors()->add("products.$index.subscription_end", 'Subscription end date must be after subscription start date.');
-                    }
-                }
+        DB::beginTransaction();
+        
+        try {
+            // Always recalculate total amount when updating
+            $product = Product::find($data['product_id'] ?? $purchase->product_id);
+            if ($product) {
+                $quantity = intval($data['quantity'] ?? $purchase->quantity);
+                $unitPrice = floatval($product->bdt_price ?? $product->base_price ?? $product->price ?? 0);
+                $data['total_amount'] = $quantity * $unitPrice;
             }
-        } else {
-            // Single product validation (backward compatibility)
-            $validator = Validator::make($data, [
-                'po_number' => 'sometimes|string|unique:purchases,po_number,' . $id,
-                'status' => 'sometimes|string',
-                'client_id' => 'sometimes|exists:clients,id',
-                'product_id' => 'sometimes|exists:products,id',
-                'quantity' => 'sometimes|integer|min:1',
-                'subscription_start' => 'sometimes|date',
-                'subscription_end' => 'sometimes|date',
-                'subscription_active' => 'sometimes|boolean',
-                'total_amount' => 'sometimes|numeric|min:0',
-                'attachment' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx,xls,xlsx|max:10240' // 10MB max
-            ]);
 
-            // Custom validation for single product date comparison in update
-            if (isset($data['subscription_start']) && isset($data['subscription_end'])) {
-                $startDate = new \DateTime($data['subscription_start']);
-                $endDate = new \DateTime($data['subscription_end']);
-
-                if ($startDate >= $endDate) {
-                    $validator->errors()->add('subscription_end', 'Subscription end date must be after subscription start date.');
-                }
+            $purchase->update($data);
+            
+            DB::commit();
+            
+            // Transform the updated data to match frontend expectations
+            $purchaseArray = $purchase->fresh(['client', 'product'])->toArray();
+            
+            // Create products array from single product
+            if ($purchase->product) {
+                $purchaseArray['products'] = [
+                    [
+                        'product_name' => $purchase->product->product_name ?? $purchase->product->name ?? 'N/A',
+                        'quantity' => $purchase->quantity ?? 1,
+                        'subscription_start' => $purchase->subscription_start,
+                        'subscription_end' => $purchase->subscription_end,
+                    ]
+                ];
+            } else {
+                $purchaseArray['products'] = [];
             }
+            
+            return $purchaseArray;
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Delete purchase
+     */
+    public function delete($id)
+    {
+        $purchase = Purchase::find($id);
+        
+        if (!$purchase) {
+            throw new \Exception('Purchase not found');
         }
 
-        if ($validator->fails()) {
-            throw new \Exception('Validation failed: ' . json_encode($validator->errors()));
-        }
+        DB::beginTransaction();
+        
+        try {
+            // Delete related records
+            if ($purchase->subscription_active) {
+                // Delete related subscriptions, billings, and payments
+                Subscription::where('purchase_id', $id)->delete();
+                $billings = Billing_management::where('purchase_id', $id)->get();
+                foreach ($billings as $billing) {
+                    Payment_management::where('billing_id', $billing->id)->delete();
+                }
+                Billing_management::where('purchase_id', $id)->delete();
+            }
 
-        // Handle file upload if attachment is present
-        if (isset($data['attachment']) && $data['attachment'] instanceof \Illuminate\Http\UploadedFile) {
-            // Delete old attachment if exists
+            // Delete attachment file if exists
             if ($purchase->attachment) {
                 Storage::disk('public')->delete($purchase->attachment);
             }
 
-            $file = $data['attachment'];
-            $fileName = time() . '_' . $file->getClientOriginalName();
-            $filePath = $file->storeAs('purchase_attachments', $fileName, 'public');
-            $requestData['attachment'] = $filePath;
+            $purchase->delete();
+            
+            DB::commit();
+            return true;
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Validate purchase data
+     */
+    private function validatePurchaseData(array $data, $id = null)
+    {
+        $rules = [
+            'client_id' => 'required|exists:clients,id',
+            'status' => 'required|string|in:Draft,Active,In Progress,Completed,Expired,Expiring Soon',
+            'subscription_active' => 'boolean',
+        ];
+
+        // Validate products array or single product
+        if (isset($data['products']) && is_array($data['products'])) {
+            $rules['products'] = 'required|array|min:1';
+            $rules['products.*.productId'] = 'required|exists:products,id';
+            $rules['products.*.quantity'] = 'required|integer|min:1';
         } else {
-            $requestData = $data;
+            $rules['product_id'] = 'required|exists:products,id';
+            $rules['quantity'] = 'required|integer|min:1';
         }
 
-        // Automatically update cli_name from client if client_id is provided
-        if (isset($requestData['client_id'])) {
-            $client = Client::find($requestData['client_id']);
-            if ($client) {
-                $requestData['cli_name'] = $client->cli_name ?? $client->name;
-            }
+        // Subscription validation
+        if (isset($data['subscription_active']) && $this->getBooleanValue($data['subscription_active'])) {
+            $rules['subscription_start'] = 'required|date';
+            $rules['subscription_end'] = 'required|date|after:subscription_start';
         }
 
-        $purchase->update($requestData);
+        $validator = Validator::make($data, $rules);
 
-        return $purchase;
+        if ($validator->fails()) {
+            throw new \Exception('Validation failed: ' . json_encode($validator->errors()));
+        }
     }
 
     /**
-     * Delete a purchase
+     * Convert various boolean representations to actual boolean
      */
-    public function delete($id)
-    {
-        $purchase = $this->model->find($id);
-
-        if (!$purchase) {
-            throw new \Exception('Purchase not found');
-        }
-
-        return $purchase->delete();
-    }
-
-    /**
-     * Format products subscriptions data for storage
-     */
-    private function formatProductsSubscriptions($products, $clientId)
-    {
-        if (empty($products) || !is_array($products)) {
-            return null;
-        }
-
-        $formattedProducts = [];
-        foreach ($products as $productData) {
-            $productId = $productData['productId'] ?? $productData['product_id'] ?? null;
-            if ($productId) {
-                $product = Product::find($productId);
-                $productName = $product ? ($product->product_name ?? $product->name ?? 'Unknown Product') : 'Unknown Product';
-
-                $formattedProducts[] = [
-                    'id' => $productId,
-                    'name' => $productName,
-                    'quantity' => $productData['quantity'] ?? 1,
-                    'subscription_start' => $productData['subscription_start'] ?? null,
-                    'subscription_end' => $productData['subscription_end'] ?? null,
-                    'status' => 'Pending'
-                ];
-            }
-        }
-
-        return !empty($formattedProducts) ? json_encode($formattedProducts) : null;
-    }
-
-    /**
-     * Determine purchase status based on start and end dates
-     * 
-     * @param string $startDate Start date in dd/mm/yyyy format
-     * @param string $endDate End date in dd/mm/yyyy format
-     * @return string Status of the purchase
-     */
-    public function getPurchaseStatus($startDate, $endDate)
-    {
-        // Parse dates from dd/mm/yyyy format
-        $start = null;
-        $end = null;
-        
-        if ($startDate) {
-            $start = \DateTime::createFromFormat('d/m/Y', $startDate);
-            if (!$start) {
-                // If dd/mm/yyyy format fails, try other common formats
-                $start = \DateTime::createFromFormat('Y-m-d', $startDate);
-                if (!$start) {
-                    $start = \DateTime::createFromFormat('m/d/Y', $startDate);
-                }
-            }
-        }
-        
-        if ($endDate) {
-            $end = \DateTime::createFromFormat('d/m/Y', $endDate);
-            if (!$end) {
-                // If dd/mm/yyyy format fails, try other common formats
-                $end = \DateTime::createFromFormat('Y-m-d', $endDate);
-                if (!$end) {
-                    $end = \DateTime::createFromFormat('m/d/Y', $endDate);
-                }
-            }
-        }
-        
-        $currentDate = new \DateTime();
-        
-        // If no start date, status is pending
-        if (!$start) {
-            return 'Pending';
-        }
-        
-        // If start date is in the future, status is pending
-        if ($start > $currentDate) {
-            return 'Pending';
-        }
-        
-        // If no end date but start date is in past, status is active
-        if (!$end) {
-            return 'Active';
-        }
-        
-        // Check if end date is coming up within 7 days but still in the future
-        $sevenDaysFromNow = clone $currentDate;
-        $sevenDaysFromNow->add(new \DateInterval('P7D')); // P7D = Period of 7 Days
-        
-        if ($end > $currentDate && $end <= $sevenDaysFromNow) {
-            return 'Expired soon';
-        }
-        
-        // If end date is in the future (more than 7 days), status is active
-        if ($end > $currentDate) {
-            return 'Active';
-        }
-        
-        // If end date is in the past, status is expired
-        return 'Expired';
-    }
-
-    /**
-     * Convert various input types to boolean value
-     */
-    private function getBooleanValue($value): bool
+    private function getBooleanValue($value)
     {
         if (is_bool($value)) {
             return $value;
         }
-
+        
         if (is_string($value)) {
-            $value = strtolower($value);
-            return $value === '1' || $value === 'true' || $value === 'on';
+            return in_array(strtolower($value), ['true', '1', 'yes', 'on']);
         }
-
+        
         if (is_numeric($value)) {
-            return (bool) $value;
+            return intval($value) === 1;
         }
-
-        return (bool) $value;
+        
+        return false;
     }
 }

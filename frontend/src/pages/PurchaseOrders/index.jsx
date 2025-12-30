@@ -8,6 +8,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import CreatePurchaseOrderPopup from '../../components/PurchaseOrders/CreatePurchaseOrderPopup';
 import api from '../../api';
+import { formatDate, formatDateRange } from '../../utils/dateUtils';
 
 export default function PurchaseOrders() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -65,15 +66,6 @@ export default function PurchaseOrders() {
     }
   };
 
-  const formatDateRange = (start, end) => {
-    if (!start || !end) return 'N/A';
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-    const startFormatted = startDate.toString() !== 'Invalid Date' ? startDate.toLocaleDateString() : 'Invalid';
-    const endFormatted = endDate.toString() !== 'Invalid Date' ? endDate.toLocaleDateString() : 'Invalid';
-    return `${startFormatted} to ${endFormatted}`;
-  };
-
   const formatCurrency = (amount) => {
     const num = typeof amount === 'number' ? amount : parseFloat(amount || 0);
     return isNaN(num) ? '0.00' : num.toFixed(2);
@@ -110,13 +102,13 @@ export default function PurchaseOrders() {
           });
         } else {
           // Fallback to single product if no products array
-          formData.append('product_id', orderData.productId.toString());
+          formData.append('product_id', orderData.product_id.toString());
           formData.append('quantity', orderData.quantity.toString());
-          formData.append('subscription_start', orderData.subscriptionStart);
-          formData.append('subscription_end', orderData.subscriptionEnd);
+          formData.append('subscription_start', orderData.subscription_start);
+          formData.append('subscription_end', orderData.subscription_end);
         }
         
-        formData.append('subscription_active', orderData.subscriptionActive ? '1' : '0');
+        formData.append('subscription_active', orderData.subscription_active ? '1' : '0');
         formData.append('total_amount', '0'); // backend calculate করে নেবে
         if (orderData.attachment) {
           formData.append('attachment', orderData.attachment, orderData.attachment.name);
@@ -135,16 +127,16 @@ export default function PurchaseOrders() {
           status: orderData.status,
           client_id: orderData.client_id,
           products: orderData.products, // Send products array if available
-          subscription_active: orderData.subscriptionActive ? 1 : 0, // boolean → 1/0
+          subscription_active: orderData.subscription_active ? 1 : 0, // boolean → 1/0
           total_amount: 0 // backend calculate করে নেবে
         };
         
         // Only add single product fields if no products array is provided
         if (!orderData.products || !Array.isArray(orderData.products) || orderData.products.length === 0) {
-          purchaseData.product_id = orderData.productId;
+          purchaseData.product_id = orderData.product_id;
           purchaseData.quantity = parseInt(orderData.quantity, 10); // নিশ্চিত integer
-          purchaseData.subscription_start = orderData.subscriptionStart; // YYYY-MM-DD format হতে হবে
-          purchaseData.subscription_end = orderData.subscriptionEnd;     // YYYY-MM-DD format হতে হবে
+          purchaseData.subscription_start = orderData.subscription_start; // YYYY-MM-DD format হতে হবে
+          purchaseData.subscription_end = orderData.subscription_end;     // YYYY-MM-DD format হতে হবে
         }
         
         console.log('Sending purchase data:', purchaseData); // ডিবাগিংয়ের জন্য
@@ -245,7 +237,7 @@ export default function PurchaseOrders() {
                       <div>
                         <div className="font-semibold text-gray-900">{po.po_number}</div>
                         <div className="text-sm text-gray-600">
-                          Created: {po.created_at ? new Date(po.created_at).toLocaleDateString() : 'N/A'}
+                          Created: {formatDate(po.created_at)}
                         </div>
                       </div>
                     </TableCell>

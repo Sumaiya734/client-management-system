@@ -6,7 +6,7 @@ import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
 
 interface Client {
   id: string | number | null;
-  name: string;
+  name: string;  // Maps to cli_name on backend
   company: string;
   email: string;
   phone: string;
@@ -82,12 +82,8 @@ const EditClientPopup: React.FC<EditClientPopupProps> = ({
     
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
-    } else if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(formData.email)) {
+    } else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(formData.email)) {
       newErrors.email = 'Email is invalid';
-    }
-    
-    if (!formData.company.trim()) {
-      newErrors.company = 'Company is required';
     }
     
     setErrors(newErrors);
@@ -98,12 +94,32 @@ const EditClientPopup: React.FC<EditClientPopupProps> = ({
     e.preventDefault();
     
     if (validateForm()) {
-      onUpdate(formData);
+      // Map frontend field names to backend field names
+      const backendData = {
+        id: formData.id,
+        cli_name: formData.name,  // Map name to cli_name
+        company: formData.company,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        status: formData.status,
+      };
+      
+      onUpdate(backendData as unknown as Client);
     }
   };
 
   const handleCancel = () => {
-    setFormData(client); // Reset form data
+    // Reset form data with proper mapping
+    setFormData({
+      id: client.id || null,
+      name: client.name || '',
+      company: client.company || '',
+      email: client.email || '',
+      phone: client.phone || '',
+      address: client.address || '',
+      status: client.status || 'Active',
+    });
     setErrors({}); // Clear errors
     onClose();
   };
@@ -163,10 +179,8 @@ const EditClientPopup: React.FC<EditClientPopupProps> = ({
                 id="company"
                 value={formData.company}
                 onChange={(e) => handleInputChange('company', e.target.value)}
-                className={`w-full px-2 py-1.5 border ${errors.company ? 'border-red-500' : 'border-gray-300'} rounded-md text-sm`}
-                required
+                className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
               />
-              {errors.company && <p className="text-xs text-red-600 mt-1">{errors.company}</p>}
             </div>
           </div>
 

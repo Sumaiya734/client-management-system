@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('products', function (Blueprint $table) {
-            $table->string('base_currency', 10)->default('USD')->after('base_price');
+            $table->json('multi_currency')->nullable()->change();
         });
     }
 
@@ -22,7 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('products', function (Blueprint $table) {
-            $table->dropColumn('base_currency');
+            $table->string('multi_currency')->nullable()->change();
         });
     }
 };

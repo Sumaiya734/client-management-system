@@ -8,6 +8,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import BillDetailsPopup from '../../components/BillingManagement/BillDetailsPopup';
 import { billingManagementApi } from '../../api';
+import { formatDate } from '../../utils/dateUtils';
 
 export default function BillingManagement() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -363,8 +364,8 @@ export default function BillingManagement() {
                 const clientCompany = typeof bill.client === 'object' ? bill.client?.company || 'N/A' : bill.client || 'N/A';
                 const clientContact = typeof bill.client === 'object' ? bill.client?.cli_name || bill.client?.contact || 'N/A' : 'N/A';
                 const poNumber = bill.po_number || bill.poNumber || 'N/A';
-                const billDate = bill.bill_date || bill.billDate || 'N/A';
-                const dueDate = bill.due_date || bill.dueDate || 'N/A';
+                const billDate = formatDate(bill.bill_date || bill.billDate);
+                const dueDate = formatDate(bill.due_date || bill.dueDate);
                 const totalAmount = `$${typeof bill.total_amount === 'number' ? bill.total_amount.toFixed(2) : parseFloat(bill.total_amount)?.toFixed(2) || '0.00'}`;
                 const paidAmount = `$${typeof bill.paid_amount === 'number' ? bill.paid_amount.toFixed(2) : parseFloat(bill.paid_amount)?.toFixed(2) || '0.00'}`;
                 const status = bill.status || 'N/A';

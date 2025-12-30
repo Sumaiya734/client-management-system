@@ -13,8 +13,7 @@ import {
   UserCog, 
   Bell, 
   LogOut,
-  Search
-  LogOut,
+  Search,
   Menu
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';

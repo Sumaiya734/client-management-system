@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\PurchaseService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 class PurchaseController extends Controller
 {
@@ -23,7 +24,7 @@ class PurchaseController extends Controller
     {
         try {
             $purchases = $this->purchaseService->getAll();
-            
+
             return response()->json([
                 'success' => true,
                 'data' => $purchases
@@ -43,6 +44,37 @@ class PurchaseController extends Controller
     public function store(Request $request): JsonResponse
     {
         try {
+
+            // ----------------------------
+            // AUTO-GENERATE PO NUMBER
+            // ----------------------------
+            $year = date('Y');
+
+            $lastPo = DB::table('purchases')
+                ->where('po_number', 'like', "PO-$year-%")
+                ->orderBy('id', 'desc')
+                ->first();
+
+            if ($lastPo && isset($lastPo->po_number)) {
+                // Extract the serial number part after the year
+                $pattern = "/PO-$year-(\d+)$/";
+                if (preg_match($pattern, $lastPo->po_number, $matches)) {
+                    $lastSerial = intval($matches[1]);
+                    $nextSerial = $lastSerial + 1;
+                    $nextDigits = str_pad($nextSerial, strlen($matches[1]), '0', STR_PAD_LEFT);
+                } else {
+                    $nextDigits = "0001"; // fallback
+                }
+            } else {
+                $nextDigits = "0001";
+            }
+
+            $generatedPo = "PO-$year-$nextDigits";
+
+            // Inject PO number into request
+            $request->merge(['po_number' => $generatedPo]);
+            // ----------------------------
+
             $purchases = $this->purchaseService->create($request->all());
 
             return response()->json([
@@ -52,7 +84,6 @@ class PurchaseController extends Controller
             ], 201);
             
         } catch (\Exception $e) {
-            // Extract validation errors from the exception message if present
             $errors = [];
             if (strpos($e->getMessage(), 'Validation failed') !== false) {
                 $errors = json_decode(substr($e->getMessage(), strpos($e->getMessage(), ':') + 1), true);
@@ -62,7 +93,7 @@ class PurchaseController extends Controller
                     'errors' => $errors
                 ], 422);
             }
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create purchase',
@@ -85,7 +116,7 @@ class PurchaseController extends Controller
                     'message' => 'Purchase not found'
                 ], 404);
             }
-            
+
             return response()->json([
                 'success' => true,
                 'data' => $purchase
@@ -105,6 +136,11 @@ class PurchaseController extends Controller
     public function update(Request $request, string $id): JsonResponse
     {
         try {
+            // Optional: prevent editing the PO number
+            if ($request->has('po_number')) {
+                $request->request->remove('po_number');
+            }
+
             $purchase = $this->purchaseService->update($id, $request->all());
 
             return response()->json([
@@ -114,7 +150,6 @@ class PurchaseController extends Controller
             ]);
             
         } catch (\Exception $e) {
-            // Extract validation errors from the exception message if present
             $errors = [];
             if (strpos($e->getMessage(), 'Validation failed') !== false) {
                 $errors = json_decode(substr($e->getMessage(), strpos($e->getMessage(), ':') + 1), true);
@@ -124,14 +159,14 @@ class PurchaseController extends Controller
                     'errors' => $errors
                 ], 422);
             }
-            
+
             if (strpos($e->getMessage(), 'Purchase not found') !== false) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Purchase not found'
                 ], 404);
             }
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update purchase',
@@ -147,7 +182,7 @@ class PurchaseController extends Controller
     {
         try {
             $result = $this->purchaseService->delete($id);
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Purchase deleted successfully'
@@ -159,10 +194,54 @@ class PurchaseController extends Controller
                     'message' => 'Purchase not found'
                 ], 404);
             }
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete purchase',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Generate the next PO number without creating a record
+     */
+    public function generatePoNumber(): JsonResponse
+    {
+        try {
+            $year = date('Y');
+
+            $lastPo = DB::table('purchases')
+                ->where('po_number', 'like', "PO-$year-%")
+                ->orderBy('id', 'desc')
+                ->first();
+
+            if ($lastPo && isset($lastPo->po_number)) {
+                // Extract the serial number part after the year
+                $pattern = "/PO-$year-(\d+)$/";
+                if (preg_match($pattern, $lastPo->po_number, $matches)) {
+                    $lastSerial = intval($matches[1]);
+                    $nextSerial = $lastSerial + 1;
+                    $nextDigits = str_pad($nextSerial, strlen($matches[1]), '0', STR_PAD_LEFT);
+                } else {
+                    $nextDigits = "0001"; // fallback
+                }
+            } else {
+                $nextDigits = "0001";
+            }
+
+            $generatedPo = "PO-$year-$nextDigits";
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'po_number' => $generatedPo
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to generate PO number',
                 'error' => $e->getMessage()
             ], 500);
         }
