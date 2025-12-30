@@ -16,6 +16,7 @@ import CurrencyRates from './pages/Currency&Rates/index';
 import ReportsAnalytics from './pages/Reports&Analytics/index';
 import UserManagement from './pages/UserManagement/index';
 import Notifications from './pages/Notifications/index';
+import VendorManagement from './pages/VendorManagement/index';
 import Login from './pages/Auth/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import SearchPage from './pages/SearchPage';
@@ -143,6 +144,21 @@ function App() {
                   
                   <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
                     <ReportsAnalytics />
+                  </main>
+                </div>
+              </div>
+            </ProtectedRoute>
+          } />
+          <Route path="/vendors" element={
+            <ProtectedRoute>
+              <div className="flex h-screen bg-[var(--soft-purple)]">
+                <Sidebar />
+                
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <Header />
+                  
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--soft-purple)] p-6">
+                    <VendorManagement />
                   </main>
                 </div>
               </div>

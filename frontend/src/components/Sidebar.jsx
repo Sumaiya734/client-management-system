@@ -14,7 +14,8 @@ import {
   Bell, 
   LogOut,
   Search,
-  Menu
+  Menu,
+  Store
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import logo from '../assets/nanosoft logo.png';
@@ -29,13 +30,14 @@ export default function Sidebar() {
     { name: 'Dashboard', href: '/', icon: Home },
     // { name: 'Global Search', href: '/search', icon: Search },
     { name: 'Client Management', href: '/clients', icon: Users },
+    { name: 'Vendor Management', href: '/vendors', icon: Store },
     { name: 'Products & Pricing', href: '/products', icon: Package },
     { name: 'Purchase Orders', href: '/orders', icon: FileText },
     { name: 'Subscriptions', href: '/subscriptions', icon: Calendar },
     { name: 'Billing Management', href: '/billing', icon: CreditCard },
     { name: 'Payment Management', href: '/payments', icon: Wallet },
     { name: 'Currency & Rates', href: '/currency', icon: DollarSign },
-    { name: 'Reports & Analytics', href: '/reports', icon: BarChart3 },
+    { name: 'Reports & Analytics', href: '/reports', icon: BarChart3 },   
     { name: 'User Management', href: '/users', icon: UserCog },
     { name: 'Notifications', href: '/notifications', icon: Bell },
   ];

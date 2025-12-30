@@ -11,11 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasColumn('products', 'base_currency')) {
-            Schema::table('products', function (Blueprint $table) {
-                $table->string('base_currency', 10)->default('USD')->after('base_price');
-            });
-        }
+        Schema::table('purchases', function (Blueprint $table) {
+            $table->date('delivery_date')->nullable()->after('attachment');
+        });
     }
 
     /**
@@ -23,8 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('products', function (Blueprint $table) {
-            $table->dropColumn('base_currency');
+        Schema::table('purchases', function (Blueprint $table) {
+            $table->dropColumn('delivery_date');
         });
     }
 };

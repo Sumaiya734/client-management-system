@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://127.0.0.1:8000/api",
+  baseURL: "http://localhost:8000/api/",
 });
 
 // Add request interceptor to include auth token
@@ -102,6 +102,16 @@ export const dashboardApi = {
 export const searchApi = {
   search: (params) => api.get('/search', { params }),
   getSearchableModels: () => api.get('/searchable-models'),
+};
+
+// Vendor API functions
+export const vendorApi = {
+  getAll: () => api.get('/vendors'),
+  getById: (id) => api.get(`/vendors/${id}`),
+  create: (data) => api.post('/vendors', data),
+  update: (id, data) => api.put(`/vendors/${id}`, data),
+  delete: (id) => api.delete(`/vendors/${id}`),
+  search: (params) => api.post('/vendors-search', params),
 };
 
 // Authentication API functions

@@ -90,6 +90,10 @@ Route::apiResource('subscriptions', \App\Http\Controllers\Api\SubscriptionContro
 // Payment Management Routes
 Route::apiResource('payment-managements', \App\Http\Controllers\Api\PaymentManagementController::class);
 
+// Vendor Management Routes
+Route::apiResource('vendors', \App\Http\Controllers\Api\VendorController::class);
+Route::post('vendors-search', [\App\Http\Controllers\Api\VendorController::class, 'search']);
+
 // User Management Routes
 Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('users', \App\Http\Controllers\Api\UserManagementController::class);

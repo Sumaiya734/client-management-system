@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ChevronDown, Upload, X as XIcon } from 'lucide-react';
 import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
+import { vendorApi } from '../../api.js';
 
 interface Product {
   id: number | null;
@@ -38,6 +39,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
   const [formData, setFormData] = useState({
     name: '',
     vendor: '',
+    vendorId: null, // Add vendorId field
     vendorWebsite: '',
     category: '',
     subscriptionType: '',
@@ -52,11 +54,16 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
     category: false, 
     subscriptionType: false, 
     baseCurrency: false, 
-    status: false 
+    status: false,
+    vendor: false // Add vendor dropdown state
   });
   
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [attachments, setAttachments] = useState<File[]>([]);
+  
+  // State for vendors
+  const [vendors, setVendors] = useState<any[]>([]);
+  const [loadingVendors, setLoadingVendors] = useState(true);
 
   // Update form data when product changes
   useEffect(() => {
@@ -64,6 +71,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
       setFormData({
         name: product.name || '',
         vendor: product.vendor || '',
+        vendorId: null, // Initialize to null
         vendorWebsite: product.vendorWebsite || '',
         category: product.category || '',
         subscriptionType: product.type || '',
@@ -77,6 +85,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
       setFormData({
         name: '',
         vendor: '',
+        vendorId: null, // Initialize to null
         vendorWebsite: '',
         category: '',
         subscriptionType: '',
@@ -88,6 +97,33 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
       });
     }
   }, [product]);
+
+  // Fetch vendors when component mounts
+  useEffect(() => {
+    const fetchVendors = async () => {
+      try {
+        setLoadingVendors(true);
+        const response = await vendorApi.getAll();
+        setVendors(response.data);
+      } catch (error) {
+        console.error('Error fetching vendors:', error);
+      } finally {
+        setLoadingVendors(false);
+      }
+    };
+
+    fetchVendors();
+  }, []);
+
+  // Set vendorId when vendors are loaded and product has vendor
+  useEffect(() => {
+    if (product && vendors.length > 0 && !formData.vendorId) {
+      const foundVendor = vendors.find(v => v.name === product.vendor);
+      if (foundVendor) {
+        setFormData(prev => ({ ...prev, vendorId: foundVendor.id }));
+      }
+    }
+  }, [vendors, product, formData.vendorId]);
 
   const categoryOptions = ['Communication', 'Productivity', 'Design', 'AI Tools', 'Media'];
   const subscriptionTypeOptions = ['Per User', 'Per License', 'Per Editor', 'Per Account'];
@@ -117,11 +153,26 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
   };
 
   const selectOption = (dropdown: string, value: string) => {
-    handleInputChange(
-      dropdown === 'subscriptionType' ? 'subscriptionType' : 
-      dropdown === 'baseCurrency' ? 'baseCurrency' : dropdown,
-      value
-    );
+    if (dropdown === 'vendor') {
+      // Find the selected vendor from the vendors array
+      const selectedVendor = vendors.find(v => v.id === parseInt(value));
+      if (selectedVendor) {
+        // Update both vendor name and website when vendor is selected
+        setFormData(prev => ({
+          ...prev,
+          vendor: selectedVendor.name,
+          vendorId: selectedVendor.id,
+          vendorWebsite: selectedVendor.website || ''
+        }));
+      }
+    } else {
+      handleInputChange(
+        dropdown === 'subscriptionType' ? 'subscriptionType' : 
+        dropdown === 'baseCurrency' ? 'baseCurrency' : dropdown,
+        value
+      );
+    }
+    
     setDropdownStates(prev => ({ 
       ...prev, 
       [dropdown]: false 
@@ -250,14 +301,34 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
 
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Vendor</label>
-              <input
-                type="text"
-                value={formData.vendor}
-                onChange={(e) => handleInputChange('vendor', e.target.value)}
-                className={`w-full px-2 py-1.5 border ${
-                  errors.vendor ? 'border-red-500' : 'border-gray-300'
-                } rounded-md text-sm`}
-              />
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => toggleDropdown('vendor')}
+                  className={`w-full px-2 py-1.5 border ${
+                    errors.vendor ? 'border-red-500' : 'border-gray-300'
+                  } rounded-md bg-white text-left text-sm flex items-center justify-between`}
+                  disabled={loadingVendors}
+                >
+                  {loadingVendors ? 'Loading vendors...' : (formData.vendor || 'Select vendor')}
+                  <ChevronDown size={14} />
+                </button>
+
+                {dropdownStates.vendor && !loadingVendors && (
+                  <div className="absolute w-full bg-white border border-gray-200 rounded-md shadow-md mt-1 text-xs max-h-40 overflow-y-auto">
+                    {vendors.map((vendor) => (
+                      <button
+                        key={vendor.id}
+                        type="button"
+                        onClick={() => selectOption('vendor', vendor.id.toString())}
+                        className="w-full px-2 py-1.5 text-left hover:bg-gray-50"
+                      >
+                        {vendor.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               {errors.vendor && <p className="text-xs text-red-600 mt-1">{errors.vendor}</p>}
             </div>
           </div>

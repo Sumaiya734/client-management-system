@@ -11,6 +11,7 @@ use App\Models\Payment_management;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Carbon;
 
 class PurchaseService
 {
@@ -33,6 +34,9 @@ class PurchaseService
                         'quantity' => $purchase->quantity ?? 1,
                         'subscription_start' => $purchase->subscription_start,
                         'subscription_end' => $purchase->subscription_end,
+                        'subscription_type' => $purchase->subscription_type,
+                        'recurring_count' => $purchase->recurring_count,
+                        'delivery_date' => $purchase->delivery_date,
                     ]
                 ];
             } else {
@@ -65,6 +69,9 @@ class PurchaseService
                     'quantity' => $purchase->quantity ?? 1,
                     'subscription_start' => $purchase->subscription_start,
                     'subscription_end' => $purchase->subscription_end,
+                    'subscription_type' => $purchase->subscription_type,
+                    'recurring_count' => $purchase->recurring_count,
+                    'delivery_date' => $purchase->delivery_date,
                 ]
             ];
         } else {
@@ -143,6 +150,23 @@ class PurchaseService
             $attachmentPath = $file->store('purchase_attachments', 'public');
         }
 
+        // Calculate subscription dates if using subscription type format
+        $subscriptionStart = $data['subscription_start'] ?? null;
+        $subscriptionEnd = $data['subscription_end'] ?? null;
+        
+        if (isset($data['subscription_type']) && isset($data['recurring_count'])) {
+            // Calculate subscription dates based on type and recurring count
+            $startDate = Carbon::now();
+            $months = (int)$data['subscription_type'];
+            $recurringCount = (int)$data['recurring_count'];
+            
+            // Calculate end date based on subscription type and recurring count
+            $endDate = $startDate->copy()->addMonths($months * $recurringCount);
+            
+            $subscriptionStart = $startDate->format('Y-m-d');
+            $subscriptionEnd = $endDate->format('Y-m-d');
+        }
+
         // Create purchase record
         $purchase = Purchase::create([
             'po_number' => $data['po_number'],
@@ -152,27 +176,30 @@ class PurchaseService
             'total_amount' => $totalAmount,
             'status' => $data['status'] ?? 'Draft',
             'subscription_active' => $this->getBooleanValue($data['subscription_active'] ?? false),
-            'subscription_start' => $data['subscription_start'] ?? null,
-            'subscription_end' => $data['subscription_end'] ?? null,
+            'subscription_start' => $subscriptionStart,
+            'subscription_end' => $subscriptionEnd,
+            'subscription_type' => $data['subscription_type'] ?? null,
+            'recurring_count' => $data['recurring_count'] ?? null,
+            'delivery_date' => $data['delivery_date'] ?? null,
             'attachment' => $attachmentPath,
         ]);
 
         // Create subscription if subscription_active is true and subscription dates are provided
         if ($this->getBooleanValue($data['subscription_active'] ?? false) && 
-            isset($data['subscription_start']) && 
-            isset($data['subscription_end'])) {
+            $subscriptionStart && 
+            $subscriptionEnd) {
             
             $subscription = Subscription::create([
                 'po_number' => $data['po_number'],
                 'client_id' => $data['client_id'],
                 'product_id' => $data['product_id'],
                 'purchase_id' => $purchase->id,
-                'start_date' => $data['subscription_start'],
-                'end_date' => $data['subscription_end'],
+                'start_date' => $subscriptionStart,
+                'end_date' => $subscriptionEnd,
                 'status' => 'Pending',
                 'quantity' => $quantity,
                 'total_amount' => $totalAmount,
-                'next_billing_date' => $data['subscription_end'],
+                'next_billing_date' => $subscriptionEnd,
                 'notes' => 'Auto-created from purchase order'
             ]);
 
@@ -183,7 +210,7 @@ class PurchaseService
                 'client' => $client->company ?? $client->name,
                 'po_number' => $data['po_number'],
                 'bill_date' => date('Y-m-d'),
-                'due_date' => $data['subscription_end'],
+                'due_date' => $subscriptionEnd,
                 'total_amount' => $totalAmount,
                 'paid_amount' => 0,
                 'status' => 'Pending',
@@ -236,7 +263,27 @@ class PurchaseService
                 $data['total_amount'] = $quantity * $unitPrice;
             }
 
-            $purchase->update($data);
+            // Handle subscription date calculation for updates
+            $updateData = $data;
+                    
+            // If subscription_type and recurring_count are provided, calculate dates
+            if (isset($data['subscription_type']) && isset($data['recurring_count'])) {
+                $startDate = Carbon::now();
+                $months = (int)$data['subscription_type'];
+                $recurringCount = (int)$data['recurring_count'];
+                        
+                $endDate = $startDate->copy()->addMonths($months * $recurringCount);
+                        
+                $updateData['subscription_start'] = $startDate->format('Y-m-d');
+                $updateData['subscription_end'] = $endDate->format('Y-m-d');
+            }
+                    
+            // Include delivery_date if provided
+            if (isset($data['delivery_date'])) {
+                $updateData['delivery_date'] = $data['delivery_date'];
+            }
+                    
+            $purchase->update($updateData);
             
             DB::commit();
             
@@ -251,6 +298,9 @@ class PurchaseService
                         'quantity' => $purchase->quantity ?? 1,
                         'subscription_start' => $purchase->subscription_start,
                         'subscription_end' => $purchase->subscription_end,
+                        'subscription_type' => $purchase->subscription_type,
+                        'recurring_count' => $purchase->recurring_count,
+                        'delivery_date' => $purchase->delivery_date,
                     ]
                 ];
             } else {
@@ -326,11 +376,30 @@ class PurchaseService
             $rules['product_id'] = 'required|exists:products,id';
             $rules['quantity'] = 'required|integer|min:1';
         }
+        
+        // Delivery date validation
+        if (isset($data['delivery_date'])) {
+            $rules['delivery_date'] = 'nullable|date';
+        }
 
-        // Subscription validation
+        // Subscription validation - support both old date-based and new type-based formats
         if (isset($data['subscription_active']) && $this->getBooleanValue($data['subscription_active'])) {
-            $rules['subscription_start'] = 'required|date';
-            $rules['subscription_end'] = 'required|date|after:subscription_start';
+            // Check if using new subscription type format
+            if (isset($data['subscription_type'])) {
+                $rules['subscription_type'] = 'required|string|in:1,2,3,6,12';
+                $rules['recurring_count'] = 'required|integer|min:1';
+                // When using subscription type, start and end dates are calculated automatically, so make them optional
+                $rules['subscription_start'] = 'nullable|date';
+                $rules['subscription_end'] = 'nullable|date';
+            } else {
+                // Using old date format
+                $rules['subscription_start'] = 'required|date';
+                $rules['subscription_end'] = 'required|date|after:subscription_start';
+            }
+        } else {
+            // If subscription is not active, make subscription start and end optional
+            $rules['subscription_start'] = 'nullable|date';
+            $rules['subscription_end'] = 'nullable|date';
         }
 
         $validator = Validator::make($data, $rules);

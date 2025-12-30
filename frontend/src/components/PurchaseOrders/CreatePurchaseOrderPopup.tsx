@@ -39,15 +39,17 @@ const CreatePurchaseOrderPopup: React.FC<CreatePurchaseOrderPopupProps> = ({
     product: '',
     productId: 0,
     quantity: 1,
-    subscriptionStart: '',
-    subscriptionEnd: '',
+    subscriptionType: '',
+    recurringCount: 1,
+    deliveryDate: '',
     subscriptionActive: false
   });
 
   const [dropdownStates, setDropdownStates] = useState({
     status: false,
     client: false,
-    product: false
+    product: false,
+    subscriptionType: false
   });
 
   const [loading, setLoading] = useState(false);
@@ -155,13 +157,8 @@ const CreatePurchaseOrderPopup: React.FC<CreatePurchaseOrderPopupProps> = ({
       return;
     }
     
-    if (!formData.subscriptionStart) {
-      alert('Please enter subscription start date');
-      return;
-    }
-    
-    if (!formData.subscriptionEnd) {
-      alert('Please enter subscription end date');
+    if (!formData.subscriptionType) {
+      alert('Please select a subscription type');
       return;
     }
     
@@ -171,8 +168,9 @@ const CreatePurchaseOrderPopup: React.FC<CreatePurchaseOrderPopupProps> = ({
       client_id: formData.clientId,
       product_id: formData.productId,
       quantity: formData.quantity,
-      subscription_start: formData.subscriptionStart,
-      subscription_end: formData.subscriptionEnd,
+      subscription_type: formData.subscriptionType,
+      recurring_count: formData.recurringCount,
+      delivery_date: formData.deliveryDate,
       subscription_active: formData.subscriptionActive,
       // Include attachment if present
       attachment: attachments.length > 0 ? attachments[0] : null
@@ -190,8 +188,9 @@ const CreatePurchaseOrderPopup: React.FC<CreatePurchaseOrderPopupProps> = ({
       product: '',
       productId: 0,
       quantity: 1,
-      subscriptionStart: '',
-      subscriptionEnd: '',
+      subscriptionType: '',
+      recurringCount: 1,
+      deliveryDate: '',
       subscriptionActive: false
     });
     setAttachments([]);
@@ -206,8 +205,9 @@ const CreatePurchaseOrderPopup: React.FC<CreatePurchaseOrderPopupProps> = ({
       product: '',
       productId: 0,
       quantity: 1,
-      subscriptionStart: '',
-      subscriptionEnd: '',
+      subscriptionType: '',
+      recurringCount: 1,
+      deliveryDate: '',
       subscriptionActive: false
     });
     setAttachments([]);
@@ -261,8 +261,22 @@ const CreatePurchaseOrderPopup: React.FC<CreatePurchaseOrderPopupProps> = ({
 
   if (!isOpen && !isAnimating) return null;
 
+  const handlePopupClick = (e: React.MouseEvent) => {
+    // Close dropdowns if they're open, but don't close the popup
+    if (dropdownStates.client || dropdownStates.product || dropdownStates.status || dropdownStates.subscriptionType) {
+      setDropdownStates({
+        client: false,
+        product: false,
+        status: false,
+        subscriptionType: false
+      });
+    } else {
+      onClose();
+    }
+  };
+
   return createPortal(
-    <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose}>
+    <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={handlePopupClick}>
       <PopupAnimation animationType="zoomIn" duration="0.3s">
         <div className="bg-white rounded-lg shadow-lg w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
 
@@ -343,7 +357,9 @@ const CreatePurchaseOrderPopup: React.FC<CreatePurchaseOrderPopupProps> = ({
                     {dropdownStates.client && (
                       <div className="absolute w-full bg-white border border-gray-200 rounded-md shadow-md z-20 mt-1 max-h-40 overflow-auto text-xs">
                         {loading ? (
-                          <div className="px-2 py-2 text-center text-gray-500">Loading...</div>
+                          <div className="px-2 py-2 text-center text-gray-500">Loading clients...</div>
+                        ) : clients.length === 0 ? (
+                          <div className="px-2 py-2 text-center text-gray-500">No clients available</div>
                         ) : (
                           clients.map((client) => (
                             <button
@@ -415,33 +431,67 @@ const CreatePurchaseOrderPopup: React.FC<CreatePurchaseOrderPopupProps> = ({
                 </div>
               </div>
 
-              {/* DATES */}
+              {/* SUBSCRIPTION TYPE */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Subscription Start</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Subscription Type</label>
                   <div className="relative">
-                    <input
-                      type="date"
-                      value={formData.subscriptionStart}
-                      onChange={(e) => handleInputChange('subscriptionStart', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-gray-800"
-                    />
-                    <Calendar className="absolute right-2 top-2 h-3 w-3 text-gray-400 pointer-events-none" />
+                    <button
+                      type="button"
+                      onClick={() => toggleDropdown('subscriptionType')}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded-md bg-white text-left flex items-center justify-between"
+                    >
+                      {formData.subscriptionType || 'Select subscription type'}
+                      <ChevronDown size={14} />
+                    </button>
+
+                    {dropdownStates.subscriptionType && (
+                      <div className="absolute w-full bg-white border border-gray-200 rounded-md shadow-md z-20 mt-1 text-xs">
+                        {[1, 2, 3, 6, 12].map((month) => (
+                          <button
+                            key={month}
+                            type="button"
+                            onClick={() => {
+                              setFormData(prev => ({ ...prev, subscriptionType: month.toString() }));
+                              setDropdownStates(prev => ({ ...prev, subscriptionType: false }));
+                            }}
+                            className="w-full px-2 py-1.5 text-left hover:bg-gray-50"
+                          >
+                            {month} month{month > 1 ? 's' : ''}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Subscription End</label>
-                  <div className="relative">
+                {formData.subscriptionType && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Recurring Count</label>
                     <input
-                      type="date"
-                      value={formData.subscriptionEnd}
-                      onChange={(e) => handleInputChange('subscriptionEnd', e.target.value)}
+                      type="number"
+                      min={1}
+                      value={formData.recurringCount}
+                      onChange={(e) => handleInputChange('recurringCount', parseInt(e.target.value) || 1)}
                       className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-gray-800"
                     />
-                    <Calendar className="absolute right-2 top-2 h-3 w-3 text-gray-400 pointer-events-none" />
+                    <p className="text-[10px] text-gray-500 mt-1">Number of times to repeat this subscription</p>
                   </div>
+                )}
+              </div>
+
+              {/* DELIVERY DATE */}
+              <div className="mt-4">
+                <label className="block text-xs font-medium text-gray-700 mb-1">Delivery Date</label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={formData.deliveryDate}
+                    onChange={(e) => handleInputChange('deliveryDate', e.target.value)}
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-gray-800"
+                  />
+                  <Calendar className="absolute right-2 top-2 h-3 w-3 text-gray-400 pointer-events-none" />
                 </div>
               </div>
 
