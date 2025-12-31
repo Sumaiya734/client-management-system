@@ -66,7 +66,7 @@ class SubscriptionService extends BaseService
             return [
                 'id' => $subscription->id,
                 'poNumber' => $subscription->po_number ?? $purchase->po_number ?? 'N/A',
-                'createdDate' => $subscription->start_date ?? $purchase->subscription_start ?? 'N/A',
+                'createdDate' => $subscription->start_date ?? $purchase->delivery_date ?? 'N/A',
                 'client' => [
                     'company' => $subscription->client->company ?? $subscription->client->name ?? $purchase->cli_name ?? 'N/A',
                     'contact' => $subscription->client->contact ?? 'N/A',
@@ -144,7 +144,7 @@ class SubscriptionService extends BaseService
         $transformedSubscription = [
             'id' => $subscription->id,
             'poNumber' => $subscription->po_number ?? $purchase->po_number ?? 'N/A',
-            'createdDate' => $subscription->start_date ?? $purchase->subscription_start ?? 'N/A',
+            'createdDate' => $subscription->start_date ?? $purchase->delivery_date ?? 'N/A',
             'client' => [
                 'company' => $subscription->client->company ?? $subscription->client->name ?? $purchase->cli_name ?? 'N/A',
                 'contact' => $subscription->client->contact ?? 'N/A',
@@ -267,7 +267,7 @@ class SubscriptionService extends BaseService
                     'name' => $productData['name'] ?? $productData['product_name'] ?? 'N/A',
                     'quantity' => $productData['quantity'] ?? 1,
                     'status' => $productData['status'] ?? 'Pending',
-                    'dateRange' => $productData['dateRange'] ?? ($productData['subscription_start'] . ' to ' . $productData['subscription_end'] ?? 'N/A'),
+                    'dateRange' => $productData['dateRange'] ?? ($purchase->delivery_date ?? 'N/A'),
                     'action' => $productData['status'] === 'Pending' ? 'Subscribe' : 'Edit'
                 ];
             }

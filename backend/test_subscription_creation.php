@@ -38,8 +38,9 @@ try {
             'client_id' => $client->id,
             'product_id' => $product->id,
             'quantity' => 2,
-            'subscription_start' => '2025-01-01',
-            'subscription_end' => '2025-12-31',
+            'subscription_type' => '1',
+            'recurring_count' => 12,
+            'delivery_date' => '2025-01-01',
             'subscription_active' => true,
             'total_amount' => 1000
         ];

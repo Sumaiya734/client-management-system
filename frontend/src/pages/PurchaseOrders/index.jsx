@@ -90,26 +90,22 @@ export default function PurchaseOrders() {
         // Use FormData when there's an attachment
         const formData = new FormData();
         formData.append('status', orderData.status);
-        formData.append('client_id', parseInt(orderData.client_id).toString());
+        formData.append('client_id', orderData.client_id.toString());
+        formData.append('product_id', orderData.product_id.toString());
+        formData.append('quantity', orderData.quantity.toString());
+        formData.append('subscription_active', orderData.subscription_active ? '1' : '0');
         
-        // Handle products - convert to the format expected by backend
-        if (orderData.products && Array.isArray(orderData.products) && orderData.products.length > 0) {
-          orderData.products.forEach((product, index) => {
-            formData.append(`products[${index}][productId]`, product.productId.toString());
-            formData.append(`products[${index}][quantity]`, product.quantity.toString());
-            formData.append(`products[${index}][subscription_start]`, product.subscriptionStart);
-            formData.append(`products[${index}][subscription_end]`, product.subscriptionEnd);
-          });
-        } else {
-          // Fallback to single product if no products array
-          formData.append('product_id', orderData.product_id.toString());
-          formData.append('quantity', orderData.quantity.toString());
-          formData.append('subscription_start', orderData.subscription_start);
-          formData.append('subscription_end', orderData.subscription_end);
+        // Add subscription fields if they exist
+        if (orderData.subscription_type) {
+          formData.append('subscription_type', orderData.subscription_type);
+        }
+        if (orderData.recurring_count) {
+          formData.append('recurring_count', orderData.recurring_count.toString());
+        }
+        if (orderData.delivery_date) {
+          formData.append('delivery_date', orderData.delivery_date);
         }
         
-        formData.append('subscription_active', orderData.subscription_active ? '1' : '0');
-        formData.append('total_amount', '0'); // backend calculate করে নেবে
         if (orderData.attachment) {
           formData.append('attachment', orderData.attachment, orderData.attachment.name);
         }
@@ -123,36 +119,30 @@ export default function PurchaseOrders() {
       } else {
         // Prepare data exactly as backend expects (no attachment)
         const purchaseData = {
-          // po_number পাঠাবে না → backend নিজেই generate করে
           status: orderData.status,
           client_id: orderData.client_id,
-          products: orderData.products, // Send products array if available
-          subscription_active: orderData.subscription_active ? 1 : 0, // boolean → 1/0
-          total_amount: 0 // backend calculate করে নেবে
+          product_id: orderData.product_id,
+          quantity: parseInt(orderData.quantity, 10),
+          subscription_active: Boolean(orderData.subscription_active),
+          subscription_type: orderData.subscription_type,
+          recurring_count: orderData.recurring_count,
+          delivery_date: orderData.delivery_date
         };
         
-        // Only add single product fields if no products array is provided
-        if (!orderData.products || !Array.isArray(orderData.products) || orderData.products.length === 0) {
-          purchaseData.product_id = orderData.product_id;
-          purchaseData.quantity = parseInt(orderData.quantity, 10); // নিশ্চিত integer
-          purchaseData.subscription_start = orderData.subscription_start; // YYYY-MM-DD format হতে হবে
-          purchaseData.subscription_end = orderData.subscription_end;     // YYYY-MM-DD format হতে হবে
-        }
-        
-        console.log('Sending purchase data:', purchaseData); // ডিবাগিংয়ের জন্য
+        console.log('Sending purchase data:', purchaseData);
         
         response = await api.post('/purchases', purchaseData);
       }
       
       // Success → refresh list
       fetchPurchaseOrders();
-      setIsCreatePopupOpen(false); // popup বন্ধ করো
+      setIsCreatePopupOpen(false);
       alert('Purchase order created successfully!');
       console.log('Created purchase:', response.data);
     } catch (error) {
       console.error('Error creating purchase order:', error);
 
-      // Validation error details দেখাও
+      // Validation error details
       if (error.response?.status === 422 && error.response?.data?.errors) {
         const errors = error.response.data.errors;
         console.log('Validation errors:', errors);

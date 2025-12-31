@@ -81,8 +81,8 @@ Route::get('notifications/user/{userId}', [\App\Http\Controllers\Api\Notificatio
 Route::post('notifications/{id}/send', [\App\Http\Controllers\Api\NotificationController::class, 'sendNotification']);
 
 // Purchase Management Routes
-Route::apiResource('purchases', \App\Http\Controllers\Api\PurchaseController::class);
 Route::get('purchases/generate-po-number', [\App\Http\Controllers\Api\PurchaseController::class, 'generatePoNumber']);
+Route::apiResource('purchases', \App\Http\Controllers\Api\PurchaseController::class);
 
 // Subscription Management Routes
 Route::apiResource('subscriptions', \App\Http\Controllers\Api\SubscriptionController::class)->middleware('auth:sanctum');

@@ -44,37 +44,6 @@ class PurchaseController extends Controller
     public function store(Request $request): JsonResponse
     {
         try {
-
-            // ----------------------------
-            // AUTO-GENERATE PO NUMBER
-            // ----------------------------
-            $year = date('Y');
-
-            $lastPo = DB::table('purchases')
-                ->where('po_number', 'like', "PO-$year-%")
-                ->orderBy('id', 'desc')
-                ->first();
-
-            if ($lastPo && isset($lastPo->po_number)) {
-                // Extract the serial number part after the year
-                $pattern = "/PO-$year-(\d+)$/";
-                if (preg_match($pattern, $lastPo->po_number, $matches)) {
-                    $lastSerial = intval($matches[1]);
-                    $nextSerial = $lastSerial + 1;
-                    $nextDigits = str_pad($nextSerial, strlen($matches[1]), '0', STR_PAD_LEFT);
-                } else {
-                    $nextDigits = "0001"; // fallback
-                }
-            } else {
-                $nextDigits = "0001";
-            }
-
-            $generatedPo = "PO-$year-$nextDigits";
-
-            // Inject PO number into request
-            $request->merge(['po_number' => $generatedPo]);
-            // ----------------------------
-
             $purchases = $this->purchaseService->create($request->all());
 
             return response()->json([

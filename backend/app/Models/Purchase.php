@@ -13,8 +13,6 @@ class Purchase extends Model
         'client_id',
         'product_id',
         'quantity',
-        'subscription_start',
-        'subscription_end',
         'subscription_active',
         'subscription_type',
         'recurring_count',
@@ -27,8 +25,6 @@ class Purchase extends Model
     ];
     
     protected $casts = [
-        'subscription_start' => 'date',
-        'subscription_end' => 'date',
         'attachment' => 'string',
         'subscription_active' => 'boolean',
         'total_amount' => 'decimal:2'
