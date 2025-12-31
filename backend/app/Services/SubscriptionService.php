@@ -18,22 +18,210 @@ class SubscriptionService extends BaseService
     {
         $this->model = $model;
     }
-
+ 
     /**
      * Get all subscriptions with relationships and transform data
      */
     public function getAll()
     {
-        $subscriptions = $this->model->with(['client', 'product', 'purchase'])->get();
+        try {
+            $subscriptions = $this->model->with(['client', 'product', 'purchase'])->get();
+            
+            logger()->info('SubscriptionService::getAll() - Found subscriptions:', [
+                'count' => $subscriptions->count(),
+                'subscriptions' => $subscriptions->toArray()
+            ]);
 
-        // Transform the subscriptions to match the frontend expectations
-        $transformedSubscriptions = $subscriptions->map(function ($subscription) {
-            // Get the associated purchase to get additional information
+            // Transform the subscriptions to match the frontend expectations
+            $transformedSubscriptions = $subscriptions->map(function ($subscription) {
+                logger()->info('Processing subscription:', [
+                    'id' => $subscription->id,
+                    'po_number' => $subscription->po_number,
+                    'has_client' => !is_null($subscription->client),
+                    'has_product' => !is_null($subscription->product),
+                    'has_purchase' => !is_null($subscription->purchase),
+                    'products_subscription_status' => $subscription->products_subscription_status
+                ]);
+                
+                // Get the associated purchase to get additional information
+                $purchase = $subscription->purchase;
+
+                // For single product subscriptions
+                $products = [];
+                
+                // First check if subscription has products_subscription_status (stored products data)
+                if ($subscription->products_subscription_status) {
+                    $storedProducts = is_string($subscription->products_subscription_status) ? 
+                        json_decode($subscription->products_subscription_status, true) : 
+                        $subscription->products_subscription_status;
+                    
+                    if (is_array($storedProducts) && count($storedProducts) > 0) {
+                        foreach ($storedProducts as $storedProduct) {
+                            $products[] = [
+                                'name' => $storedProduct['name'] ?? $storedProduct['product_name'] ?? 'N/A',
+                                'quantity' => $storedProduct['quantity'] ?? 1,
+                                'status' => $storedProduct['status'] ?? 'Pending',
+                                'dateRange' => $subscription->start_date && $subscription->end_date ?
+                                    $subscription->start_date . ' to ' . $subscription->end_date : 'N/A',
+                                'action' => ($storedProduct['status'] ?? 'Pending') === 'Pending' ? 'Subscribe' : 'Edit'
+                            ];
+                        }
+                    } else {
+                        // Log error if products_subscription_status is not a valid array
+                        logger()->warning('Invalid products_subscription_status format for subscription ID: ' . $subscription->id, [
+                            'raw_data' => $subscription->products_subscription_status,
+                            'type' => gettype($subscription->products_subscription_status)
+                        ]);
+                    }
+                }
+                // Then check if purchase has products_subscriptions (multi-product support)
+                elseif ($purchase && $purchase->products_subscriptions) {
+                    $products = $this->parseProductsFromPurchase($purchase->products_subscriptions, $purchase);
+                }
+                // Then check if subscription has a direct product relationship
+                elseif ($subscription->product) {
+                    $products[] = [
+                        'name' => $subscription->product->product_name ?? $subscription->product->name ?? 'N/A',
+                        'quantity' => $subscription->quantity ?? 1,
+                        'status' => $subscription->status ?? 'Pending',
+                        'dateRange' => $subscription->start_date && $subscription->end_date ?
+                            $subscription->start_date . ' to ' . $subscription->end_date : 'N/A',
+                        'action' => $subscription->status === 'Pending' ? 'Subscribe' : 'Edit'
+                    ];
+                }
+                // Fallback: create a basic product entry from subscription data if no product or purchase data available
+                else {
+                    $products[] = [
+                        'name' => $subscription->product_name ?? 'Product ' . $subscription->id ?? 'N/A',
+                        'quantity' => $subscription->quantity ?? 1,
+                        'status' => $subscription->status ?? 'Pending',
+                        'dateRange' => $subscription->start_date && $subscription->end_date ?
+                            $subscription->start_date . ' to ' . $subscription->end_date : 'N/A',
+                        'action' => $subscription->status === 'Pending' ? 'Subscribe' : 'Edit'
+                    ];
+                }
+
+                logger()->info('Generated products for subscription:', [
+                    'subscription_id' => $subscription->id,
+                    'products_count' => count($products),
+                    'products' => $products
+                ]);
+
+                // Calculate progress based on product statuses
+                $activeProducts = count(array_filter($products, function($product) {
+                    return $product['status'] === 'Active';
+                }));
+                $totalProducts = count($products);
+                $progressPercentage = $totalProducts > 0 ? ($activeProducts / $totalProducts) * 100 : 0;
+
+                $progressStatus = 'Pending';
+                if ($progressPercentage === 100) {
+                    $progressStatus = 'Complete';
+                } elseif ($progressPercentage > 0) {
+                    $progressStatus = 'Partial';
+                }
+
+                $transformedSubscription = [
+                    'id' => $subscription->id,
+                    'poNumber' => $subscription->po_number ?? $purchase->po_number ?? 'N/A',
+                    'createdDate' => $subscription->start_date ?? $purchase->delivery_date ?? 'N/A',
+                    'client' => [
+                        'company' => $subscription->client->company ?? $subscription->client->name ?? $purchase->cli_name ?? 'N/A',
+                        'contact' => $subscription->client->contact ?? 'N/A',
+                        'cli_name' => $subscription->client->cli_name ?? $purchase->cli_name ?? 'N/A'
+                    ],
+                    'products' => $products,
+                    'products_subscription_status' => $subscription->products_subscription_status,
+                    'progress' => [
+                        'status' => $progressStatus,
+                        'completed' => $activeProducts,
+                        'total' => $totalProducts,
+                        'percentage' => (int) $progressPercentage
+                    ],
+                    'totalAmount' => '৳' . number_format($subscription->total_amount ?? $purchase->total_amount ?? 0, 2) . ' BDT',
+                    'canGenerateBill' => $progressStatus === 'Complete',
+                    // Store original data needed for creating new subscriptions
+                    'client_id' => $subscription->client_id ?? $purchase->client_id,
+                    'product_id' => $subscription->product_id,
+                    'total_amount' => $subscription->total_amount ?? $purchase->total_amount,
+                    // Include the raw database fields
+                    'raw_progress' => $subscription->progress,
+                    'raw_products_subscription_status' => $subscription->products_subscription_status
+                ];
+
+                logger()->info('Transformed subscription:', [
+                    'subscription_id' => $subscription->id,
+                    'products_count' => count($transformedSubscription['products']),
+                    'client_data' => $transformedSubscription['client']
+                ]);
+
+                return $transformedSubscription;
+            });
+
+            logger()->info('Final transformed subscriptions:', [
+                'count' => $transformedSubscriptions->count(),
+                'data' => $transformedSubscriptions->toArray()
+            ]);
+
+            return $transformedSubscriptions;
+        } catch (\Exception $e) {
+            logger()->error('Error in SubscriptionService::getAll()', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Get subscription by ID with relationships and transform data
+     */
+    public function getById($id)
+    {
+        try {
+            $subscription = $this->model->with(['client', 'product', 'purchase'])->find($id);
+    
+            if (!$subscription) {
+                return null;
+            }
+    
+            // Transform the single subscription to match the frontend expectations
             $purchase = $subscription->purchase;
-
+    
             // For single product subscriptions
             $products = [];
-            if ($subscription->product) {
+            
+            // First check if subscription has products_subscription_status (stored products data)
+            if ($subscription->products_subscription_status) {
+                $storedProducts = is_string($subscription->products_subscription_status) ? 
+                    json_decode($subscription->products_subscription_status, true) : 
+                    $subscription->products_subscription_status;
+                
+                if (is_array($storedProducts)) {
+                    foreach ($storedProducts as $storedProduct) {
+                        $products[] = [
+                            'name' => $storedProduct['name'] ?? $storedProduct['product_name'] ?? 'N/A',
+                            'quantity' => $storedProduct['quantity'] ?? 1,
+                            'status' => $storedProduct['status'] ?? 'Pending',
+                            'dateRange' => $subscription->start_date && $subscription->end_date ?
+                                $subscription->start_date . ' to ' . $subscription->end_date : 'N/A',
+                            'action' => ($storedProduct['status'] ?? 'Pending') === 'Pending' ? 'Subscribe' : 'Edit'
+                        ];
+                    }
+                } else {
+                    // Log error if products_subscription_status is not a valid array
+                    logger()->warning('Invalid products_subscription_status format for subscription ID: ' . $subscription->id, [
+                        'raw_data' => $subscription->products_subscription_status,
+                        'type' => gettype($subscription->products_subscription_status)
+                    ]);
+                }
+            }
+            // Then check if purchase has products_subscriptions (multi-product support)
+            elseif ($purchase && $purchase->products_subscriptions) {
+                $products = $this->parseProductsFromPurchase($purchase->products_subscriptions, $purchase);
+            }
+            // Then check if subscription has a direct product relationship
+            elseif ($subscription->product) {
                 $products[] = [
                     'name' => $subscription->product->product_name ?? $subscription->product->name ?? 'N/A',
                     'quantity' => $subscription->quantity ?? 1,
@@ -43,27 +231,33 @@ class SubscriptionService extends BaseService
                     'action' => $subscription->status === 'Pending' ? 'Subscribe' : 'Edit'
                 ];
             }
-
-            // If purchase exists and has products_subscriptions (for multi-product support)
-            if ($purchase && $purchase->products_subscriptions) {
-                $products = $this->parseProductsFromPurchase($purchase->products_subscriptions);
+            // Fallback: create a basic product entry from subscription data if no product or purchase data available
+            else {
+                $products[] = [
+                    'name' => $subscription->product_name ?? 'Product' . $subscription->id ?? 'N/A',
+                    'quantity' => $subscription->quantity ?? 1,
+                    'status' => $subscription->status ?? 'Pending',
+                    'dateRange' => $subscription->start_date && $subscription->end_date ?
+                        $subscription->start_date . ' to ' . $subscription->end_date : 'N/A',
+                    'action' => $subscription->status === 'Pending' ? 'Subscribe' : 'Edit'
+                ];
             }
-
+    
             // Calculate progress based on product statuses
             $activeProducts = count(array_filter($products, function($product) {
                 return $product['status'] === 'Active';
             }));
             $totalProducts = count($products);
             $progressPercentage = $totalProducts > 0 ? ($activeProducts / $totalProducts) * 100 : 0;
-
+    
             $progressStatus = 'Pending';
             if ($progressPercentage === 100) {
                 $progressStatus = 'Complete';
             } elseif ($progressPercentage > 0) {
                 $progressStatus = 'Partial';
             }
-
-            return [
+    
+            $transformedSubscription = [
                 'id' => $subscription->id,
                 'poNumber' => $subscription->po_number ?? $purchase->po_number ?? 'N/A',
                 'createdDate' => $subscription->start_date ?? $purchase->delivery_date ?? 'N/A',
@@ -90,86 +284,15 @@ class SubscriptionService extends BaseService
                 'raw_progress' => $subscription->progress,
                 'raw_products_subscription_status' => $subscription->products_subscription_status
             ];
-        });
-
-        return $transformedSubscriptions;
-    }
-
-    /**
-     * Get subscription by ID with relationships and transform data
-     */
-    public function getById($id)
-    {
-        $subscription = $this->model->with(['client', 'product', 'purchase'])->find($id);
-
-        if (!$subscription) {
-            return null;
+    
+            return $transformedSubscription;
+        } catch (\Exception $e) {
+            logger()->error('Error in SubscriptionService::getById()', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         }
-
-        // Transform the single subscription to match the frontend expectations
-        $purchase = $subscription->purchase;
-
-        // For single product subscriptions
-        $products = [];
-        if ($subscription->product) {
-            $products[] = [
-                'name' => $subscription->product->product_name ?? $subscription->product->name ?? 'N/A',
-                'quantity' => $subscription->quantity ?? 1,
-                'status' => $subscription->status ?? 'Pending',
-                'dateRange' => $subscription->start_date && $subscription->end_date ?
-                    $subscription->start_date . ' to ' . $subscription->end_date : 'N/A',
-                'action' => $subscription->status === 'Pending' ? 'Subscribe' : 'Edit'
-            ];
-        }
-
-        // If purchase exists and has products_subscriptions (for multi-product support)
-        if ($purchase && $purchase->products_subscriptions) {
-            $products = $this->parseProductsFromPurchase($purchase->products_subscriptions);
-        }
-
-        // Calculate progress based on product statuses
-        $activeProducts = count(array_filter($products, function($product) {
-            return $product['status'] === 'Active';
-        }));
-        $totalProducts = count($products);
-        $progressPercentage = $totalProducts > 0 ? ($activeProducts / $totalProducts) * 100 : 0;
-
-        $progressStatus = 'Pending';
-        if ($progressPercentage === 100) {
-            $progressStatus = 'Complete';
-        } elseif ($progressPercentage > 0) {
-            $progressStatus = 'Partial';
-        }
-
-        $transformedSubscription = [
-            'id' => $subscription->id,
-            'poNumber' => $subscription->po_number ?? $purchase->po_number ?? 'N/A',
-            'createdDate' => $subscription->start_date ?? $purchase->delivery_date ?? 'N/A',
-            'client' => [
-                'company' => $subscription->client->company ?? $subscription->client->name ?? $purchase->cli_name ?? 'N/A',
-                'contact' => $subscription->client->contact ?? 'N/A',
-                'cli_name' => $subscription->client->cli_name ?? $purchase->cli_name ?? 'N/A'
-            ],
-            'products' => $products,
-            'products_subscription_status' => $subscription->products_subscription_status,
-            'progress' => [
-                'status' => $progressStatus,
-                'completed' => $activeProducts,
-                'total' => $totalProducts,
-                'percentage' => (int) $progressPercentage
-            ],
-            'totalAmount' => '৳' . number_format($subscription->total_amount ?? $purchase->total_amount ?? 0, 2) . ' BDT',
-            'canGenerateBill' => $progressStatus === 'Complete',
-            // Store original data needed for creating new subscriptions
-            'client_id' => $subscription->client_id ?? $purchase->client_id,
-            'product_id' => $subscription->product_id,
-            'total_amount' => $subscription->total_amount ?? $purchase->total_amount,
-            // Include the raw database fields
-            'raw_progress' => $subscription->progress,
-            'raw_products_subscription_status' => $subscription->products_subscription_status
-        ];
-
-        return $transformedSubscription;
     }
 
     /**
@@ -180,14 +303,15 @@ class SubscriptionService extends BaseService
         $validator = Validator::make($data, [
             'po_number' => 'required|string',
             'client_id' => 'required|exists:clients,id',
-            'product_id' => 'required|exists:products,id',
+            'product_id' => 'sometimes|exists:products,id',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'status' => 'required|string',
             'quantity' => 'required|integer|min:1',
             'total_amount' => 'required|numeric|min:0',
-            'products_subscription_status' => 'sometimes|json',
-            'progress' => 'sometimes|json'
+            'products_subscription_status' => 'sometimes',
+            'progress' => 'sometimes',
+            'po_details' => 'sometimes'
         ]);
         
         if ($validator->fails()) {
@@ -197,6 +321,62 @@ class SubscriptionService extends BaseService
         // Calculate next billing date (typically the end date for now)
         $requestData = $data;
         $requestData['next_billing_date'] = $data['end_date'];
+        
+        // Ensure products_subscription_status is properly formatted as JSON if it's an array
+        if (isset($requestData['products_subscription_status'])) {
+            if (is_array($requestData['products_subscription_status'])) {
+                $requestData['products_subscription_status'] = json_encode($requestData['products_subscription_status']);
+            }
+        } else {
+            // If products_subscription_status is not provided, calculate from product data
+            if (isset($requestData['product_id'])) {
+                // Create products_subscription_status from the single product
+                $product = \App\Models\Product::find($requestData['product_id']);
+                $productName = $product ? $product->product_name ?? $product->name : 'Product';
+                
+                $productsArray = [
+                    [
+                        'name' => $productName,
+                        'quantity' => $requestData['quantity'] ?? 1,
+                        'status' => $requestData['status'] ?? 'Pending'
+                    ]
+                ];
+                
+                $requestData['products_subscription_status'] = json_encode($productsArray);
+            } else {
+                // If no product_id is provided, set to empty array
+                $requestData['products_subscription_status'] = json_encode([]);
+            }
+        }
+        
+        // Calculate progress based on products_subscription_status
+        if (isset($requestData['products_subscription_status'])) {
+            $products = is_string($requestData['products_subscription_status']) ? 
+                json_decode($requestData['products_subscription_status'], true) : 
+                $requestData['products_subscription_status'];
+            
+            if (is_array($products)) {
+                $activeProducts = count(array_filter($products, function($product) {
+                    return $product['status'] === 'Active';
+                }));
+                $totalProducts = count($products);
+                $progressPercentage = $totalProducts > 0 ? ($activeProducts / $totalProducts) * 100 : 0;
+                
+                $progressStatus = 'Pending';
+                if ($progressPercentage === 100) {
+                    $progressStatus = 'Complete';
+                } elseif ($progressPercentage > 0) {
+                    $progressStatus = 'Partial';
+                }
+                
+                $requestData['progress'] = [
+                    'status' => $progressStatus,
+                    'completed' => $activeProducts,
+                    'total' => $totalProducts,
+                    'percentage' => (int) $progressPercentage
+                ];
+            }
+        }
         
         return $this->model->create($requestData);
     }
@@ -221,12 +401,49 @@ class SubscriptionService extends BaseService
             'status' => 'sometimes|string',
             'quantity' => 'sometimes|integer|min:1',
             'total_amount' => 'sometimes|numeric|min:0',
-            'products_subscription_status' => 'sometimes|json',
-            'progress' => 'sometimes|json'
+            'products_subscription_status' => 'sometimes',
+            'progress' => 'sometimes',
+            'po_details' => 'sometimes'
         ]);
         
         if ($validator->fails()) {
             throw new \Exception('Validation failed: ' . json_encode($validator->errors()));
+        }
+        
+        // Handle products_subscription_status formatting
+        if (isset($data['products_subscription_status'])) {
+            if (is_array($data['products_subscription_status'])) {
+                $data['products_subscription_status'] = json_encode($data['products_subscription_status']);
+            }
+        }
+        
+        // If products_subscription_status is being updated, recalculate progress
+        if (isset($data['products_subscription_status'])) {
+            $products = is_string($data['products_subscription_status']) ? 
+                json_decode($data['products_subscription_status'], true) : 
+                $data['products_subscription_status'];
+            
+            if (is_array($products)) {
+                $activeProducts = count(array_filter($products, function($product) {
+                    return $product['status'] === 'Active';
+                }));
+                $totalProducts = count($products);
+                $progressPercentage = $totalProducts > 0 ? ($activeProducts / $totalProducts) * 100 : 0;
+                
+                $progressStatus = 'Pending';
+                if ($progressPercentage === 100) {
+                    $progressStatus = 'Complete';
+                } elseif ($progressPercentage > 0) {
+                    $progressStatus = 'Partial';
+                }
+                
+                $data['progress'] = [
+                    'status' => $progressStatus,
+                    'completed' => $activeProducts,
+                    'total' => $totalProducts,
+                    'percentage' => (int) $progressPercentage
+                ];
+            }
         }
         
         $subscription->update($data);
@@ -250,27 +467,46 @@ class SubscriptionService extends BaseService
     /**
      * Parse products from purchase data
      */
-    private function parseProductsFromPurchase($productsSubscriptions)
+    private function parseProductsFromPurchase($productsSubscriptions, $purchase)
     {
         $products = [];
         
-        // If products_subscriptions is a JSON string, decode it
-        if (is_string($productsSubscriptions)) {
-            $productsData = json_decode($productsSubscriptions, true);
-        } else {
-            $productsData = $productsSubscriptions;
-        }
-        
-        if (is_array($productsData)) {
-            foreach ($productsData as $productData) {
-                $products[] = [
-                    'name' => $productData['name'] ?? $productData['product_name'] ?? 'N/A',
-                    'quantity' => $productData['quantity'] ?? 1,
-                    'status' => $productData['status'] ?? 'Pending',
-                    'dateRange' => $productData['dateRange'] ?? ($purchase->delivery_date ?? 'N/A'),
-                    'action' => $productData['status'] === 'Pending' ? 'Subscribe' : 'Edit'
-                ];
+        try {
+            // If products_subscriptions is a JSON string, decode it
+            if (is_string($productsSubscriptions)) {
+                $productsData = json_decode($productsSubscriptions, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    logger()->error('JSON decode error in parseProductsFromPurchase', [
+                        'json_error' => json_last_error_msg(),
+                        'raw_data' => $productsSubscriptions
+                    ]);
+                    return $products; // Return empty array on JSON error
+                }
+            } else {
+                $productsData = $productsSubscriptions;
             }
+            
+            if (is_array($productsData)) {
+                foreach ($productsData as $productData) {
+                    $products[] = [
+                        'name' => $productData['name'] ?? $productData['product_name'] ?? 'N/A',
+                        'quantity' => $productData['quantity'] ?? 1,
+                        'status' => $productData['status'] ?? 'Pending',
+                        'dateRange' => $productData['dateRange'] ?? ($purchase->delivery_date ?? 'N/A'),
+                        'action' => $productData['status'] === 'Pending' ? 'Subscribe' : 'Edit'
+                    ];
+                }
+            } else {
+                logger()->warning('Invalid products_subscriptions format in parseProductsFromPurchase', [
+                    'type' => gettype($productsData),
+                    'raw_data' => $productsData
+                ]);
+            }
+        } catch (\Exception $e) {
+            logger()->error('Error in parseProductsFromPurchase()', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
         }
         
         return $products;

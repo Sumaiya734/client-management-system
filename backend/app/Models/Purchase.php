@@ -27,7 +27,8 @@ class Purchase extends Model
     protected $casts = [
         'attachment' => 'string',
         'subscription_active' => 'boolean',
-        'total_amount' => 'decimal:2'
+        'total_amount' => 'decimal:2',
+        'po_details' => 'array'
     ];
     
     /**

@@ -17,6 +17,7 @@ export default function Subscriptions() {
   const [selectedQuantity, setSelectedQuantity] = useState(0);
   const [selectedTotalAmount, setSelectedTotalAmount] = useState(null);
   const [originalSubscription, setOriginalSubscription] = useState(null);
+  const [editingSubscription, setEditingSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
   const [subscriptions, setSubscriptions] = useState([]);
 
@@ -29,15 +30,24 @@ export default function Subscriptions() {
     try {
       setLoading(true);
       const response = await api.get('/subscriptions');
+      console.log('Raw API response:', response.data);
+
       // Transform the API response to ensure client data has proper structure
-      const transformedSubscriptions = response.data.map(subscription => ({
-        ...subscription,
-        client: {
-          ...subscription.client,
-          company: subscription.client?.company || subscription.client || 'N/A',
-          cli_name: subscription.client?.cli_name || subscription.client?.contact || 'N/A'
-        }
-      }));
+      const transformedSubscriptions = response.data.map(subscription => {
+        console.log('Processing subscription:', subscription);
+        console.log('Subscription products:', subscription.products);
+
+        return {
+          ...subscription,
+          client: {
+            ...subscription.client,
+            company: subscription.client?.company || subscription.client || 'N/A',
+            cli_name: subscription.client?.cli_name || subscription.client?.contact || 'N/A'
+          }
+        };
+      });
+
+      console.log('Transformed subscriptions:', transformedSubscriptions);
       setSubscriptions(transformedSubscriptions);
     } catch (error) {
       console.error('Error fetching subscriptions:', error);
@@ -115,11 +125,27 @@ export default function Subscriptions() {
     }
   };
 
-  const handleOpenModal = (product, quantity, subscription) => {
+  const handleOpenModal = (product, quantity, subscription, isEdit = false) => {
     setSelectedProduct(product?.name || product);
     setSelectedQuantity(product?.quantity || quantity);
     setSelectedTotalAmount(subscription?.totalAmount || null);
-    setOriginalSubscription(subscription); // Store original subscription for client_id and product_id
+    setOriginalSubscription(subscription); // Store original subscription context
+
+    if (isEdit) {
+      // Find the actual subscription record relative to this product if possible
+      // For now, we use the main subscription object, but in a real scenario we might need checks
+      // Since the backend transforms data, we need to map back or use available fields
+      setEditingSubscription({
+        id: subscription.id,
+        start_date: product.dateRange && product.dateRange !== 'N/A' ? product.dateRange.split(' to ')[0] : '',
+        end_date: product.dateRange && product.dateRange !== 'N/A' ? product.dateRange.split(' to ')[1] : '',
+        notes: subscription.notes || '', // Notes might be on main subscription
+        // Add other fields if available
+      });
+    } else {
+      setEditingSubscription(null);
+    }
+
     setIsModalOpen(true);
   };
 
@@ -130,7 +156,7 @@ export default function Subscriptions() {
         alert('Please select both start and end dates');
         return;
       }
-      
+
       // Prepare subscription data for API
       const subscriptionData = {
         po_number: data.poNumber || originalSubscription?.poNumber || 'PO-DEFAULT-001',
@@ -144,20 +170,32 @@ export default function Subscriptions() {
         total_amount: originalSubscription?.total_amount || 0.00, // Use the original total_amount
         purchase_id: originalSubscription?.id // Link to the original purchase if available
       };
-      
-      const response = await api.post('/subscriptions', subscriptionData);
-      
-      // After response interceptor normalization, response.data contains the created subscription
-      console.log('Subscription created:', response.data);
+
+
+      let response;
+      if (editingSubscription) {
+        // UPDATE existing subscription
+        const updateData = {
+          ...subscriptionData,
+          // Ensure we keep other fields or just update what's changed
+        };
+        response = await api.put(`/subscriptions/${editingSubscription.id}`, updateData);
+        console.log('Subscription updated:', response.data);
+      } else {
+        // CREATE new subscription
+        response = await api.post('/subscriptions', subscriptionData);
+        console.log('Subscription created:', response.data);
+      }
+
       // Refresh the subscriptions list
       fetchSubscriptions();
     } catch (error) {
-      console.error('Error creating subscription:', error);
+      console.error('Error saving subscription:', error);
       if (error.response) {
         console.error('Server response:', error.response.data);
-        alert(`Failed to create subscription: ${error.response.data.message || 'Validation failed'}`);
+        alert(`Failed to save subscription: ${error.response.data.message || 'Validation failed'}`);
       } else {
-        alert('Failed to create subscription');
+        alert('Failed to save subscription');
       }
     }
   };
@@ -242,32 +280,36 @@ export default function Subscriptions() {
                     </TableCell>
                     <TableCell>
                       <div className="space-y-3">
-                        {subscription.products.map((product, index) => (
-                          <div key={index} className="border-b border-gray-100 last:border-b-0 pb-3 last:pb-0">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium text-gray-900">{product.name}</span>
-                                <span className="text-xs bg-gray-900 text-white px-2 py-1 rounded">
-                                  x{product.quantity}
-                                </span>
-                                <Badge className={`text-xs ${getStatusBadgeColor(product.status)}`}>
-                                  {product.status}
-                                </Badge>
+                        {subscription.products && subscription.products.length > 0 ? (
+                          subscription.products.map((product, index) => (
+                            <div key={index} className="border-b border-gray-100 last:border-b-0 pb-3 last:pb-0">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-gray-900">{product.name}</span>
+                                  <span className="text-xs bg-gray-900 text-white px-2 py-1 rounded">
+                                    x{product.quantity}
+                                  </span>
+                                  <Badge className={`text-xs ${getStatusBadgeColor(product.status)}`}>
+                                    {product.status}
+                                  </Badge>
+                                </div>
+                                <Button
+                                  variant={product.action === 'Subscribe' ? 'primary' : 'outline'}
+                                  size="xs"
+                                  className="text-xs"
+                                  onClick={() => handleOpenModal(product, product.quantity, subscription, product.action === 'Edit')}
+                                >
+                                  {product.action}
+                                </Button>
                               </div>
-                              <Button 
-                                variant={product.action === 'Subscribe' ? 'primary' : 'outline'}
-                                size="xs"
-                                className="text-xs"
-                                onClick={() => handleOpenModal(product, product.quantity, subscription)}
-                              >
-                                {product.action}
-                              </Button>
+                              {product.dateRange && (
+                                <div className="text-sm text-gray-600">{product.dateRange}</div>
+                              )}
                             </div>
-                            {product.dateRange && (
-                              <div className="text-sm text-gray-600">{product.dateRange}</div>
-                            )}
-                          </div>
-                        ))}
+                          ))
+                        ) : (
+                          <div className="text-gray-500 text-sm">No products found</div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -293,8 +335,8 @@ export default function Subscriptions() {
                       <div className="font-semibold text-gray-900">{subscription.totalAmount}</div>
                     </TableCell>
                     <TableCell>
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         className="text-xs"
                         icon={<FileText className="h-3 w-3" />}
@@ -312,14 +354,15 @@ export default function Subscriptions() {
       </Card>
 
       {/* Subscription Modal */}
-      <SubscriptionModal 
-        isOpen={isModalOpen} 
-        onRequestClose={() => setIsModalOpen(false)} 
-        product={selectedProduct} 
+      <SubscriptionModal
+        isOpen={isModalOpen}
+        onRequestClose={() => setIsModalOpen(false)}
+        product={selectedProduct}
         quantity={selectedQuantity}
         totalAmount={selectedTotalAmount}
-        onSubmit={handleModalSubmit} 
+        onSubmit={handleModalSubmit}
         poNumber={originalSubscription?.poNumber || 'PO-DEFAULT-001'}
+        previousSubscription={editingSubscription}
       />
     </div>
   );

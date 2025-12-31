@@ -3,10 +3,24 @@ import Modal from 'react-modal';
 import { X } from 'lucide-react';
 import { Button } from '../ui/Button';
 
-const SubscriptionModal = ({ isOpen, onRequestClose, product, quantity, totalAmount, poNumber, onSubmit }) => {
+const SubscriptionModal = ({ isOpen, onRequestClose, product, quantity, totalAmount, poNumber, onSubmit, previousSubscription = null }) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [notes, setNotes] = useState('');
+
+  // Update effect to handle previousSubscription changes
+  React.useEffect(() => {
+    if (isOpen && previousSubscription) {
+      setStartDate(previousSubscription.start_date ? previousSubscription.start_date.split('T')[0] : '');
+      setEndDate(previousSubscription.end_date ? previousSubscription.end_date.split('T')[0] : '');
+      setNotes(previousSubscription.notes || '');
+    } else if (isOpen) {
+      // Reset fields when opening fresh
+      setStartDate('');
+      setEndDate('');
+      setNotes('');
+    }
+  }, [isOpen, previousSubscription]);
 
   // Calculate unit price
   const calculateUnitPrice = () => {
@@ -67,9 +81,9 @@ const SubscriptionModal = ({ isOpen, onRequestClose, product, quantity, totalAmo
         {/* HEADER */}
         <div className="flex items-start justify-between mb-3">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">Subscribe Product</h2>
+            <h2 className="text-base font-semibold text-gray-900">{previousSubscription ? 'Edit Subscription' : 'Subscribe Product'}</h2>
             <p className="text-xs text-gray-600">
-              Configure subscription for {product} (Quantity: {quantity})
+              {previousSubscription ? 'Update subscription details' : `Configure subscription for ${product} (Quantity: ${quantity})`}
             </p>
           </div>
           <button
@@ -162,7 +176,7 @@ const SubscriptionModal = ({ isOpen, onRequestClose, product, quantity, totalAmo
             Cancel
           </Button>
           <Button variant="primary" onClick={handleSubmit} size="sm" className="px-3">
-            Activate Subscription
+            {previousSubscription ? 'Update Subscription' : 'Activate Subscription'}
           </Button>
         </div>
       </div>

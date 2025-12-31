@@ -28,15 +28,24 @@ class PurchaseService
             
             // Create products array from single product
             if ($purchase->product) {
-                $purchaseArray['products'] = [
-                    [
-                        'product_name' => $purchase->product->product_name ?? $purchase->product->name ?? 'N/A',
-                        'quantity' => $purchase->quantity ?? 1,
-                        'subscription_type' => $purchase->subscription_type,
-                        'recurring_count' => $purchase->recurring_count,
-                        'delivery_date' => $purchase->delivery_date,
-                    ]
+                $productData = [
+                    'product_name' => $purchase->product->product_name ?? $purchase->product->name ?? 'N/A',
+                    'quantity' => $purchase->quantity ?? 1,
+                    'subscription_type' => $purchase->subscription_type,
+                    'recurring_count' => $purchase->recurring_count,
+                    'delivery_date' => $purchase->delivery_date,
                 ];
+                
+                // Add subscription dates if subscription exists
+                if ($purchase->subscription_active) {
+                    $subscription = Subscription::where('purchase_id', $purchase->id)->first();
+                    if ($subscription) {
+                        $productData['subscription_start'] = $subscription->start_date;
+                        $productData['subscription_end'] = $subscription->end_date;
+                    }
+                }
+                
+                $purchaseArray['products'] = [$productData];
             } else {
                 $purchaseArray['products'] = [];
             }
@@ -61,15 +70,24 @@ class PurchaseService
         
         // Create products array from single product
         if ($purchase->product) {
-            $purchaseArray['products'] = [
-                [
-                    'product_name' => $purchase->product->product_name ?? $purchase->product->name ?? 'N/A',
-                    'quantity' => $purchase->quantity ?? 1,
-                    'subscription_type' => $purchase->subscription_type,
-                    'recurring_count' => $purchase->recurring_count,
-                    'delivery_date' => $purchase->delivery_date,
-                ]
+            $productData = [
+                'product_name' => $purchase->product->product_name ?? $purchase->product->name ?? 'N/A',
+                'quantity' => $purchase->quantity ?? 1,
+                'subscription_type' => $purchase->subscription_type,
+                'recurring_count' => $purchase->recurring_count,
+                'delivery_date' => $purchase->delivery_date,
             ];
+            
+            // Add subscription dates if subscription exists
+            if ($purchase->subscription_active) {
+                $subscription = Subscription::where('purchase_id', $purchase->id)->first();
+                if ($subscription) {
+                    $productData['subscription_start'] = $subscription->start_date;
+                    $productData['subscription_end'] = $subscription->end_date;
+                }
+            }
+            
+            $purchaseArray['products'] = [$productData];
         } else {
             $purchaseArray['products'] = [];
         }
@@ -156,24 +174,11 @@ class PurchaseService
             $data['po_number'] = $this->generatePoNumber();
         }
 
-        // Create purchase record
-        $purchase = Purchase::create([
-            'po_number' => $data['po_number'],
-            'client_id' => $data['client_id'],
-            'product_id' => $data['product_id'],
-            'quantity' => $quantity,
-            'total_amount' => $totalAmount,
-            'status' => $data['status'] ?? 'Draft',
-            'subscription_active' => $this->getBooleanValue($data['subscription_active'] ?? false),
-            'subscription_type' => $data['subscription_type'] ?? null,
-            'recurring_count' => $data['recurring_count'] ?? 1, // Default to 1 instead of null
-            'delivery_date' => $data['delivery_date'] ?? null,
-            'attachment' => $attachmentPath,
-            'cli_name' => $client->company ?? $client->cli_name ?? 'Unknown Client', // Populate cli_name column
-            'products_subscriptions' => ($product->product_name ?? $product->name ?? 'Unknown Product') . (($data['subscription_type'] ?? null) ? ' - ' . $data['subscription_type'] . ' Months' : ''), // Populate products_subscriptions
-        ]);
+        // Calculate subscription dates first to use in product data
+        $subscriptionStart = null;
+        $subscriptionEnd = null;
+        $dateRange = $data['delivery_date'] ?? 'N/A';
 
-        // Create subscription if subscription_active is true and subscription dates are provided
         if ($this->getBooleanValue($data['subscription_active'] ?? false) && 
             !empty($data['subscription_type']) && 
             !empty($data['recurring_count']) && 
@@ -189,6 +194,42 @@ class PurchaseService
             
             $subscriptionStart = $startDate->format('Y-m-d');
             $subscriptionEnd = $endDate->format('Y-m-d');
+            $dateRange = $subscriptionStart . ' to ' . $subscriptionEnd;
+        }
+
+        // Prepare structured product data
+        $productsArray = [
+            [
+                'name' => $product->product_name ?? $product->name ?? 'Unknown Product',
+                'quantity' => $quantity,
+                'status' => 'Pending',
+                'dateRange' => $dateRange,
+                // Add useful metadata
+                'product_id' => $product->id,
+                'price' => $unitPrice
+            ]
+        ];
+
+        // Create purchase record
+        $purchase = Purchase::create([
+            'po_number' => $data['po_number'],
+            'client_id' => $data['client_id'],
+            'product_id' => $data['product_id'],
+            'quantity' => $quantity,
+            'total_amount' => $totalAmount,
+            'status' => $data['status'] ?? 'Draft',
+            'subscription_active' => $this->getBooleanValue($data['subscription_active'] ?? false),
+            'subscription_type' => $data['subscription_type'] ?? null,
+            'recurring_count' => $data['recurring_count'] ?? 1, // Default to 1 instead of null
+            'delivery_date' => $data['delivery_date'] ?? null,
+            'po_details' => $data['po_details'] ?? null, // Include po_details if provided
+            'attachment' => $attachmentPath,
+            'cli_name' => $client->company ?? $client->cli_name ?? 'Unknown Client', // Populate cli_name column
+            'products_subscriptions' => json_encode($productsArray), // Save as JSON
+        ]);
+
+        // Create subscription if subscription_active is true and dates were calculated
+        if ($subscriptionStart && $subscriptionEnd) {
             
             $subscription = Subscription::create([
                 'po_number' => $data['po_number'],
@@ -201,7 +242,9 @@ class PurchaseService
                 'quantity' => $quantity,
                 'total_amount' => $totalAmount,
                 'next_billing_date' => $subscriptionEnd,
-                'notes' => 'Auto-created from purchase order'
+                'notes' => 'Auto-created from purchase order',
+                'po_details' => $data['po_details'] ?? null,
+                'products_subscription_status' => $productsArray // Eloquent cast handles JSON encoding
             ]);
 
             // Create billing record for this subscription
@@ -268,6 +311,11 @@ class PurchaseService
             if (isset($data['delivery_date'])) {
                 $data['delivery_date'] = $data['delivery_date'];
             }
+            
+            // Include po_details if provided
+            if (isset($data['po_details'])) {
+                $data['po_details'] = $data['po_details'];
+            }
                     
             $purchase->update($data);
             
@@ -278,15 +326,24 @@ class PurchaseService
             
             // Create products array from single product
             if ($purchase->product) {
-                $purchaseArray['products'] = [
-                    [
-                        'product_name' => $purchase->product->product_name ?? $purchase->product->name ?? 'N/A',
-                        'quantity' => $purchase->quantity ?? 1,
-                        'subscription_type' => $purchase->subscription_type,
-                        'recurring_count' => $purchase->recurring_count,
-                        'delivery_date' => $purchase->delivery_date,
-                    ]
+                $productData = [
+                    'product_name' => $purchase->product->product_name ?? $purchase->product->name ?? 'N/A',
+                    'quantity' => $purchase->quantity ?? 1,
+                    'subscription_type' => $purchase->subscription_type,
+                    'recurring_count' => $purchase->recurring_count,
+                    'delivery_date' => $purchase->delivery_date,
                 ];
+                
+                // Add subscription dates if subscription exists
+                if ($purchase->subscription_active) {
+                    $subscription = Subscription::where('purchase_id', $purchase->id)->first();
+                    if ($subscription) {
+                        $productData['subscription_start'] = $subscription->start_date;
+                        $productData['subscription_end'] = $subscription->end_date;
+                    }
+                }
+                
+                $purchaseArray['products'] = [$productData];
             } else {
                 $purchaseArray['products'] = [];
             }
@@ -349,6 +406,7 @@ class PurchaseService
             'client_id' => 'required|exists:clients,id',
             'status' => 'required|string|in:Draft,Active,In Progress,Completed,Expired,Expiring Soon',
             'subscription_active' => 'boolean',
+            'po_details' => 'nullable',
         ];
 
         // Validate products array or single product

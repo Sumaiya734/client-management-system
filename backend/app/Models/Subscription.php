@@ -23,12 +23,13 @@ class Subscription extends Model
         'products_subscription_status',
         'progress'
     ];
-    
+     
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
         'next_billing_date' => 'date',
         'total_amount' => 'decimal:2',
+        'po_details' => 'array',
         'products_subscription_status' => 'array',
         'progress' => 'array'
     ];

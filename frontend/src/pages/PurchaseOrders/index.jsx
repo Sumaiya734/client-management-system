@@ -224,7 +224,7 @@ export default function PurchaseOrders() {
                 purchaseOrders.map((po) => (
                   <TableRow key={po.id}>
                     <TableCell>
-                      <div>
+                      <div> 
                         <div className="font-semibold text-gray-900">{po.po_number}</div>
                         <div className="text-sm text-gray-600">
                           Created: {formatDate(po.created_at)}
@@ -251,7 +251,12 @@ export default function PurchaseOrders() {
                                 </span>
                               </div>
                               <div className="text-sm text-gray-600">
-                                {formatDateRange(product.subscription_start, product.subscription_end)}
+                                {product.subscription_start && product.subscription_end 
+                                  ? formatDateRange(product.subscription_start, product.subscription_end)
+                                  : product.delivery_date 
+                                    ? `Delivery: ${formatDate(product.delivery_date)}`
+                                    : 'N/A'
+                                }
                               </div>
                             </div>
                           ))
