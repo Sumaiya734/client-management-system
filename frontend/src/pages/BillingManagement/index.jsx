@@ -9,8 +9,10 @@ import { Button } from '../../components/ui/Button';
 import BillDetailsPopup from '../../components/BillingManagement/BillDetailsPopup';
 import { billingManagementApi } from '../../api';
 import { formatDate } from '../../utils/dateUtils';
+import { useNotification } from '../../components/Notifications';
 
 export default function BillingManagement() {
+  const { showSuccess, showError } = useNotification();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [loading, setLoading] = useState(true);
@@ -235,10 +237,10 @@ export default function BillingManagement() {
       
       // In a real implementation, you might want to show a modal with the report data
       // or download a PDF/Excel file
-      alert('Billing report generated successfully! Check console for details.');
+      showSuccess('Billing report generated successfully! Check console for details.');
     } catch (error) {
       console.error('Error generating report:', error);
-      alert('Error generating report. Please try again.');
+      showError('Error generating report. Please try again.');
     }
   };
 

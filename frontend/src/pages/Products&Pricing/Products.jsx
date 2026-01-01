@@ -9,12 +9,21 @@ import { Button } from '../../components/ui/Button';
 import MultiCurrencyPricingPopup from '../../components/Products/MultiCurrencyPricingPopup';
 import EditProductPopup from '../../components/Products/EditProductPopup';
 import api from '../../api';
+import { useNotification } from '../../components/Notifications';
 
 export default function Products() {
+  const { showError, showSuccess } = useNotification();
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All Categories');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    item: null,
+    action: null
+  });
   
   // Multi-currency popup state
   const [isCurrencyPopupOpen, setIsCurrencyPopupOpen] = useState(false);
@@ -105,15 +114,15 @@ export default function Products() {
         console.error('Response data:', error.response.data);
         console.error('Response status:', error.response.status);
         console.error('Response headers:', error.response.headers);
-        alert('Error: ' + (error.response.data.message || 'API request failed') + ' (Status: ' + error.response.status + ')');
+        showError('Error: ' + (error.response.data.message || 'API request failed') + ' (Status: ' + error.response.status + ')');
       } else if (error.request) {
         // The request was made but no response was received
         console.error('Request data:', error.request);
-        alert('Network error: No response from server');
+        showError('Network error: No response from server');
       } else {
         // Something happened in setting up the request that triggered an Error
         console.error('Error message:', error.message);
-        alert('Error: ' + error.message);
+        showError('Error: ' + error.message);
       }
     } finally {
       setLoading(false);
@@ -203,7 +212,7 @@ export default function Products() {
         // Update existing product
         const productId = productData.id;
         if (!productId) {
-          alert('Product ID is required for update');
+          showError('Product ID is required for update');
           return;
         }
         
@@ -246,7 +255,7 @@ export default function Products() {
             } : product
           )
         );
-        alert('Product updated successfully');
+        showSuccess('Product updated successfully');
       } else {
         // Add new product
         const formattedData = {
@@ -285,7 +294,7 @@ export default function Products() {
         
         // Add the new product to the local state
         setProducts(prevProducts => [...prevProducts, newProduct]);
-        alert('Product created successfully');
+        showSuccess('Product created successfully');
       }
       
       handleCloseProductPopup();
@@ -296,34 +305,49 @@ export default function Products() {
       // Check if it's a validation error with specific field errors
       if (error.response?.status === 422 && error.response?.data?.errors) {
         const errorMessages = Object.values(error.response.data.errors).flat();
-        alert('Validation errors: ' + errorMessages.join(', '));
+        showError('Validation errors: ' + errorMessages.join(', '));
       } else {
-        alert('Error saving product: ' + error.response?.data?.message || error.message);
+        showError('Error saving product: ' + error.response?.data?.message || error.message);
       }
     }
   };
 
   // Handle product deletion
-  const handleDeleteProduct = async (product) => {
-    if (window.confirm(`Are you sure you want to delete ${product.name}?`)) {
-      try {
-        const productId = product.id;
-        if (!productId) {
-          alert('Product ID is required for deletion');
-          return;
-        }
-        
-        const response = await api.delete(`/products/${productId}`);
-        // After response interceptor normalization, response.data contains the result
-        // Remove the product from the local state
-        setProducts(prevProducts => prevProducts.filter(p => p.id !== productId));
-        alert('Product deleted successfully');
-        fetchProducts(); // Refresh the list
-      } catch (error) {
-        console.error('Error deleting product:', error);
-        alert('Error deleting product: ' + error.response?.data?.message || error.message);
+  const handleDeleteProduct = (product) => {
+    setConfirmDialog({
+      isOpen: true,
+      item: product,
+      action: 'deleteProduct'
+    });
+  };
+
+  // Confirm product deletion
+  const confirmDeleteProduct = async () => {
+    const product = confirmDialog.item;
+    try {
+      const productId = product.id;
+      if (!productId) {
+        showError('Product ID is required for deletion');
+        return;
       }
+      
+      const response = await api.delete(`/products/${productId}`);
+      // After response interceptor normalization, response.data contains the result
+      // Remove the product from the local state
+      setProducts(prevProducts => prevProducts.filter(p => p.id !== productId));
+      showSuccess('Product deleted successfully');
+      setConfirmDialog({ isOpen: false, item: null, action: null });
+      fetchProducts(); // Refresh the list
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      showError('Error deleting product: ' + error.response?.data?.message || error.message);
+      setConfirmDialog({ isOpen: false, item: null, action: null });
     }
+  };
+
+  // Close confirmation dialog
+  const closeConfirmDialog = () => {
+    setConfirmDialog({ isOpen: false, item: null, action: null });
   };
 
   return (
@@ -487,6 +511,34 @@ export default function Products() {
           onUpdate={handleProductSubmit}
           isEditMode={isEditMode}
         />
+      )}
+      
+      {/* Confirmation Dialog */}
+      {confirmDialog.isOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Confirm Deletion</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete <strong>{confirmDialog.item?.name}</strong>? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                onClick={closeConfirmDialog}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                onClick={confirmDeleteProduct}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

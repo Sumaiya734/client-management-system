@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, ChevronDown, Calendar, Plus, Upload, X as XIcon } from 'lucide-react';
 import api from '../../api';
 import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
+import { useNotification } from '../../components/Notifications';
 
 
 interface Product {
@@ -31,6 +32,7 @@ const CreatePurchaseOrderPopup: React.FC<CreatePurchaseOrderPopupProps> = ({
   onClose,
   onCreate,
 }) => {
+  const { showError, showInfo } = useNotification();
   const [formData, setFormData] = useState({
     poNumber: '',
     status: 'Draft',
@@ -154,27 +156,27 @@ const CreatePurchaseOrderPopup: React.FC<CreatePurchaseOrderPopupProps> = ({
 
     // Validate required fields
     if (!formData.clientId || formData.clientId === 0) {
-      alert('Please select a client');
+      showInfo('Please select a client');
       return;
     }
 
     if (!formData.productId || formData.productId === 0) {
-      alert('Please select a product');
+      showInfo('Please select a product');
       return;
     }
 
     // Validation for active subscriptions
     if (formData.subscriptionActive) {
       if (!formData.subscriptionType) {
-        alert('Please select a subscription type');
+        showInfo('Please select a subscription type');
         return;
       }
       if (!formData.deliveryDate) {
-        alert('Please select a delivery date');
+        showInfo('Please select a delivery date');
         return;
       }
       if (!formData.recurringCount || formData.recurringCount < 1) {
-        alert('Please enter a valid recurring count');
+        showInfo('Please enter a valid recurring count');
         return;
       }
     }
@@ -250,11 +252,11 @@ const CreatePurchaseOrderPopup: React.FC<CreatePurchaseOrderPopupProps> = ({
 
     const validFiles = files.filter(file => {
       if (!allowedTypes.includes(file.type)) {
-        alert(`File type ${file.type} is not allowed.`);
+        showError(`File type ${file.type} is not allowed.`);
         return false;
       }
       if (file.size > 10 * 1024 * 1024) {
-        alert(`File ${file.name} is too large.`);
+        showError(`File ${file.name} is too large.`);
         return false;
       }
       return true;

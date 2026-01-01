@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, FileText, Trash2 } from 'lucide-react';
+import { Plus, FileText, Trash2, Eye } from 'lucide-react';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { SearchFilter } from '../../components/ui/SearchFilter';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../../components/ui/Card';
@@ -7,16 +7,30 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '.
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import CreatePurchaseOrderPopup from '../../components/PurchaseOrders/CreatePurchaseOrderPopup';
+import ViewPurchaseOrderPopup from '../../components/PurchaseOrders/ViewPurchaseOrderPopup';
 import api from '../../api';
 import { formatDate, formatDateRange } from '../../utils/dateUtils';
+import { useNotification } from '../../components/Notifications';
 
 export default function PurchaseOrders() {
+  const { showError, showSuccess } = useNotification();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [loading, setLoading] = useState(true);
   
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    item: null,
+    action: null
+  });
+  
   // Create PO popup state
   const [isCreatePopupOpen, setIsCreatePopupOpen] = useState(false);
+
+  // View PO popup state
+  const [isViewPopupOpen, setIsViewPopupOpen] = useState(false);
+  const [selectedPurchaseOrder, setSelectedPurchaseOrder] = useState(null);
 
   const [purchaseOrders, setPurchaseOrders] = useState([]);
 
@@ -32,7 +46,7 @@ export default function PurchaseOrders() {
       setPurchaseOrders(response.data); // response.data is the array after interceptor
     } catch (error) {
       console.error('Error fetching purchase orders:', error);
-      alert('Error loading purchase orders: ' + (error.response?.data?.message || error.message));
+      showError('Error loading purchase orders: ' + (error.response?.data?.message || error.message));
     } finally {
       setLoading(false);
     }
@@ -137,7 +151,7 @@ export default function PurchaseOrders() {
       // Success → refresh list
       fetchPurchaseOrders();
       setIsCreatePopupOpen(false);
-      alert('Purchase order created successfully!');
+      showSuccess('Purchase order created successfully!');
       console.log('Created purchase:', response.data);
     } catch (error) {
       console.error('Error creating purchase order:', error);
@@ -147,25 +161,52 @@ export default function PurchaseOrders() {
         const errors = error.response.data.errors;
         console.log('Validation errors:', errors);
         const errorMessages = Object.values(errors).flat().join(', ');
-        alert('Validation failed: ' + errorMessages);
+        showError('Validation failed: ' + errorMessages);
       } else {
-        alert('Failed to create purchase order: ' + (error.response?.data?.message || error.message));
+        showError('Failed to create purchase order: ' + (error.response?.data?.message || error.message));
       }
     }
   };
 
   // Handle deleting purchase order
-  const handleDeletePO = async (po) => {
-    if (window.confirm(`Are you sure you want to delete PO ${po.po_number || po.poNumber}?`)) {
-      try {
-        await api.delete(`/purchases/${po.id}`);
-        fetchPurchaseOrders();
-        alert('Purchase order deleted successfully');
-      } catch (error) {
-        console.error('Error deleting:', error);
-        alert('Failed to delete: ' + (error.response?.data?.message || error.message));
-      }
+  const handleDeletePO = (po) => {
+    setConfirmDialog({
+      isOpen: true,
+      item: po,
+      action: 'deletePO'
+    });
+  };
+
+  // Confirm purchase order deletion
+  const confirmDeletePO = async () => {
+    const po = confirmDialog.item;
+    try {
+      await api.delete(`/purchases/${po.id}`);
+      fetchPurchaseOrders();
+      showSuccess('Purchase order deleted successfully');
+      setConfirmDialog({ isOpen: false, item: null, action: null });
+    } catch (error) {
+      console.error('Error deleting:', error);
+      showError('Failed to delete: ' + (error.response?.data?.message || error.message));
+      setConfirmDialog({ isOpen: false, item: null, action: null });
     }
+  };
+
+  // Close confirmation dialog
+  const closeConfirmDialog = () => {
+    setConfirmDialog({ isOpen: false, item: null, action: null });
+  };
+
+  // Handle opening view popup
+  const handleViewPO = (po) => {
+    setSelectedPurchaseOrder(po);
+    setIsViewPopupOpen(true);
+  };
+
+  // Handle closing view popup
+  const handleCloseViewPopup = () => {
+    setIsViewPopupOpen(false);
+    setSelectedPurchaseOrder(null);
   };
 
   return (
@@ -277,6 +318,14 @@ export default function PurchaseOrders() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          title="View"
+                          onClick={() => handleViewPO(po)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
                         <Button variant="outline" size="sm" className="text-xs" icon={<FileText className="h-3 w-3" />}>
                           Generate Bill
                         </Button>
@@ -304,6 +353,41 @@ export default function PurchaseOrders() {
         onClose={handleCloseCreatePopup}
         onCreate={handleCreatePurchaseOrder}
       />
+
+      {/* View Purchase Order Popup */}
+      <ViewPurchaseOrderPopup
+        isOpen={isViewPopupOpen}
+        onClose={handleCloseViewPopup}
+        purchaseOrder={selectedPurchaseOrder}
+      />
+      
+      {/* Confirmation Dialog */}
+      {confirmDialog.isOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Confirm Deletion</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete PO <strong>{confirmDialog.item?.po_number}</strong>? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                onClick={closeConfirmDialog}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                onClick={confirmDeletePO}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,11 +9,20 @@ import { Button } from '../../components/ui/Button';
 import EditPaymentPopup from '../../components/PaymentManagement/EditPaymentPopup';
 import api from '../../api';
 import { formatDate } from '../../utils/dateUtils';
+import { useNotification } from '../../components/Notifications';
 
 export default function PaymentManagement() {
+  const { showError, showSuccess } = useNotification();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [loading, setLoading] = useState(true);
+  
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    item: null,
+    action: null
+  });
   
   // Payment popup state
   const [isPaymentPopupOpen, setIsPaymentPopupOpen] = useState(false);
@@ -201,38 +210,54 @@ export default function PaymentManagement() {
         errorMessage = error.response.data.message;
       }
       
-      alert(errorMessage);
+      showError(errorMessage);
     }
   };
 
   // Handle payment deletion
-  const handleDeletePayment = async (payment) => {
-    if (window.confirm(`Are you sure you want to delete payment ${payment.transactionId}?`)) {
-      try {
-        const response = await api.delete(`/payment-managements/${payment.id}`);
-        // After response interceptor normalization, response.data contains the result
-        // Refresh the payments list
-        fetchPayments();
-        console.log('Deleted payment:', payment);
-      } catch (error) {
-        console.error('Error deleting payment:', error);
-        let errorMessage = 'Failed to delete payment';
-        
-        if (error.response?.data?.errors) {
-          // Handle validation errors
-          const errors = error.response.data.errors;
-          if (typeof errors === 'object') {
-            errorMessage = Object.values(errors).flat().join(', ');
-          } else {
-            errorMessage = errors;
-          }
-        } else if (error.response?.data?.message) {
-          errorMessage = error.response.data.message;
+  const handleDeletePayment = (payment) => {
+    setConfirmDialog({
+      isOpen: true,
+      item: payment,
+      action: 'deletePayment'
+    });
+  };
+
+  // Confirm payment deletion
+  const confirmDeletePayment = async () => {
+    const payment = confirmDialog.item;
+    try {
+      const response = await api.delete(`/payment-managements/${payment.id}`);
+      // After response interceptor normalization, response.data contains the result
+      // Refresh the payments list
+      fetchPayments();
+      showSuccess('Payment deleted successfully');
+      setConfirmDialog({ isOpen: false, item: null, action: null });
+      console.log('Deleted payment:', payment);
+    } catch (error) {
+      console.error('Error deleting payment:', error);
+      let errorMessage = 'Failed to delete payment';
+      
+      if (error.response?.data?.errors) {
+        // Handle validation errors
+        const errors = error.response.data.errors;
+        if (typeof errors === 'object') {
+          errorMessage = Object.values(errors).flat().join(', ');
+        } else {
+          errorMessage = errors;
         }
-        
-        alert(errorMessage);
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
       }
+      
+      showError(errorMessage);
+      setConfirmDialog({ isOpen: false, item: null, action: null });
     }
+  };
+
+  // Close confirmation dialog
+  const closeConfirmDialog = () => {
+    setConfirmDialog({ isOpen: false, item: null, action: null });
   };
 
   return (
@@ -370,6 +395,34 @@ export default function PaymentManagement() {
           onUpdate={handlePaymentSubmit}
           isEditMode={isEditMode}
         />
+      )}
+      
+      {/* Confirmation Dialog */}
+      {confirmDialog.isOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Confirm Deletion</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete payment <strong>{confirmDialog.item?.transactionId}</strong>? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                onClick={closeConfirmDialog}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                onClick={confirmDeletePayment}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

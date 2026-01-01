@@ -3,8 +3,10 @@ import Modal from 'react-modal';
 import { X } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { userManagementApi } from '../../api';
+import { useNotification } from '../Notifications';
 
 const ManagePermissionsModal = ({ isOpen, onRequestClose, user, onUpdate }) => {
+  const { showError } = useNotification();
   const [isAdministrator, setIsAdministrator] = useState(false);
   const [permissions, setPermissions] = useState({
     clientManagement: false,
@@ -85,7 +87,7 @@ const ManagePermissionsModal = ({ isOpen, onRequestClose, user, onUpdate }) => {
       onRequestClose();
     } catch (error) {
       console.error('Error updating permissions:', error);
-      alert('Failed to update permissions. Please try again.');
+      showError('Failed to update permissions. Please try again.');
     } finally {
       setLoading(false);
     }

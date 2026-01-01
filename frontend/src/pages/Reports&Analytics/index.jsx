@@ -4,8 +4,10 @@ import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
 import api from '../../api';
+import { useNotification } from '../../components/Notifications';
 
 const ReportsAnalytics = () => {
+  const { showSuccess, showError } = useNotification();
   const [activeTab, setActiveTab] = useState('Revenue Analysis');
   
   // State variables for API data
@@ -206,11 +208,11 @@ const ReportsAnalytics = () => {
         ]);
       }
       
-      // Show success notification or message
-      alert('Report generated successfully!');
+      // Show success notification
+      showSuccess('Report generated successfully!');
     } catch (error) {
       console.error('Error generating report:', error);
-      alert('Error generating report. Please try again.');
+      showError('Error generating report. Please try again.');
     }
   };
   

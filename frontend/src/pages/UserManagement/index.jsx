@@ -9,8 +9,10 @@ import ManagePermissionsModal from '../../components/userManagement/ManagePermis
 import EditUserModal from '../../components/userManagement/EditUserModal';
 import { userManagementApi } from '../../api';
 import { useAuth } from '../../context/AuthContext';
+import { useNotification } from '../../components/Notifications';
 
 const UserManagement = () => {
+  const { showError, showSuccess } = useNotification();
   const [activeTab, setActiveTab] = useState('Users');
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('All Roles');
@@ -20,6 +22,13 @@ const UserManagement = () => {
   const [isAddMode, setIsAddMode] = useState(false);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    item: null,
+    action: null
+  });
   
   const { user: currentUser } = useAuth();
 
@@ -86,15 +95,32 @@ const UserManagement = () => {
     }
   };
 
-  const handleDeleteUser = async (userId) => {
-    if (window.confirm('Are you sure you want to delete this user?')) {
-      try {
-        await userManagementApi.delete(userId);
-        setUsers(users.filter(user => user.id !== userId));
-      } catch (error) {
-        console.error('Error deleting user:', error);
-      }
+  const handleDeleteUser = (user) => {
+    setConfirmDialog({
+      isOpen: true,
+      item: user,
+      action: 'deleteUser'
+    });
+  };
+
+  // Confirm user deletion
+  const confirmDeleteUser = async () => {
+    const user = confirmDialog.item;
+    try {
+      await userManagementApi.delete(user.id);
+      setUsers(users.filter(u => u.id !== user.id));
+      showSuccess('User deleted successfully');
+      setConfirmDialog({ isOpen: false, item: null, action: null });
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      showError('Error deleting user: ' + (error.response?.data?.message || error.message));
+      setConfirmDialog({ isOpen: false, item: null, action: null });
     }
+  };
+
+  // Close confirmation dialog
+  const closeConfirmDialog = () => {
+    setConfirmDialog({ isOpen: false, item: null, action: null });
   };
 
   const handleUpdatePermissions = async (userId, permissionsData) => {
@@ -259,7 +285,7 @@ const UserManagement = () => {
                               <Edit className="h-4 w-4" />
                             </button>
                             <button
-                              onClick={() => handleDeleteUser(user.id)}
+                              onClick={() => handleDeleteUser(user)}
                               className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                               title="Delete"
                             >
@@ -472,6 +498,34 @@ const UserManagement = () => {
         isAddMode={isAddMode}
         onSave={handleSaveUser}
       />
+      
+      {/* Confirmation Dialog */}
+      {confirmDialog.isOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Confirm Deletion</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete user <strong>{confirmDialog.item?.name}</strong>? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                onClick={closeConfirmDialog}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                onClick={confirmDeleteUser}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

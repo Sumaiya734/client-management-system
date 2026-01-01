@@ -8,12 +8,21 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import EditVendorPopup from '../../components/VendorForm/EditVendorPopup';
 import { vendorApi } from '../../api';
+import { useNotification } from '../../components/Notifications/NotificationContext';
 
 export default function VendorManagement() {
+  const { showError, showSuccess } = useNotification();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    item: null,
+    action: null
+  });
 
   // Popup state management
   const [isEditPopupOpen, setIsEditPopupOpen] = useState(false);
@@ -69,15 +78,15 @@ export default function VendorManagement() {
         console.error('Response data:', error.response.data);
         console.error('Response status:', error.response.status);
         console.error('Response headers:', error.response.headers);
-        alert('Error: ' + (error.response.data.message || 'API request failed') + ' (Status: ' + error.response.status + ')');
+        showError('Error: ' + (error.response.data.message || 'API request failed') + ' (Status: ' + error.response.status + ')');
       } else if (error.request) {
         // The request was made but no response was received
         console.error('Request data:', error.request);
-        alert('Network error: No response from server');
+        showError('Network error: No response from server');
       } else {
         // Something happened in setting up the request that triggered an Error
         console.error('Error message:', error.message);
-        alert('Error: ' + error.message);
+        showError('Error: ' + error.message);
       }
     } finally {
       setLoading(false);
@@ -125,7 +134,7 @@ export default function VendorManagement() {
         // Update existing vendor - ensure ID is properly formatted
         const vendorId = vendorData.id;
         if (!vendorId) {
-          alert('Vendor ID is required for update');
+          showError('Vendor ID is required for update');
           return;
         }
         
@@ -133,14 +142,14 @@ export default function VendorManagement() {
         // After response interceptor normalization, response.data contains the updated vendor
         // Update the vendor in the local state
         setVendors(prev => prev.map(v => v.id === vendorId ? response.data : v));
-        alert('Vendor updated successfully');
+        showSuccess('Vendor updated successfully');
       } else {
         // Create new vendor
         const response = await vendorApi.create(vendorData);
         // After response interceptor normalization, response.data contains the created vendor
         // Add the new vendor to the local state
         setVendors(prev => [...prev, response.data]);
-        alert('Vendor created successfully');
+        showSuccess('Vendor created successfully');
       }
       
       handleClosePopup();
@@ -151,34 +160,49 @@ export default function VendorManagement() {
       // Check if it's a validation error with specific field errors
       if (error.response?.status === 422 && error.response?.data?.errors) {
         const errorMessages = Object.values(error.response.data.errors).flat();
-        alert('Validation errors: ' + errorMessages.join(', '));
+        showError('Validation errors: ' + errorMessages.join(', '));
       } else {
-        alert('Error saving vendor: ' + error.response?.data?.message || error.message);
+        showError('Error saving vendor: ' + error.response?.data?.message || error.message);
       }
     }
   };
 
   // Handle vendor deletion
-  const handleDeleteVendor = async (vendor) => {
-    if (window.confirm(`Are you sure you want to delete ${vendor.name}?`)) {
-      try {
-        const vendorId = vendor.id;
-        if (!vendorId) {
-          alert('Vendor ID is required for deletion');
-          return;
-        }
-        
-        const response = await vendorApi.delete(vendorId);
-        // After response interceptor normalization, response.data contains the result
-        // Remove the vendor from the local state
-        setVendors(prev => prev.filter(v => v.id !== vendorId));
-        alert('Vendor deleted successfully');
-        fetchVendors(); // Refresh the list
-      } catch (error) {
-        console.error('Error deleting vendor:', error);
-        alert('Error deleting vendor: ' + error.response?.data?.message || error.message);
+  const handleDeleteVendor = (vendor) => {
+    setConfirmDialog({
+      isOpen: true,
+      item: vendor,
+      action: 'deleteVendor'
+    });
+  };
+
+  // Confirm vendor deletion
+  const confirmDeleteVendor = async () => {
+    const vendor = confirmDialog.item;
+    try {
+      const vendorId = vendor.id;
+      if (!vendorId) {
+        showError('Vendor ID is required for deletion');
+        return;
       }
+      
+      const response = await vendorApi.delete(vendorId);
+      // After response interceptor normalization, response.data contains the result
+      // Remove the vendor from the local state
+      setVendors(prev => prev.filter(v => v.id !== vendorId));
+      showSuccess('Vendor deleted successfully');
+      fetchVendors(); // Refresh the list
+      setConfirmDialog({ isOpen: false, item: null, action: null });
+    } catch (error) {
+      console.error('Error deleting vendor:', error);
+      showError('Error deleting vendor: ' + error.response?.data?.message || error.message);
+      setConfirmDialog({ isOpen: false, item: null, action: null });
     }
+  };
+
+  // Close confirmation dialog
+  const closeConfirmDialog = () => {
+    setConfirmDialog({ isOpen: false, item: null, action: null });
   };
 
   return (
@@ -284,6 +308,34 @@ export default function VendorManagement() {
           onUpdate={handleVendorSubmit}
           isEditMode={isEditMode}
         />
+      )}
+      
+      {/* Confirmation Dialog */}
+      {confirmDialog.isOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Confirm Deletion</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete <strong>{confirmDialog.item?.name}</strong>? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                onClick={closeConfirmDialog}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                onClick={confirmDeleteVendor}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -8,8 +8,10 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import SubscriptionModal from '../../components/subscriptions/SubscriptionModal';
 import api from '../../api';
+import { useNotification } from '../../components/Notifications';
 
 export default function Subscriptions() {
+  const { showError, showSuccess } = useNotification();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -153,7 +155,7 @@ export default function Subscriptions() {
     try {
       // Validate required fields
       if (!data.startDate || !data.endDate) {
-        alert('Please select both start and end dates');
+        showError('Please select both start and end dates');
         return;
       }
 
@@ -193,9 +195,9 @@ export default function Subscriptions() {
       console.error('Error saving subscription:', error);
       if (error.response) {
         console.error('Server response:', error.response.data);
-        alert(`Failed to save subscription: ${error.response.data.message || 'Validation failed'}`);
+        showError(`Failed to save subscription: ${error.response.data.message || 'Validation failed'}`);
       } else {
-        alert('Failed to save subscription');
+        showError('Failed to save subscription');
       }
     }
   };

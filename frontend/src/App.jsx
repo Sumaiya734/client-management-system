@@ -20,9 +20,11 @@ import VendorManagement from './pages/VendorManagement/index';
 import Login from './pages/Auth/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import SearchPage from './pages/SearchPage';
+import { NotificationProviderWrapper } from './components/Notifications/NotificationContext';
 
 function App() {
   return (
+    <NotificationProviderWrapper>
       <Router>
         <Routes>
           {/* Public routes */}
@@ -226,6 +228,7 @@ function App() {
           } />
         </Routes>
       </Router>
+    </NotificationProviderWrapper>
   );
 }
 

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, Calendar, ChevronDown } from 'lucide-react';
 import { currencyRatesApi } from '../../api';
 import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
+import { useNotification } from '../Notifications';
 
 const EditExchangeRatePopup = ({
   rate,
@@ -11,6 +12,7 @@ const EditExchangeRatePopup = ({
   onUpdate,
   isEditMode = true,
 }) => {
+  const { showError, showSuccess } = useNotification();
   const [formData, setFormData] = useState({
     currency: '',
     rateValue: '',
@@ -95,7 +97,7 @@ const EditExchangeRatePopup = ({
         errorMessage = err.response.data.message;
       }
       
-      alert(errorMessage);
+      showError(errorMessage);
     }
   };
 

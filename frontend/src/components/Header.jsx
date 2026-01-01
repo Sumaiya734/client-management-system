@@ -3,9 +3,16 @@ import { Search, Bell, Settings, User, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import GlobalSearch from './GlobalSearch';
+import { useNotification } from './Notifications';
 
 export default function Header() {
+  const { showError, showSuccess } = useNotification();
   const [showDropdown, setShowDropdown] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    item: null,
+    action: null
+  });
   const dropdownRef = useRef(null);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -23,15 +30,30 @@ export default function Header() {
     };
   }, []);
 
-  const handleLogout = async () => {
-    if (window.confirm('Are you sure you want to log out?')) {
-      try {
-        await logout();
-        navigate('/login');
-      } catch (error) {
-        console.error('Logout failed:', error);
-      }
+  const handleLogout = () => {
+    setConfirmDialog({
+      isOpen: true,
+      item: null,
+      action: 'logout'
+    });
+  };
+
+  // Confirm logout
+  const confirmLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+      setConfirmDialog({ isOpen: false, item: null, action: null });
+    } catch (error) {
+      console.error('Logout failed:', error);
+      showError('Logout failed: ' + (error.response?.data?.message || error.message));
+      setConfirmDialog({ isOpen: false, item: null, action: null });
     }
+  };
+
+  // Close confirmation dialog
+  const closeConfirmDialog = () => {
+    setConfirmDialog({ isOpen: false, item: null, action: null });
   };
 
   const displayName = user?.name || user?.email || 'User';
@@ -99,6 +121,34 @@ export default function Header() {
         </div>
 
       </div>
+      
+      {/* Confirmation Dialog */}
+      {confirmDialog.isOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Confirm Logout</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to log out?
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                onClick={closeConfirmDialog}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                onClick={confirmLogout}
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
