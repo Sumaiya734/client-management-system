@@ -47,4 +47,27 @@ class Purchase extends Model
         return $this->belongsTo(Product::class, 'product_id');
     }
     
+    /**
+     * Get the subscriptions for the purchase.
+     */
+    public function subscription()
+    {
+        return $this->hasOne(Subscription::class, 'purchase_id');
+    }
+    
+    /**
+     * Get the billing records for the purchase.
+     */
+    public function billing()
+    {
+        return $this->hasMany(Billing_management::class, 'purchase_id');
+    }
+    
+    /**
+     * Get the payment records for the purchase.
+     */
+    public function payment()
+    {
+        return $this->hasMany(Payment_management::class, 'purchase_id');
+    }
 }

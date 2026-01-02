@@ -81,8 +81,25 @@ Route::get('notifications/user/{userId}', [\App\Http\Controllers\Api\Notificatio
 Route::post('notifications/{id}/send', [\App\Http\Controllers\Api\NotificationController::class, 'sendNotification']);
 
 // Purchase Management Routes
-Route::get('purchases/generate-po-number', [\App\Http\Controllers\Api\PurchaseController::class, 'generatePoNumber']);
-Route::apiResource('purchases', \App\Http\Controllers\Api\PurchaseController::class);
+Route::prefix('purchases')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Api\PurchaseController::class, 'index']);
+
+    Route::post('/', [\App\Http\Controllers\Api\PurchaseController::class, 'store']);
+
+    Route::get('/generate-po', [\App\Http\Controllers\Api\PurchaseController::class, 'generatePoNumber']);
+
+    Route::get('/client/{clientId}', [\App\Http\Controllers\Api\PurchaseController::class, 'getByClient']);
+
+    Route::get('/po/{poNumber}', [\App\Http\Controllers\Api\PurchaseController::class, 'getByPoNumber']);
+
+    Route::get('/{id}/with-related', [\App\Http\Controllers\Api\PurchaseController::class, 'getWithRelatedData']);
+
+    Route::get('/{id}', [\App\Http\Controllers\Api\PurchaseController::class, 'show']);
+
+    Route::put('/{id}', [\App\Http\Controllers\Api\PurchaseController::class, 'update']);
+
+    Route::delete('/{id}', [\App\Http\Controllers\Api\PurchaseController::class, 'destroy']);
+});
 
 // Subscription Management Routes
 Route::apiResource('subscriptions', \App\Http\Controllers\Api\SubscriptionController::class)->middleware('auth:sanctum');

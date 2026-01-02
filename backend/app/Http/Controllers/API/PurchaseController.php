@@ -7,6 +7,7 @@ use App\Services\PurchaseService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class PurchaseController extends Controller
 {
@@ -30,6 +31,7 @@ class PurchaseController extends Controller
                 'data' => $purchases
             ]);
         } catch (\Exception $e) {
+            Log::error('Failed to retrieve purchases: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve purchases',
@@ -44,23 +46,32 @@ class PurchaseController extends Controller
     public function store(Request $request): JsonResponse
     {
         try {
-            $purchases = $this->purchaseService->create($request->all());
+            // Log request for debugging
+            Log::info('Purchase store request', ['data' => $request->all()]);
+
+            $purchase = $this->purchaseService->create($request->all());
 
             return response()->json([
                 'success' => true,
-                'message' => count($purchases) > 1 ? 'Purchases created successfully' : 'Purchase created successfully',
-                'data' => count($purchases) > 1 ? $purchases : $purchases[0]
+                'message' => 'Purchase created successfully',
+                'data' => $purchase
             ], 201);
             
         } catch (\Exception $e) {
-            $errors = [];
+            Log::error('Purchase creation failed: ' . $e->getMessage());
+            
             if (strpos($e->getMessage(), 'Validation failed') !== false) {
-                $errors = json_decode(substr($e->getMessage(), strpos($e->getMessage(), ':') + 1), true);
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation failed',
-                    'errors' => $errors
-                ], 422);
+                try {
+                    $errorPart = substr($e->getMessage(), strpos($e->getMessage(), ':') + 1);
+                    $errors = json_decode(trim($errorPart), true);
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Validation failed',
+                        'errors' => $errors
+                    ], 422);
+                } catch (\Exception $jsonError) {
+                    // If JSON decode fails, return the original message
+                }
             }
 
             return response()->json([
@@ -91,6 +102,7 @@ class PurchaseController extends Controller
                 'data' => $purchase
             ]);
         } catch (\Exception $e) {
+            Log::error('Failed to retrieve purchase: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve purchase',
@@ -110,6 +122,8 @@ class PurchaseController extends Controller
                 $request->request->remove('po_number');
             }
 
+            Log::info('Purchase update request', ['id' => $id, 'data' => $request->all()]);
+
             $purchase = $this->purchaseService->update($id, $request->all());
 
             return response()->json([
@@ -119,14 +133,20 @@ class PurchaseController extends Controller
             ]);
             
         } catch (\Exception $e) {
-            $errors = [];
+            Log::error('Purchase update failed: ' . $e->getMessage());
+            
             if (strpos($e->getMessage(), 'Validation failed') !== false) {
-                $errors = json_decode(substr($e->getMessage(), strpos($e->getMessage(), ':') + 1), true);
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation failed',
-                    'errors' => $errors
-                ], 422);
+                try {
+                    $errorPart = substr($e->getMessage(), strpos($e->getMessage(), ':') + 1);
+                    $errors = json_decode(trim($errorPart), true);
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Validation failed',
+                        'errors' => $errors
+                    ], 422);
+                } catch (\Exception $jsonError) {
+                    // If JSON decode fails, return the original message
+                }
             }
 
             if (strpos($e->getMessage(), 'Purchase not found') !== false) {
@@ -150,6 +170,8 @@ class PurchaseController extends Controller
     public function destroy(string $id): JsonResponse
     {
         try {
+            Log::info('Purchase delete request', ['id' => $id]);
+            
             $result = $this->purchaseService->delete($id);
 
             return response()->json([
@@ -157,6 +179,8 @@ class PurchaseController extends Controller
                 'message' => 'Purchase deleted successfully'
             ]);
         } catch (\Exception $e) {
+            Log::error('Purchase delete failed: ' . $e->getMessage());
+            
             if (strpos($e->getMessage(), 'Purchase not found') !== false) {
                 return response()->json([
                     'success' => false,
@@ -178,39 +202,100 @@ class PurchaseController extends Controller
     public function generatePoNumber(): JsonResponse
     {
         try {
-            $year = date('Y');
-
-            $lastPo = DB::table('purchases')
-                ->where('po_number', 'like', "PO-$year-%")
-                ->orderBy('id', 'desc')
-                ->first();
-
-            if ($lastPo && isset($lastPo->po_number)) {
-                // Extract the serial number part after the year
-                $pattern = "/PO-$year-(\d+)$/";
-                if (preg_match($pattern, $lastPo->po_number, $matches)) {
-                    $lastSerial = intval($matches[1]);
-                    $nextSerial = $lastSerial + 1;
-                    $nextDigits = str_pad($nextSerial, strlen($matches[1]), '0', STR_PAD_LEFT);
-                } else {
-                    $nextDigits = "0001"; // fallback
-                }
-            } else {
-                $nextDigits = "0001";
-            }
-
-            $generatedPo = "PO-$year-$nextDigits";
+            // Use the service method for PO number generation to maintain consistency
+            $poNumber = $this->purchaseService->generatePoNumber();
 
             return response()->json([
                 'success' => true,
                 'data' => [
-                    'po_number' => $generatedPo
+                    'po_number' => $poNumber
                 ]
             ]);
         } catch (\Exception $e) {
+            Log::error('Failed to generate PO number: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to generate PO number',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get purchases by client ID
+     */
+    public function getByClient($clientId): JsonResponse
+    {
+        try {
+            $purchases = $this->purchaseService->getByClientId($clientId);
+
+            return response()->json([
+                'success' => true,
+                'data' => $purchases
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to retrieve client purchases: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve purchases for client',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get purchase by PO number
+     */
+    public function getByPoNumber($poNumber): JsonResponse
+    {
+        try {
+            $purchase = $this->purchaseService->getByPoNumber($poNumber);
+            
+            if (!$purchase) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Purchase not found'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $purchase
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to retrieve purchase by PO number: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve purchase',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get purchase with related data (subscriptions, billing, payments)
+     */
+    public function getWithRelatedData($id): JsonResponse
+    {
+        try {
+            $purchase = $this->purchaseService->getWithRelatedData($id);
+            
+            if (!$purchase) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Purchase not found'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $purchase
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to retrieve purchase with related data: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve purchase with related data',
                 'error' => $e->getMessage()
             ], 500);
         }

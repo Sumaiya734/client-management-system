@@ -1,6 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { X, Calendar, FileText } from 'lucide-react';
+import { X, Calendar, FileText, Package, Clock, DollarSign, Building2 } from 'lucide-react';
 import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
 import { formatDate, formatDateRange } from '../../utils/dateUtils';
 
@@ -49,187 +49,219 @@ const ViewPurchaseOrderPopup: React.FC<ViewPurchaseOrderPopupProps> = ({
   const { isVisible, isAnimating } = useAnimationState(isOpen);
 
   if (!isOpen && !isAnimating) return null;
-
   if (!purchaseOrder) return null;
 
-  const formatCurrency = (amount: number) => {
-    const num = typeof amount === 'number' ? amount : parseFloat(amount || 0);
-    return isNaN(num) ? '0.00' : num.toFixed(2);
+  const formatCurrency = (amount?: number) => {
+    const num = amount || 0;
+    return num.toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  const handlePopupClick = (e: React.MouseEvent) => {
-    onClose();
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, { bg: string; text: string }> = {
+      pending: { bg: 'bg-yellow-100 text-yellow-800', text: 'Pending' },
+      approved: { bg: 'bg-green-100 text-green-800', text: 'Approved' },
+      delivered: { bg: 'bg-blue-100 text-blue-800', text: 'Delivered' },
+      cancelled: { bg: 'bg-red-100 text-red-800', text: 'Cancelled' },
+      default: { bg: 'bg-gray-100 text-gray-800', text: status },
+    };
+
+    const variant = variants[status?.toLowerCase()] || variants.default;
+    return (
+      <span className={`px-3 py-1 rounded-full text-xs font-medium ${variant.bg} ${variant.text}`}>
+        {variant.text}
+      </span>
+    );
+  };
+
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) onClose();
   };
 
   return createPortal(
-    <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={handlePopupClick}>
-      <PopupAnimation animationType="zoomIn" duration="0.3s">
-        <div className="bg-white rounded-lg shadow-lg w-full max-w-[98vw] mx-2 max-h-[75vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-
-          {/* HEADER */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200">
+    <div
+      className={`fixed inset-0 z-[9999] flex items-center justify-center transition-all duration-300 ${
+        isAnimating ? 'bg-black/60 backdrop-blur-sm' : 'bg-black/0 pointer-events-none'
+      }`}
+      onClick={handleBackdropClick}
+    >
+      <PopupAnimation animationType="scale" duration="0.3s">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white px-6 py-5 flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">View Purchase Order</h2>
-              <p className="text-xs text-gray-500 mt-1">Purchase Order Details</p>
+              <h2 className="text-xl font-bold">Purchase Order Details</h2>
+              <p className="text-slate-300 text-sm mt-1">PO #{purchaseOrder.po_number}</p>
             </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-              <X size={20} />
+            <button
+              onClick={onClose}
+              className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+              aria-label="Close"
+            >
+              <X size={22} />
             </button>
           </div>
 
-          {/* FORM */}
-          <div className="p-4 text-sm space-y-6">
-
-            {/* BASIC INFORMATION */}
-            <div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">Basic Information</h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-                {/* PO NUMBER */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">PO Number</label>
-                  <div className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm bg-gray-100">
-                    {purchaseOrder.po_number}
-                  </div>
+          {/* Body - Scrollable */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-8">
+            {/* Basic Info Grid */}
+            <section>
+              <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                <Building2 size={18} />
+                Basic Information
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-600">PO Number</label>
+                  <p className="text-sm font-semibold text-slate-900">{purchaseOrder.po_number}</p>
                 </div>
 
-                {/* STATUS */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
-                  <div className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm bg-gray-100">
-                    {purchaseOrder.status}
-                  </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-600">Status</label>
+                  <div>{getStatusBadge(purchaseOrder.status)}</div>
                 </div>
 
-                {/* CLIENT */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Client</label>
-                  <div className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm bg-gray-100">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-600">Client</label>
+                  <p className="text-sm font-medium text-slate-900">
                     {purchaseOrder.client?.company || purchaseOrder.cli_name || 'N/A'}
-                  </div>
+                  </p>
                 </div>
 
-                {/* DELIVERY DATE */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Delivery Date</label>
-                  <div className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm bg-gray-100">
-                    {purchaseOrder.delivery_date ? formatDate(purchaseOrder.delivery_date) : 'N/A'}
-                  </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-600 flex items-center gap-1">
+                    <Calendar size={14} />
+                    Delivery Date
+                  </label>
+                  <p className="text-sm font-medium text-slate-900">
+                    {purchaseOrder.delivery_date ? formatDate(purchaseOrder.delivery_date) : 'Not specified'}
+                  </p>
                 </div>
 
-                {/* TOTAL AMOUNT */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Total Amount</label>
-                  <div className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm bg-gray-100">
-                    ৳{formatCurrency(purchaseOrder.total_amount || 0)} BDT
-                  </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-600 flex items-center gap-1">
+                    <DollarSign size={14} />
+                    Total Amount
+                  </label>
+                  <p className="text-lg font-bold text-slate-900">
+                    ৳{formatCurrency(purchaseOrder.total_amount)} BDT
+                  </p>
                 </div>
 
-                {/* SUBSCRIPTION ACTIVE */}
-                <div>
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={purchaseOrder.subscription_active || false}
-                      readOnly
-                      className="h-3 w-3 text-gray-900 border-gray-300 rounded"
-                    />
-                    <label className="ml-2 text-xs font-medium text-gray-700">
-                      Subscription Active
-                    </label>
-                  </div>
+                <div className="space-y-1 flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={purchaseOrder.subscription_active || false}
+                    readOnly
+                    className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+                  />
+                  <label className="ml-2 text-sm font-medium text-slate-700">
+                    Subscription Active
+                  </label>
                 </div>
-
               </div>
-            </div>
+            </section>
 
-            {/* PRODUCTS */}
-            <div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">Products & Subscription</h3>
+            {/* Products Section */}
+            <section>
+              <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                <Package size={18} />
+                Products & Subscription
+              </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-                {/* PRODUCTS LIST */}
-                <div className="md:col-span-3">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Products</label>
-                  <div className="space-y-2">
-                    {purchaseOrder.products && purchaseOrder.products.length > 0 ? (
-                      purchaseOrder.products.map((product, index) => (
-                        <div key={index} className="border border-gray-200 rounded-md p-3 bg-gray-50">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="font-medium text-gray-900">
-                              {product.product_name || 'N/A'}
+              {purchaseOrder.products && purchaseOrder.products.length > 0 ? (
+                <div className="overflow-hidden rounded-lg border border-slate-200">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 border-b border-slate-200">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-medium text-slate-700">Product</th>
+                        <th className="px-4 py-3 text-center font-medium text-slate-700">Quantity</th>
+                        <th className="px-4 py-3 text-left font-medium text-slate-700">Schedule</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {purchaseOrder.products.map((product, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-3 font-medium text-slate-900">
+                            {product.product_name || 'Unnamed Product'}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
+                              ×{product.quantity || 1}
                             </span>
-                            <span className="text-xs bg-gray-900 text-white px-2 py-1 rounded">
-                              x{product.quantity || 1}
-                            </span>
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            {product.subscription_start && product.subscription_end
-                              ? formatDateRange(product.subscription_start, product.subscription_end)
-                              : product.delivery_date
-                                ? `Delivery: ${formatDate(product.delivery_date)}`
-                                : 'N/A'
-                            }
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-sm text-gray-500">No products</div>
-                    )}
-                  </div>
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {product.subscription_start && product.subscription_end ? (
+                              <span className="flex items-center gap-1">
+                                <Clock size={14} />
+                                {formatDateRange(product.subscription_start, product.subscription_end)}
+                              </span>
+                            ) : product.delivery_date ? (
+                              <span className="flex items-center gap-1">
+                                <Calendar size={14} />
+                                Delivery: {formatDate(product.delivery_date)}
+                              </span>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
+              ) : (
+                <p className="text-slate-500 italic">No products added</p>
+              )}
 
-                {/* SUBSCRIPTION TYPE */}
-                {purchaseOrder.subscription_active && (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Subscription Type</label>
-                    <div className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm bg-gray-100">
-                      {purchaseOrder.subscription_type ? `${purchaseOrder.subscription_type} month${parseInt(purchaseOrder.subscription_type) > 1 ? 's' : ''}` : 'N/A'}
+              {/* Subscription Details */}
+              {purchaseOrder.subscription_active && (
+                <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {purchaseOrder.subscription_type && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-slate-600">Subscription Duration</label>
+                      <p className="text-sm font-medium text-slate-900">
+                        {purchaseOrder.subscription_type} month{parseInt(purchaseOrder.subscription_type) > 1 ? 's' : ''}
+                      </p>
                     </div>
-                  </div>
-                )}
-
-                {/* RECURRING COUNT */}
-                {purchaseOrder.subscription_active && purchaseOrder.recurring_count && (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Recurring Count</label>
-                    <div className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm bg-gray-100">
-                      {purchaseOrder.recurring_count}
+                  )}
+                  {purchaseOrder.recurring_count && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-slate-600">Recurring Count</label>
+                      <p className="text-sm font-medium text-slate-900">{purchaseOrder.recurring_count}</p>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
+              )}
+            </section>
 
-              </div>
-
-
-            </div>
-
-            {/* ATTACHMENTS */}
+            {/* Attachment */}
             {purchaseOrder.attachment && (
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Attachments</h3>
-                <div className="border border-gray-200 rounded-md p-3 bg-gray-50">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-gray-600" />
-                    <span className="text-sm text-gray-900">{purchaseOrder.attachment}</span>
+              <section>
+                <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                  <FileText size={18} />
+                  Attachment
+                </h3>
+                <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                  <FileText className="h-8 w-8 text-slate-600" />
+                  <div>
+                    <p className="font-medium text-slate-900">{purchaseOrder.attachment}</p>
+                    <p className="text-xs text-slate-500">Uploaded file</p>
                   </div>
                 </div>
-              </div>
+              </section>
             )}
+          </div>
 
-            {/* FOOTER */}
-            <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
+          {/* Footer */}
+          <div className="border-t border-slate-200 px-6 py-4 bg-slate-50">
+            <div className="flex justify-end">
               <button
-                type="button"
                 onClick={onClose}
-                className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                className="px-5 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors"
               >
                 Close
               </button>
             </div>
-
           </div>
         </div>
       </PopupAnimation>

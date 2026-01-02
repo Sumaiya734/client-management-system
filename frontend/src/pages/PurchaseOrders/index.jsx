@@ -100,16 +100,26 @@ export default function PurchaseOrders() {
     try {
       let response;
       
-      if (orderData.attachment && orderData.attachment instanceof File) {
+      // Determine if we need FormData (attachment present)
+      const hasAttachment = orderData.attachment && orderData.attachment instanceof File;
+
+      if (hasAttachment) {
         // Use FormData when there's an attachment
         const formData = new FormData();
         formData.append('status', orderData.status);
         formData.append('client_id', orderData.client_id.toString());
-        formData.append('product_id', orderData.product_id.toString());
-        formData.append('quantity', orderData.quantity.toString());
+        
+        // Handle products array
+        if (orderData.products && Array.isArray(orderData.products)) {
+          orderData.products.forEach((product, index) => {
+            formData.append(`products[${index}][productId]`, product.productId);
+            formData.append(`products[${index}][quantity]`, product.quantity);
+          });
+        }
+        
+        // Handle subscription fields
         formData.append('subscription_active', orderData.subscription_active ? '1' : '0');
         
-        // Add subscription fields if they exist
         if (orderData.subscription_type) {
           formData.append('subscription_type', orderData.subscription_type);
         }
@@ -119,10 +129,11 @@ export default function PurchaseOrders() {
         if (orderData.delivery_date) {
           formData.append('delivery_date', orderData.delivery_date);
         }
-        
-        if (orderData.attachment) {
-          formData.append('attachment', orderData.attachment, orderData.attachment.name);
+        if (orderData.po_details) {
+          formData.append('po_details', orderData.po_details);
         }
+        
+        formData.append('attachment', orderData.attachment, orderData.attachment.name);
         
         // Use axios with proper headers for file upload
         response = await api.post('/purchases', formData, {
@@ -131,16 +142,17 @@ export default function PurchaseOrders() {
           },
         });
       } else {
-        // Prepare data exactly as backend expects (no attachment)
+        // Use JSON for no attachment
         const purchaseData = {
+          po_number: orderData.po_number,
           status: orderData.status,
           client_id: orderData.client_id,
-          product_id: orderData.product_id,
-          quantity: parseInt(orderData.quantity, 10),
+          products: orderData.products, // Send array directly
           subscription_active: Boolean(orderData.subscription_active),
           subscription_type: orderData.subscription_type,
           recurring_count: orderData.recurring_count,
-          delivery_date: orderData.delivery_date
+          delivery_date: orderData.delivery_date,
+          po_details: orderData.po_details
         };
         
         console.log('Sending purchase data:', purchaseData);
@@ -275,7 +287,7 @@ export default function PurchaseOrders() {
                     <TableCell>
                       <div>
                         <div className="font-medium text-gray-900">{po.client?.company || 'N/A'}</div>
-                        <div className="text-sm text-gray-600">{po.cli_name || 'N/A'}</div>
+                        <div className="text-sm text-gray-600">{po.client?.cli_name || 'N/A'}</div>
                       </div>
                     </TableCell>
                     <TableCell>
