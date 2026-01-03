@@ -1,186 +1,294 @@
-import React, { useState } from 'react';
-import Modal from 'react-modal';
-import { X } from 'lucide-react';
-import { Button } from '../ui/Button';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { X, Calendar, Upload, Lock, Unlock } from 'lucide-react';
+import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
 
-const SubscriptionModal = ({ isOpen, onRequestClose, product, quantity, totalAmount, poNumber, onSubmit, previousSubscription = null }) => {
+const SubscriptionModal = ({
+  isOpen,
+  onRequestClose,
+  product,
+  quantity,
+  totalAmount: initialTotalAmount,
+  poNumber,
+  onSubmit,
+  previousSubscription = null,
+}) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [deliveryDate, setDeliveryDate] = useState('');
   const [notes, setNotes] = useState('');
+  const [attachment, setAttachment] = useState(null);
+  const [customPrice, setCustomPrice] = useState(false);
+  const [customTotal, setCustomTotal] = useState(initialTotalAmount || '');
 
-  // Update effect to handle previousSubscription changes
-  React.useEffect(() => {
+  const { isVisible, isAnimating } = useAnimationState(isOpen);
+
+  useEffect(() => {
     if (isOpen && previousSubscription) {
-      setStartDate(previousSubscription.start_date ? previousSubscription.start_date.split('T')[0] : '');
-      setEndDate(previousSubscription.end_date ? previousSubscription.end_date.split('T')[0] : '');
+      setStartDate(previousSubscription.start_date?.split('T')[0] || '');
+      setEndDate(previousSubscription.end_date?.split('T')[0] || '');
+      setDeliveryDate(previousSubscription.delivery_date?.split('T')[0] || '');
       setNotes(previousSubscription.notes || '');
+      setCustomTotal(previousSubscription.total_amount ?? initialTotalAmount);
+      setCustomPrice(!!previousSubscription.custom_price);
+      setAttachment(null);
     } else if (isOpen) {
-      // Reset fields when opening fresh
       setStartDate('');
       setEndDate('');
+      setDeliveryDate('');
       setNotes('');
+      setCustomTotal(initialTotalAmount || '');
+      setCustomPrice(false);
+      setAttachment(null);
     }
-  }, [isOpen, previousSubscription]);
+  }, [isOpen, previousSubscription, initialTotalAmount]);
 
-  // Calculate unit price
+  const currencyMatch = (initialTotalAmount?.toString() || customTotal?.toString() || '').match(/([৳$€£¥₽₹]|BDT|USD|EUR)/);
+  const currency = currencyMatch ? currencyMatch[0] : '৳';
+
   const calculateUnitPrice = () => {
-    if (!totalAmount || !quantity) return '0.00';
-    const numericValue = totalAmount.replace(/[^\d.]/g, '') || '0';
-    const total = parseFloat(numericValue) || 0;
-    return quantity > 0 ? (total / quantity).toFixed(2) : '0.00';
+    const totalStr = customPrice ? customTotal : initialTotalAmount;
+    const numeric = parseFloat((totalStr || '').replace(/[^\d.]/g, '')) || 0;
+    return quantity > 0 ? (numeric / quantity).toFixed(0) : '0';
   };
 
   const unitPrice = calculateUnitPrice();
-  const currency = totalAmount ? totalAmount.match(/[^\d.\s]+/g)?.[0] || '৳' : '৳';
-  const currencySuffix = totalAmount ? totalAmount.split(' ').pop() || 'BDT' : 'BDT';
+  const displayTotal = customPrice ? customTotal : initialTotalAmount || `${currency}0`;
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) setAttachment(file);
+  };
 
   const handleSubmit = () => {
+    if (!startDate || !endDate) {
+      alert('Start and End dates are required.');
+      return;
+    }
+
     onSubmit({
       startDate,
       endDate,
+      deliveryDate,
       notes,
+      attachment,
       product,
       quantity,
-      poNumber
+      poNumber,
+      totalAmount: displayTotal,
+      customPrice,
+      unitPrice,
     });
     onRequestClose();
   };
 
-  // COMPACT + WIDER STYLE
-  const customStyles = {
-    overlay: {
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      zIndex: 50,
-    },
-    content: {
-      top: '50%',
-      left: '50%',
-      right: 'auto',
-      bottom: 'auto',
-      transform: 'translate(-50%, -50%)',
-      backgroundColor: 'white',
-      borderRadius: '0.5rem',
-      padding: '0',
-      maxWidth: '500px',           // WIDER
-      width: '60%',                // NEAR FULL WIDTH 
-      border: 'none',
-      boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)',
-    },
-  };
+  const isFormValid = startDate && endDate;
 
-  return (
-    <Modal
-      isOpen={isOpen}
-      onRequestClose={onRequestClose}
-      style={customStyles}
-      contentLabel="Subscribe Product"
-      ariaHideApp={false}
+  if (!isVisible) return null;
+
+  return createPortal(
+    <div
+      className={`fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 px-4 transition-opacity duration-300 ${
+        isAnimating ? 'opacity-100' : 'opacity-0'
+      }`}
+      onClick={onRequestClose}
     >
-      <div className="p-4"> {/* reduced from p-5 */}
-
-        {/* HEADER */}
-        <div className="flex items-start justify-between mb-3">
-          <div>
-            <h2 className="text-base font-semibold text-gray-900">{previousSubscription ? 'Edit Subscription' : 'Subscribe Product'}</h2>
-            <p className="text-xs text-gray-600">
-              {previousSubscription ? 'Update subscription details' : `Configure subscription for ${product} (Quantity: ${quantity})`}
-            </p>
-          </div>
-          <button
-            onClick={onRequestClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors p-1"
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* FORM FIELDS */}
-        <div className="space-y-3 mb-3">  {/* reduced spacing */}
-
-          {/* PO Number */}
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">PO Number</label>
-            <input
-              type="text"
-              value={poNumber || ''}
-              readOnly
-              className="w-full px-2 py-1.5 border border-gray-300 rounded bg-gray-100 text-gray-700 text-sm"
-            />
-          </div>
-
-          {/* Start Date */}
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Subscription Start Date</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
-            />
-          </div>
-
-          {/* End Date */}
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Subscription End Date</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
-            />
-          </div>
-
-          {/* Notes */}
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Subscription Notes</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Enter subscription notes (optional)"
-              rows={2}   // made smaller
-              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm resize-none"
-            />
-          </div>
-        </div>
-
-        {/* PRODUCT DETAILS BOX */}
-        <div className="bg-gray-50 rounded p-2 mb-3">
-          <div className="space-y-1 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Product:</span>
-              <span className="text-gray-900 font-medium">{product}</span>
+      <PopupAnimation animationType="zoomIn" duration="0.3s">
+        <div
+          className="w-full max-w-4xl rounded-xl bg-white shadow-2xl max-h-[95vh] overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 bg-gray-50">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">
+                {previousSubscription ? 'Edit Subscription' : 'Create Subscription'}
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                {product} — {quantity} {quantity > 1 ? 'licenses' : 'license'}
+              </p>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Quantity:</span>
-              <span className="text-gray-900 font-medium">{quantity}</span>
+            <button
+              onClick={onRequestClose}
+              className="rounded-lg p-2 text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition"
+            >
+              <X size={22} />
+            </button>
+          </div>
+
+          {/* Two Column Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-6">
+            {/* Left: Form Fields */}
+            <div className="space-y-6">
+              {/* Subscription Period */}
+              <div>
+                <h3 className="text-base font-medium text-gray-900 mb-4">Subscription Period</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Start Date <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      End Date <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="date"
+                        value={endDate}
+                        min={startDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                     
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Delivery Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Expected First Delivery (Optional)
+                </label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={deliveryDate}
+                    onChange={(e) => setDeliveryDate(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                 
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Notes (Optional)
+                </label>
+                <textarea
+                  rows={4}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Add any internal notes or special instructions..."
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Attachment */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Attachment (Optional)
+                </label>
+                <label className="block border-2 border-dashed border-gray-300 rounded-lg p-5 text-center cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition">
+                  <Upload className="mx-auto text-gray-400 mb-3" size={32} />
+                  <p className="text-sm text-gray-600">
+                    {attachment ? attachment.name : 'Click to upload file (PO, contract, etc.)'}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">PDF, DOC, JPG, PNG</p>
+                  <input type="file" className="hidden" onChange={handleFileChange} accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" />
+                </label>
+                {attachment && (
+                  <p className="text-xs text-gray-500 text-right mt-2">
+                    {(attachment.size / 1024).toFixed(0)} KB
+                  </p>
+                )}
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Unit Price:</span>
-              <span className="text-gray-900 font-medium">
-                {currency}{unitPrice} {currencySuffix}
-              </span>
-            </div>
-            <div className="flex justify-between pt-1 border-t border-gray-300">
-              <span className="text-gray-900 font-semibold">Total:</span>
-              <span className="text-gray-900 font-semibold">
-                {totalAmount || `${currency}0.00 ${currencySuffix}`}
-              </span>
+
+            {/* Right: Order Summary */}
+            <div className="space-y-6">
+              <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                <div className="flex justify-between items-center mb-5">
+                  <h3 className="text-base font-semibold text-gray-900">Order Summary</h3>
+                  <button
+                    onClick={() => setCustomPrice(!customPrice)}
+                    className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1.5 font-medium"
+                  >
+                    {customPrice ? <Lock size={16} /> : <Unlock size={16} />}
+                    {customPrice ? 'Price Locked' : 'Edit Price'}
+                  </button>
+                </div>
+
+                <div className="space-y-4 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Product</span>
+                    <span className="font-medium text-gray-900">{product}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">PO Number</span>
+                    <span className="font-medium text-gray-900">{poNumber || '—'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Quantity</span>
+                    <span className="font-medium text-gray-900">{quantity}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Unit Price</span>
+                    <span className="font-medium text-gray-900">{currency}{unitPrice}</span>
+                  </div>
+
+                  <div className="pt-4 border-t border-gray-300">
+                    {customPrice && (
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Custom Total Amount
+                        </label>
+                        <input
+                          type="text"
+                          value={customTotal}
+                          onChange={(e) => setCustomTotal(e.target.value)}
+                          placeholder="e.g. ৳25,000"
+                          className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-end">
+                      <span className="text-base font-semibold text-gray-900">Total Amount</span>
+                      <span className="text-2xl font-bold text-blue-600">{displayTotal}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* ACTION BUTTONS */}
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={onRequestClose} size="sm" className="px-3">
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={handleSubmit} size="sm" className="px-3">
-            {previousSubscription ? 'Update Subscription' : 'Activate Subscription'}
-          </Button>
+          {/* Footer */}
+          <div className="flex justify-end gap-4 px-6 py-4 border-t border-gray-200 bg-gray-50">
+            <button
+              onClick={onRequestClose}
+              className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={!isFormValid}
+              className={`px-8 py-2.5 text-sm font-medium text-white rounded-lg transition ${
+                isFormValid
+                  ? 'bg-blue-600 hover:bg-blue-700 shadow-md'
+                  : 'bg-gray-400 cursor-not-allowed'
+              }`}
+            >
+              {previousSubscription ? 'Update Subscription' : 'Activate Subscription'}
+            </button>
+          </div>
         </div>
-      </div>
-    </Modal>
+      </PopupAnimation>
+    </div>,
+    document.body
   );
 };
 

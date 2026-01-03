@@ -23,8 +23,8 @@ class DashboardService
         
         // Get recent data
         $recentClients = Client::orderBy('created_at', 'desc')->limit(5)->get();
-        $recentPayments = Payment_management::orderBy('created_at', 'desc')->limit(5)->get();
-        $recentBills = Billing_management::orderBy('created_at', 'desc')->limit(5)->get();
+        $recentPayments = Payment_management::with('client')->orderBy('created_at', 'desc')->limit(5)->get();
+        $recentBills = Billing_management::with('client')->orderBy('created_at', 'desc')->limit(5)->get();
         
         // Get additional stats
         $paidBills = Billing_management::where('payment_status', 'Paid')->count();
@@ -37,7 +37,8 @@ class DashboardService
                 'activeSubscriptions' => $activeSubscriptions,
                 'pendingPayments' => $pendingPayments,
                 'monthlyRevenue' => $monthlyRevenue,
-                'paymentRate' => $paymentRate . '%'
+                'paymentRate' => $paymentRate . '%',
+                'totalBills' => $totalBills
             ],
             'recent' => [
                 'recentClients' => $recentClients,

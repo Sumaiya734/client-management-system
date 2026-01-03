@@ -20,7 +20,41 @@ class BillingManagementService extends BaseService
      */
     public function getAll()
     {
-        return $this->model->with('client', 'subscription', 'purchase')->get();
+        $billings = $this->model->with('client', 'subscription', 'purchase')->get();
+        
+        // Process each billing record to include products from the associated purchase
+        foreach ($billings as $billing) {
+            if ($billing->purchase) {
+                // Extract products from the purchase
+                $products = [];
+                $purchaseData = $billing->purchase->toArray();
+                
+                if (isset($purchaseData['products_subscriptions'])) {
+                    $productsSubscriptions = $purchaseData['products_subscriptions'];
+                    
+                    // If it's a JSON string, decode it
+                    if (is_string($productsSubscriptions)) {
+                        $productsSubscriptions = json_decode($productsSubscriptions, true);
+                    }
+                    
+                    if (is_array($productsSubscriptions)) {
+                        foreach ($productsSubscriptions as $productData) {
+                            $products[] = [
+                                'description' => $productData['name'] ?? $productData['product_name'] ?? 'Product',
+                                'quantity' => $productData['quantity'] ?? 1,
+                                'unit_price' => $productData['price'] ?? 0,
+                                'total' => $productData['sub_total'] ?? ($productData['quantity'] ?? 1) * ($productData['price'] ?? 0)
+                            ];
+                        }
+                    }
+                }
+                
+                // Add products to the billing record
+                $billing->setAttribute('products', $products);
+            }
+        }
+        
+        return $billings;
     }
 
     /**
@@ -28,7 +62,38 @@ class BillingManagementService extends BaseService
      */
     public function getById($id)
     {
-        return $this->model->with('client', 'subscription', 'purchase')->find($id);
+        $billing = $this->model->with('client', 'subscription', 'purchase')->find($id);
+        
+        if ($billing && $billing->purchase) {
+            // Extract products from the purchase
+            $products = [];
+            $purchaseData = $billing->purchase->toArray();
+            
+            if (isset($purchaseData['products_subscriptions'])) {
+                $productsSubscriptions = $purchaseData['products_subscriptions'];
+                
+                // If it's a JSON string, decode it
+                if (is_string($productsSubscriptions)) {
+                    $productsSubscriptions = json_decode($productsSubscriptions, true);
+                }
+                
+                if (is_array($productsSubscriptions)) {
+                    foreach ($productsSubscriptions as $productData) {
+                        $products[] = [
+                            'description' => $productData['name'] ?? $productData['product_name'] ?? 'Product',
+                            'quantity' => $productData['quantity'] ?? 1,
+                            'unit_price' => $productData['price'] ?? 0,
+                            'total' => $productData['sub_total'] ?? ($productData['quantity'] ?? 1) * ($productData['price'] ?? 0)
+                        ];
+                    }
+                }
+            }
+            
+            // Add products to the billing record
+            $billing->setAttribute('products', $products);
+        }
+        
+        return $billing;
     }
 
     /**
@@ -135,7 +200,41 @@ class BillingManagementService extends BaseService
             $query->where('bill_date', '<=', $request->get('end_date'));
         }
 
-        return $query->with('client', 'subscription', 'purchase')->get();
+        $billings = $query->with('client', 'subscription', 'purchase')->get();
+        
+        // Process each billing record to include products from the associated purchase
+        foreach ($billings as $billing) {
+            if ($billing->purchase) {
+                // Extract products from the purchase
+                $products = [];
+                $purchaseData = $billing->purchase->toArray();
+                
+                if (isset($purchaseData['products_subscriptions'])) {
+                    $productsSubscriptions = $purchaseData['products_subscriptions'];
+                    
+                    // If it's a JSON string, decode it
+                    if (is_string($productsSubscriptions)) {
+                        $productsSubscriptions = json_decode($productsSubscriptions, true);
+                    }
+                    
+                    if (is_array($productsSubscriptions)) {
+                        foreach ($productsSubscriptions as $productData) {
+                            $products[] = [
+                                'description' => $productData['name'] ?? $productData['product_name'] ?? 'Product',
+                                'quantity' => $productData['quantity'] ?? 1,
+                                'unit_price' => $productData['price'] ?? 0,
+                                'total' => $productData['sub_total'] ?? ($productData['quantity'] ?? 1) * ($productData['price'] ?? 0)
+                            ];
+                        }
+                    }
+                }
+                
+                // Add products to the billing record
+                $billing->setAttribute('products', $products);
+            }
+        }
+        
+        return $billings;
     }
 
     /**

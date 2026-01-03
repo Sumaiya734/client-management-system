@@ -58,27 +58,27 @@ export default function BillingManagement() {
         { 
           title: 'Total Bills', 
           value: summary.totalBills?.toString() || '0', 
-          subtext: `${summary.paidBills || 0} paid, ${summary.unpaidBills || 0} unpaid`, 
+          subtext: `৳${summary.paidBills || 0} paid, ৳${summary.unpaidBills || 0} unpaid`, 
           icon: FileText, 
           color: 'blue' 
         },
         { 
           title: 'Total Revenue', 
-          value: `$${totalRevenue.toFixed(2)}`, 
+          value: `৳${totalRevenue.toFixed(2)}`, 
           subtext: 'All billed amounts', 
           icon: DollarSign, 
           color: 'green' 
         },
         { 
           title: 'Amount Collected', 
-          value: `$${amountCollected.toFixed(2)}`, 
+          value: `৳${amountCollected.toFixed(2)}`, 
           subtext: `${percentage}% of total revenue`, 
           icon: DollarSign, 
           color: 'blue' 
         },
         { 
           title: 'Outstanding', 
-          value: `$${typeof summary.outstandingAmount === 'number' ? summary.outstandingAmount.toFixed(2) : parseFloat(summary.outstandingAmount)?.toFixed(2) || '0.00'}`, 
+          value: `৳${typeof summary.outstandingAmount === 'number' ? summary.outstandingAmount.toFixed(2) : parseFloat(summary.outstandingAmount)?.toFixed(2) || '0.00'}`, 
           subtext: 'Pending collection', 
           icon: Calendar, 
           color: 'orange' 
@@ -368,8 +368,8 @@ export default function BillingManagement() {
                 const poNumber = bill.po_number || bill.poNumber || 'N/A';
                 const billDate = formatDate(bill.bill_date || bill.billDate);
                 const dueDate = formatDate(bill.due_date || bill.dueDate);
-                const totalAmount = `$${typeof bill.total_amount === 'number' ? bill.total_amount.toFixed(2) : parseFloat(bill.total_amount)?.toFixed(2) || '0.00'}`;
-                const paidAmount = `$${typeof bill.paid_amount === 'number' ? bill.paid_amount.toFixed(2) : parseFloat(bill.paid_amount)?.toFixed(2) || '0.00'}`;
+                const totalAmount = `৳${typeof bill.total_amount === 'number' ? bill.total_amount.toFixed(2) : parseFloat(bill.total_amount)?.toFixed(2) || '0.00'}`;
+                const paidAmount = `৳${typeof bill.paid_amount === 'number' ? bill.paid_amount.toFixed(2) : parseFloat(bill.paid_amount)?.toFixed(2) || '0.00'}`;
                 const status = bill.status || 'N/A';
                 const paymentStatus = bill.payment_status || bill.paymentStatus || status;
                 

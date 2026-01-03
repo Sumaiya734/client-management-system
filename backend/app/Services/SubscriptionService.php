@@ -6,6 +6,7 @@ use App\Models\Subscription;
 use App\Models\Purchase;
 use App\Models\Product;
 use App\Models\Client;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -120,6 +121,34 @@ class SubscriptionService extends BaseService
                 } elseif ($progressPercentage > 0) {
                     $progressStatus = 'Partial';
                 }
+                
+                // Determine individual product status based on dates
+                $products = array_map(function($product) use ($subscription) {
+                    $status = $product['status'];
+                    
+                    // Check if product has date range
+                    if (isset($subscription->end_date) && $subscription->end_date) {
+                        $endDate = Carbon::parse($subscription->end_date);
+                        $now = Carbon::now();
+                        $daysToExpiry = $now->diffInDays($endDate, false);
+                        
+                        if ($now->gt($endDate)) {
+                            // Subscription is expired
+                            $status = 'Expired';
+                        } elseif ($daysToExpiry <= 7) {
+                            // Subscription expires within 7 days
+                            $status = 'Expiring Soon';
+                        } else {
+                            // Subscription is active
+                            $status = 'Active';
+                        }
+                    }
+                    
+                    $product['status'] = $status;
+                    $product['action'] = ($status === 'Pending' || $status === 'Expiring Soon' || $status === 'Active') ? 'Edit' : 'Edit';
+                    
+                    return $product;
+                }, $products);
 
                 $transformedSubscription = [
                     'id' => $subscription->id,
@@ -256,6 +285,34 @@ class SubscriptionService extends BaseService
             } elseif ($progressPercentage > 0) {
                 $progressStatus = 'Partial';
             }
+            
+            // Determine individual product status based on dates
+            $products = array_map(function($product) use ($subscription) {
+                $status = $product['status'];
+                
+                // Check if product has date range
+                if (isset($subscription->end_date) && $subscription->end_date) {
+                    $endDate = Carbon::parse($subscription->end_date);
+                    $now = Carbon::now();
+                    $daysToExpiry = $now->diffInDays($endDate, false);
+                    
+                    if ($now->gt($endDate)) {
+                        // Subscription is expired
+                        $status = 'Expired';
+                    } elseif ($daysToExpiry <= 7) {
+                        // Subscription expires within 7 days
+                        $status = 'Expiring Soon';
+                    } else {
+                        // Subscription is active
+                        $status = 'Active';
+                    }
+                }
+                
+                $product['status'] = $status;
+                $product['action'] = ($status === 'Pending' || $status === 'Expiring Soon' || $status === 'Active') ? 'Edit' : 'Edit';
+                
+                return $product;
+            }, $products);
     
             $transformedSubscription = [
                 'id' => $subscription->id,
@@ -483,7 +540,7 @@ class SubscriptionService extends BaseService
                     return $products; // Return empty array on JSON error
                 }
             } else {
-                $productsData = $productsSubscriptions;
+                $productsData = $productsSubscriptions; 
             }
             
             if (is_array($productsData)) {

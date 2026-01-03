@@ -79,7 +79,7 @@ export default function Subscriptions() {
     },
     {
       title: 'Expiring Soon',
-      value: '0',
+      value: subscriptions.filter(s => s.products.some(p => p.status === 'Expiring Soon')).length.toString(),
       icon: Clock,
       color: 'yellow'
     }
@@ -90,6 +90,9 @@ export default function Subscriptions() {
     { value: 'Pending', label: 'Pending' },
     { value: 'Partial', label: 'Partial' },
     { value: 'Complete', label: 'Complete' },
+    { value: 'Active', label: 'Active' },
+    { value: 'Expiring Soon', label: 'Expiring Soon' },
+    { value: 'Expired', label: 'Expired' },
   ];
 
   const filters = [
@@ -115,14 +118,19 @@ export default function Subscriptions() {
       case 'Pending': return 'text-orange-600';
       case 'Partial': return 'text-yellow-600';
       case 'Complete': return 'text-green-600';
+      case 'Active': return 'text-green-600';
+      case 'Expiring Soon': return 'text-red-600';
+      case 'Expired': return 'text-red-600';
       default: return 'text-gray-600';
     }
   };
 
   const getStatusBadgeColor = (status) => {
     switch (status) {
-      case 'Active': return 'bg-gray-900 text-white';
+      case 'Active': return 'bg-green-100 text-green-800';
       case 'Pending': return 'bg-gray-200 text-gray-700';
+      case 'Expiring Soon': return 'bg-red-100 text-red-800';
+      case 'Expired': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -266,7 +274,14 @@ export default function Subscriptions() {
                   </TableCell>
                 </TableRow>
               ) : (
-                subscriptions.map((subscription) => (
+                subscriptions.filter(subscription => {
+                  // Apply status filter
+                  if (statusFilter !== 'All Status') {
+                    // Check if any product in the subscription matches the status filter
+                    return subscription.products.some(product => product.status === statusFilter);
+                  }
+                  return true; // No filter applied
+                }).map((subscription) => (
                   <TableRow key={subscription.id}>
                     <TableCell>
                       <div>
@@ -316,9 +331,9 @@ export default function Subscriptions() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        {subscription.progress.status === 'Active' ? (
+                        {(subscription.progress.status === 'Active' || subscription.progress.status === 'Complete') ? (
                           <CheckCircle className={`h-4 w-4 ${getProgressColor(subscription.progress.status)}`} />
-                        ) : subscription.progress.status === 'Pending' ? (
+                        ) : (subscription.progress.status === 'Pending' || subscription.progress.status === 'Partial') ? (
                           <AlertTriangle className={`h-4 w-4 ${getProgressColor(subscription.progress.status)}`} />
                         ) : (
                           <Clock className={`h-4 w-4 ${getProgressColor(subscription.progress.status)}`} />

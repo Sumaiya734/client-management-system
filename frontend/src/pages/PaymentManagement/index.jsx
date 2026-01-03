@@ -52,7 +52,7 @@ export default function PaymentManagement() {
             contact: payment.client?.cli_name || payment.client?.contact || 'N/A'
           },
           date: formatDate(payment.date),
-          amount: `$${typeof payment.amount === 'number' ? payment.amount.toFixed(2) : parseFloat(payment.amount || 0).toFixed(2)}`,
+          amount: `৳${typeof payment.amount === 'number' ? payment.amount.toFixed(2) : parseFloat(payment.amount || 0).toFixed(2)}`,
           method: payment.method || 'N/A',
           transactionId: payment.transaction_id || 'N/A',
           status: payment.status || 'N/A',
@@ -73,7 +73,7 @@ export default function PaymentManagement() {
       value: payments
         .filter(p => p.status === 'Completed')
         .reduce((sum, p) => {
-          const amountStr = p.amount.replace('$', '');
+          const amountStr = p.amount.replace('৳', '');
           const amountNum = parseFloat(amountStr);
           return sum + (isNaN(amountNum) ? 0 : amountNum);
         }, 0)
@@ -85,7 +85,7 @@ export default function PaymentManagement() {
       value: payments
         .filter(p => p.status === 'Pending')
         .reduce((sum, p) => {
-          const amountStr = p.amount.replace('$', '');
+          const amountStr = p.amount.replace('৳', '');
           const amountNum = parseFloat(amountStr);
           return sum + (isNaN(amountNum) ? 0 : amountNum);
         }, 0)
@@ -94,7 +94,7 @@ export default function PaymentManagement() {
     },
     {
       title: 'Outstanding Balance',
-      value: '$0.00', // This would be calculated based on unpaid bills
+      value: '৳0.00', // This would be calculated based on unpaid bills
       icon: CheckCircle,
     },
     {
@@ -128,7 +128,7 @@ export default function PaymentManagement() {
       contact: ''
     },
     date: new Date().toISOString().split('T')[0],
-    amount: '$0.00',
+    amount: '৳0.00',
     method: 'Credit Card',
     transactionId: '',
     status: 'Completed',
@@ -169,7 +169,7 @@ export default function PaymentManagement() {
         po_number: paymentData.poNumber,
         client_id: paymentData.client_id || 1, // Use client_id from payment data if available, fallback to 1
         date: paymentData.date,
-        amount: parseFloat(paymentData.amount.toString().replace('$', '')),
+        amount: parseFloat(paymentData.amount.toString().replace('৳', '')),
         method: paymentData.method,
         transaction_id: paymentData.transactionId,
         status: paymentData.status,

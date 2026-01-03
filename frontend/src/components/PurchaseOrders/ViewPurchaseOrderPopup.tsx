@@ -84,7 +84,7 @@ const ViewPurchaseOrderPopup: React.FC<ViewPurchaseOrderPopupProps> = ({
       }`}
       onClick={handleBackdropClick}
     >
-      <PopupAnimation animationType="scale" duration="0.3s">
+      <PopupAnimation animationType="zoomIn" duration="0.3s">
         <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
           {/* Header */}
           <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white px-6 py-5 flex items-center justify-between">

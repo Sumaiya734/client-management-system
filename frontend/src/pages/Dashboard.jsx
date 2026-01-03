@@ -67,15 +67,21 @@ export default function Dashboard() {
   ];
 
   const recentClients = recent.recentClients?.map(client => ({
-    name: client.name || client.client_name || 'Unknown Client',
+    name: client.cli_name || client.name || client.client_name || 'Unknown Client',
     lastPayment: formatDate(client.created_at),
     status: client.status || 'Active'
   })) || [];
 
   const recentPayments = recent.recentPayments?.map(payment => ({
-    name: payment.client_name || payment.name || 'Unknown Client',
+    name: payment.client?.cli_name || payment.client?.name || payment.client_name || payment.name || 'Unknown Client',
     amount: payment.amount ? `$${payment.amount}` : '$0',
     daysOverdue: payment.days_overdue || 'N/A'
+  })) || [];
+
+  const recentBills = recent.recentBills?.map(bill => ({
+    name: bill.client?.cli_name || bill.client?.name || bill.client_name || bill.name || 'Unknown Client',
+    amount: bill.total_amount ? `$${bill.total_amount}` : '$0',
+    status: bill.payment_status || 'N/A'
   })) || [];
 
   // Show loading state
@@ -157,8 +163,8 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Recent Clients and Recent Payments */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      {/* Recent Clients, Recent Payments, and Recent Bills */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <Card className="p-3">
           <CardHeader className="p-2 pb-1">
             <CardTitle className="text-base">Recent Clients</CardTitle>
@@ -206,6 +212,32 @@ export default function Dashboard() {
                 ))
               ) : (
                 <p className="text-sm text-gray-500">No recent payments</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="p-3">
+          <CardHeader className="p-2 pb-1">
+            <CardTitle className="text-base">Recent Bills</CardTitle>
+            <CardDescription className="text-sm">Latest billing records</CardDescription>
+          </CardHeader>
+          <CardContent className="p-2 pt-1">
+            <div className="space-y-2">
+              {recentBills.length > 0 ? (
+                recentBills.map((bill, index) => (
+                  <div key={index} className="flex items-center justify-between py-1">
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-900">{bill.name}</h3>
+                      <p className="text-sm text-gray-500">{bill.amount}</p>
+                    </div>
+                    <Badge size="sm" variant={bill.status === 'Paid' ? 'active' : 'inactive'}>
+                      {bill.status}
+                    </Badge>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-gray-500">No recent bills</p>
               )}
             </div>
           </CardContent>
