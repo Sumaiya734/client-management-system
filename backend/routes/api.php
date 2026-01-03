@@ -64,6 +64,7 @@ Route::apiResource('billing-managements', \App\Http\Controllers\Api\BillingManag
 // Additional billing management routes
 Route::get('billing-managements-search', [\App\Http\Controllers\Api\BillingManagementController::class, 'search']);
 Route::get('billing-managements-summary', [\App\Http\Controllers\Api\BillingManagementController::class, 'summary']);
+Route::get('billing-managements/{id}/download', [\App\Http\Controllers\Api\BillingManagementController::class, 'download']);
 
 // Currency Rate Routes
 Route::apiResource('currency-rates', \App\Http\Controllers\Api\CurrencyRateController::class);
@@ -122,6 +123,16 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::get('search', [\App\Http\Controllers\SearchController::class, 'search']);
 Route::post('search', [\App\Http\Controllers\SearchController::class, 'search']);
 Route::get('searchable-models', [\App\Http\Controllers\SearchController::class, 'getSearchableModels']);
+
+// Invoice Management Routes
+Route::apiResource('invoices', \App\Http\Controllers\InvoiceController::class);
+
+// Additional invoice routes
+Route::post('invoices/generate-from-subscription', [\App\Http\Controllers\InvoiceController::class, 'generateFromSubscription']);
+Route::post('invoices/generate-from-purchase', [\App\Http\Controllers\InvoiceController::class, 'generateFromPurchase']);
+Route::get('invoices/client/{clientId}', [\App\Http\Controllers\InvoiceController::class, 'getByClient']);
+Route::get('invoices/status/{status}', [\App\Http\Controllers\InvoiceController::class, 'getByStatus']);
+Route::get('invoices/{id}/download', [\App\Http\Controllers\InvoiceController::class, 'downloadInvoice']);
 
 // Report Management Routes
 Route::apiResource('reports', \App\Http\Controllers\Api\ReportController::class);

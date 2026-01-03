@@ -213,12 +213,23 @@ export default function BillingManagement() {
     setSelectedBill(null);
   };
 
-  // Handle download bill
-  const handleDownloadBill = (bill) => {
-    // Extract bill number safely, handling both string and potential numeric formats
-    const billNumber = bill.bill_number || bill.billNumber || bill.id || 'Unknown';
-    console.log('Downloading bill:', billNumber);
-    // TODO: Implement download logic
+  // Handle download bill (opens in new tab)
+  const handleDownloadBill = async (bill) => {
+    try {
+      const billId = bill.id;
+      const response = await billingManagementApi.downloadBill(billId);
+      
+      // Create a temporary URL and open in new tab
+      const blob = new Blob([response.data], { type: 'text/html' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      
+      // Clean up after a short delay
+      setTimeout(() => window.URL.revokeObjectURL(url), 500);
+    } catch (error) {
+      console.error('Error viewing bill:', error);
+      showError('Failed to view bill');
+    }
   };
 
   // Handle send email

@@ -21,7 +21,7 @@ class PurchaseService
      */
     public function getAll()
     {
-        $purchases = Purchase::with(['client'])->get();
+        $purchases = Purchase::with(['client', 'invoice'])->get();
 
         return $purchases->map(function ($purchase) {
             return $this->transformPurchaseWithProducts($purchase);
@@ -33,7 +33,7 @@ class PurchaseService
      */
     public function getById($id)
     {
-        $purchase = Purchase::with(['client'])->find($id);
+        $purchase = Purchase::with(['client', 'invoice'])->find($id);
 
         if (!$purchase) {
             return null;

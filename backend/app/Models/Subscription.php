@@ -57,4 +57,12 @@ class Subscription extends Model
     {
         return $this->belongsTo(Purchase::class, 'purchase_id');
     }
+    
+    /**
+     * Get the invoice records for the subscription.
+     */
+    public function invoice()
+    {
+        return $this->hasMany(Invoice::class, 'subscription_id');
+    }
 }

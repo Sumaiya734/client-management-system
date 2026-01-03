@@ -26,7 +26,7 @@ class SubscriptionService extends BaseService
     public function getAll()
     {
         try {
-            $subscriptions = $this->model->with(['client', 'product', 'purchase'])->get();
+            $subscriptions = $this->model->with(['client', 'product', 'purchase', 'invoice'])->get();
             
             logger()->info('SubscriptionService::getAll() - Found subscriptions:', [
                 'count' => $subscriptions->count(),
@@ -108,20 +108,6 @@ class SubscriptionService extends BaseService
                     'products' => $products
                 ]);
 
-                // Calculate progress based on product statuses
-                $activeProducts = count(array_filter($products, function($product) {
-                    return $product['status'] === 'Active';
-                }));
-                $totalProducts = count($products);
-                $progressPercentage = $totalProducts > 0 ? ($activeProducts / $totalProducts) * 100 : 0;
-
-                $progressStatus = 'Pending';
-                if ($progressPercentage === 100) {
-                    $progressStatus = 'Complete';
-                } elseif ($progressPercentage > 0) {
-                    $progressStatus = 'Partial';
-                }
-                
                 // Determine individual product status based on dates
                 $products = array_map(function($product) use ($subscription) {
                     $status = $product['status'];
@@ -149,6 +135,38 @@ class SubscriptionService extends BaseService
                     
                     return $product;
                 }, $products);
+                
+                // Calculate progress based on updated product statuses
+                $activeProducts = count(array_filter($products, function($product) {
+                    return $product['status'] === 'Active';
+                }));
+                $totalProducts = count($products);
+                $progressPercentage = $totalProducts > 0 ? ($activeProducts / $totalProducts) * 100 : 0;
+
+                $progressStatus = 'Pending';
+                if ($progressPercentage === 100) {
+                    $progressStatus = 'Complete';
+                } elseif ($progressPercentage > 0) {
+                    $progressStatus = 'Partial';
+                }
+                
+                // Additional logic: if any products are expired, overall status could be 'Expired'
+                $expiredProducts = count(array_filter($products, function($product) {
+                    return $product['status'] === 'Expired';
+                }));
+                
+                if ($expiredProducts > 0) {
+                    $progressStatus = 'Expired';
+                }
+                
+                // Additional logic: if any products are expiring soon, overall status could be 'Expiring Soon'
+                $expiringSoonProducts = count(array_filter($products, function($product) {
+                    return $product['status'] === 'Expiring Soon';
+                }));
+                
+                if ($expiringSoonProducts > 0 && $expiredProducts === 0) {
+                    $progressStatus = 'Expiring Soon';
+                }
 
                 $transformedSubscription = [
                     'id' => $subscription->id,
@@ -168,14 +186,16 @@ class SubscriptionService extends BaseService
                         'percentage' => (int) $progressPercentage
                     ],
                     'totalAmount' => '৳' . number_format($subscription->total_amount ?? $purchase->total_amount ?? 0, 2) . ' BDT',
-                    'canGenerateBill' => $progressStatus === 'Complete',
+                    'canGenerateBill' => $progressStatus === 'Complete' || $progressStatus === 'Active' || $progressStatus === 'Expiring Soon' || $progressStatus === 'Expired',
                     // Store original data needed for creating new subscriptions
                     'client_id' => $subscription->client_id ?? $purchase->client_id,
                     'product_id' => $subscription->product_id,
                     'total_amount' => $subscription->total_amount ?? $purchase->total_amount,
                     // Include the raw database fields
                     'raw_progress' => $subscription->progress,
-                    'raw_products_subscription_status' => $subscription->products_subscription_status
+                    'raw_progress' => $subscription->progress,
+                    'raw_products_subscription_status' => $subscription->products_subscription_status,
+                    'invoice' => $subscription->invoice
                 ];
 
                 logger()->info('Transformed subscription:', [
@@ -208,7 +228,7 @@ class SubscriptionService extends BaseService
     public function getById($id)
     {
         try {
-            $subscription = $this->model->with(['client', 'product', 'purchase'])->find($id);
+            $subscription = $this->model->with(['client', 'product', 'purchase', 'invoice'])->find($id);
     
             if (!$subscription) {
                 return null;
@@ -272,20 +292,6 @@ class SubscriptionService extends BaseService
                 ];
             }
     
-            // Calculate progress based on product statuses
-            $activeProducts = count(array_filter($products, function($product) {
-                return $product['status'] === 'Active';
-            }));
-            $totalProducts = count($products);
-            $progressPercentage = $totalProducts > 0 ? ($activeProducts / $totalProducts) * 100 : 0;
-    
-            $progressStatus = 'Pending';
-            if ($progressPercentage === 100) {
-                $progressStatus = 'Complete';
-            } elseif ($progressPercentage > 0) {
-                $progressStatus = 'Partial';
-            }
-            
             // Determine individual product status based on dates
             $products = array_map(function($product) use ($subscription) {
                 $status = $product['status'];
@@ -313,6 +319,38 @@ class SubscriptionService extends BaseService
                 
                 return $product;
             }, $products);
+            
+            // Calculate progress based on updated product statuses
+            $activeProducts = count(array_filter($products, function($product) {
+                return $product['status'] === 'Active';
+            }));
+            $totalProducts = count($products);
+            $progressPercentage = $totalProducts > 0 ? ($activeProducts / $totalProducts) * 100 : 0;
+    
+            $progressStatus = 'Pending';
+            if ($progressPercentage === 100) {
+                $progressStatus = 'Complete';
+            } elseif ($progressPercentage > 0) {
+                $progressStatus = 'Partial';
+            }
+            
+            // Additional logic: if any products are expired, overall status could be 'Expired'
+            $expiredProducts = count(array_filter($products, function($product) {
+                return $product['status'] === 'Expired';
+            }));
+            
+            if ($expiredProducts > 0) {
+                $progressStatus = 'Expired';
+            }
+            
+            // Additional logic: if any products are expiring soon, overall status could be 'Expiring Soon'
+            $expiringSoonProducts = count(array_filter($products, function($product) {
+                return $product['status'] === 'Expiring Soon';
+            }));
+            
+            if ($expiringSoonProducts > 0 && $expiredProducts === 0) {
+                $progressStatus = 'Expiring Soon';
+            }
     
             $transformedSubscription = [
                 'id' => $subscription->id,
@@ -332,7 +370,7 @@ class SubscriptionService extends BaseService
                     'percentage' => (int) $progressPercentage
                 ],
                 'totalAmount' => '৳' . number_format($subscription->total_amount ?? $purchase->total_amount ?? 0, 2) . ' BDT',
-                'canGenerateBill' => $progressStatus === 'Complete',
+                'canGenerateBill' => $progressStatus === 'Complete' || $progressStatus === 'Active' || $progressStatus === 'Expiring Soon' || $progressStatus === 'Expired',
                 // Store original data needed for creating new subscriptions
                 'client_id' => $subscription->client_id ?? $purchase->client_id,
                 'product_id' => $subscription->product_id,

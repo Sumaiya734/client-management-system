@@ -8,7 +8,9 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import SubscriptionModal from '../../components/subscriptions/SubscriptionModal';
 import api from '../../api';
+import { invoiceApi } from '../../api';
 import { useNotification } from '../../components/Notifications';
+import { formatDate, formatDateRange } from '../../utils/dateUtils';
 
 export default function Subscriptions() {
   const { showError, showSuccess } = useNotification();
@@ -210,6 +212,49 @@ export default function Subscriptions() {
     }
   };
 
+  const handleGenerateInvoiceFromSubscription = async (subscription) => {
+    try {
+      const response = await invoiceApi.generateFromSubscription({
+        subscription_id: subscription.id
+      });
+      
+      if (response.data.success) {
+        showSuccess('Invoice generated successfully');
+        
+        // Refresh subscriptions to update UI
+        fetchSubscriptions();
+
+        // View the invoice
+        const invoiceId = response.data.data.id;
+        handleViewInvoiceSubscription(invoiceId);
+      }
+    } catch (error) {
+      console.error('Error generating invoice:', error);
+      if (error.response) {
+        showError(error.response.data.message || 'Failed to generate invoice');
+      } else {
+        showError('Failed to generate invoice');
+      }
+    }
+  };
+
+  const handleViewInvoiceSubscription = async (invoiceId) => {
+    try {
+      const response = await invoiceApi.downloadInvoice(invoiceId);
+      
+      // Create a temporary URL and open in new tab
+      const blob = new Blob([response.data], { type: 'text/html' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      
+      // Clean up after a short delay
+      setTimeout(() => window.URL.revokeObjectURL(url), 500);
+    } catch (error) {
+      console.error('Error viewing invoice:', error);
+      showError('Failed to view invoice');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -286,7 +331,7 @@ export default function Subscriptions() {
                     <TableCell>
                       <div>
                         <div className="font-semibold text-gray-900">{subscription.poNumber}</div>
-                        <div className="text-sm text-gray-600">Created: {subscription.createdDate}</div>
+                        <div className="text-sm text-gray-600">Created: {formatDate(subscription.createdDate)}</div>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -319,8 +364,13 @@ export default function Subscriptions() {
                                   {product.action}
                                 </Button>
                               </div>
-                              {product.dateRange && (
-                                <div className="text-sm text-gray-600">{product.dateRange}</div>
+                              {product.dateRange && product.dateRange !== 'N/A' && (
+                                <div className="text-sm text-gray-600">
+                                  {product.dateRange.includes(' to ') 
+                                    ? formatDateRange(product.dateRange.split(' to ')[0], product.dateRange.split(' to ')[1])
+                                    : formatDate(product.dateRange)
+                                  }
+                                </div>
                               )}
                             </div>
                           ))
@@ -352,15 +402,28 @@ export default function Subscriptions() {
                       <div className="font-semibold text-gray-900">{subscription.totalAmount}</div>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-xs"
-                        icon={<FileText className="h-3 w-3" />}
-                        disabled={!subscription.canGenerateBill}
-                      >
-                        Generate Bill
-                      </Button>
+                      {subscription.invoice && subscription.invoice.length > 0 ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs"
+                          icon={<FileText className="h-3 w-3" />}
+                          onClick={() => handleViewInvoiceSubscription(subscription.invoice[0].id)}
+                        >
+                          View Bill
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs"
+                          icon={<FileText className="h-3 w-3" />}
+                          disabled={!subscription.canGenerateBill}
+                          onClick={() => handleGenerateInvoiceFromSubscription(subscription)}
+                        >
+                          Generate Bill
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))

@@ -89,6 +89,11 @@ export const billingManagementApi = {
   delete: (id) => api.delete(`/billing-managements/${id}`),
   search: (params) => api.get('/billing-managements-search', { params }),
   summary: () => api.get('/billing-managements-summary'),
+  downloadBill: (id) => {
+    return api.get(`/billing-managements/${id}/download`, { 
+      responseType: 'blob' 
+    });
+  },
   generateReport: (params) => api.post('/reports-generate', params),
 };
 
@@ -112,6 +117,24 @@ export const vendorApi = {
   update: (id, data) => api.put(`/vendors/${id}`, data),
   delete: (id) => api.delete(`/vendors/${id}`),
   search: (params) => api.post('/vendors-search', params),
+};
+
+// Invoice API functions
+export const invoiceApi = {
+  getAll: () => api.get('/invoices'),
+  getById: (id) => api.get(`/invoices/${id}`),
+  create: (data) => api.post('/invoices', data),
+  update: (id, data) => api.put(`/invoices/${id}`, data),
+  delete: (id) => api.delete(`/invoices/${id}`),
+  generateFromSubscription: (data) => api.post('/invoices/generate-from-subscription', data),
+  generateFromPurchase: (data) => api.post('/invoices/generate-from-purchase', data),
+  getByClient: (clientId) => api.get(`/invoices/client/${clientId}`),
+  getByStatus: (status) => api.get(`/invoices/status/${status}`),
+  downloadInvoice: (id) => {
+    return api.get(`/invoices/${id}/download`, { 
+      responseType: 'blob' 
+    });
+  },
 };
 
 // Authentication API functions

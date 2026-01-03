@@ -9,6 +9,7 @@ import { Button } from '../../components/ui/Button';
 import CreatePurchaseOrderPopup from '../../components/PurchaseOrders/CreatePurchaseOrderPopup';
 import ViewPurchaseOrderPopup from '../../components/PurchaseOrders/ViewPurchaseOrderPopup';
 import api from '../../api';
+import { invoiceApi } from '../../api';
 import { formatDate, formatDateRange } from '../../utils/dateUtils';
 import { useNotification } from '../../components/Notifications';
 
@@ -221,6 +222,49 @@ export default function PurchaseOrders() {
     setSelectedPurchaseOrder(null);
   };
 
+  const handleGenerateInvoiceFromPO = async (purchaseOrder) => {
+    try {
+      const response = await invoiceApi.generateFromPurchase({
+        purchase_id: purchaseOrder.id
+      });
+      
+      if (response.data.success) {
+        showSuccess('Invoice generated successfully');
+        
+        // Refresh list to update UI state
+        fetchPurchaseOrders();
+
+        // View the invoice
+        const invoiceId = response.data.data.id;
+        handleViewInvoicePO(invoiceId);
+      }
+    } catch (error) {
+      console.error('Error generating invoice:', error);
+      if (error.response) {
+        showError(error.response.data.message || 'Failed to generate invoice');
+      } else {
+        showError('Failed to generate invoice');
+      }
+    }
+  };
+
+  const handleViewInvoicePO = async (invoiceId) => {
+    try {
+      const response = await invoiceApi.downloadInvoice(invoiceId);
+      
+      // Create a temporary URL and open in new tab
+      const blob = new Blob([response.data], { type: 'text/html' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      
+      // Clean up after a short delay to ensure browser has opened it
+      setTimeout(() => window.URL.revokeObjectURL(url), 500);
+    } catch (error) {
+      console.error('Error viewing invoice:', error);
+      showError('Failed to view invoice');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -338,9 +382,29 @@ export default function PurchaseOrders() {
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm" className="text-xs" icon={<FileText className="h-3 w-3" />}>
-                          Generate Bill
-                        </Button>
+
+                        {po.invoice && po.invoice.length > 0 ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs"
+                            icon={<Eye className="h-3 w-3" />}
+                            onClick={() => handleViewInvoicePO(po.invoice[0].id)}
+                          >
+                            View Bill
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs"
+                            icon={<FileText className="h-3 w-3" />}
+                            onClick={() => handleGenerateInvoiceFromPO(po)}
+                          >
+                            Generate Bill
+                          </Button>
+                        )}
+
                         <Button
                           variant="outline"
                           size="icon"

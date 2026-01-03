@@ -1,257 +1,313 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
-use App\Services\BillingManagementService;
+use App\Services\InvoiceService;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Validator;
 
-class BillingManagementController extends Controller
+class InvoiceController extends Controller
 {
-    protected $billingService;
-    
-    public function __construct(BillingManagementService $billingService)
+    private $invoiceService;
+
+    public function __construct(InvoiceService $invoiceService)
     {
-        $this->billingService = $billingService;
+        $this->invoiceService = $invoiceService;
     }
 
     /**
-     * Display a listing of the resource.
+     * Display a listing of the invoices.
      */
-    public function index()
+    public function index(): JsonResponse
     {
         try {
-            $billings = $this->billingService->getAll();
-            
+            $invoices = $this->invoiceService->getAll();
             return response()->json([
                 'success' => true,
-                'data' => $billings,
-                'message' => 'Billing records retrieved successfully'
+                'data' => $invoices
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to retrieve billing records',
-                'error' => $e->getMessage()
+                'message' => $e->getMessage()
             ], 500);
         }
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Store a newly created invoice in storage.
      */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         try {
-            $billing = $this->billingService->create($request->all());
+            $validator = Validator::make($request->all(), [
+                'client_id' => 'required|exists:clients,id',
+                'issue_date' => 'required|date',
+                'due_date' => 'nullable|date|after_or_equal:issue_date',
+                'items' => 'required|array',
+                'items.*.name' => 'required|string',
+                'items.*.quantity' => 'required|numeric|min:0.01',
+                'items.*.unit_price' => 'required|numeric|min:0',
+                'status' => 'in:Draft,Sent,Paid,Overdue,Cancelled',
+                'payment_status' => 'in:Unpaid,Partially Paid,Paid'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $invoice = $this->invoiceService->create($request->all());
 
             return response()->json([
                 'success' => true,
-                'data' => $billing,
-                'message' => 'Billing record created successfully'
+                'data' => $invoice,
+                'message' => 'Invoice created successfully'
             ], 201);
-            
         } catch (\Exception $e) {
-            // Extract validation errors from the exception message if present
-            $errors = [];
-            if (strpos($e->getMessage(), 'Validation error') !== false) {
-                $errors = json_decode(substr($e->getMessage(), strpos($e->getMessage(), ':') + 1), true);
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Display the specified invoice.
+     */
+    public function show(int $id): JsonResponse
+    {
+        try {
+            $invoice = $this->invoiceService->getById($id);
+
+            if (!$invoice) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validation error',
-                    'errors' => $errors
+                    'message' => 'Invoice not found'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $invoice
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update the specified invoice in storage.
+     */
+    public function update(Request $request, int $id): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'client_id' => 'sometimes|exists:clients,id',
+                'issue_date' => 'sometimes|date',
+                'due_date' => 'sometimes|date|after_or_equal:issue_date',
+                'items' => 'sometimes|array',
+                'items.*.name' => 'sometimes|required|string',
+                'items.*.quantity' => 'sometimes|required|numeric|min:0.01',
+                'items.*.unit_price' => 'sometimes|required|numeric|min:0',
+                'status' => 'in:Draft,Sent,Paid,Overdue,Cancelled',
+                'payment_status' => 'in:Unpaid,Partially Paid,Paid'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
                 ], 422);
             }
-            
+
+            $invoice = $this->invoiceService->update($id, $request->all());
+
+            return response()->json([
+                'success' => true,
+                'data' => $invoice,
+                'message' => 'Invoice updated successfully'
+            ]);
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create billing record',
-                'error' => $e->getMessage()
+                'message' => $e->getMessage()
             ], 500);
         }
     }
 
     /**
-     * Display the specified resource.
+     * Remove the specified invoice from storage.
      */
-    public function show(string $id)
+    public function destroy(int $id): JsonResponse
     {
         try {
-            $billing = $this->billingService->getById($id);
-
-            if (!$billing) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Billing record not found'
-                ], 404);
-            }
+            $this->invoiceService->delete($id);
 
             return response()->json([
                 'success' => true,
-                'data' => $billing,
-                'message' => 'Billing record retrieved successfully'
+                'message' => 'Invoice deleted successfully'
             ]);
-            
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to retrieve billing record',
-                'error' => $e->getMessage()
+                'message' => $e->getMessage()
             ], 500);
         }
     }
 
     /**
-     * Update the specified resource in storage.
+     * Generate invoice from subscription
      */
-    public function update(Request $request, string $id)
+    public function generateFromSubscription(Request $request): JsonResponse
     {
         try {
-            $billing = $this->billingService->update($id, $request->all());
-
-            return response()->json([
-                'success' => true,
-                'data' => $billing,
-                'message' => 'Billing record updated successfully'
+            $validator = Validator::make($request->all(), [
+                'subscription_id' => 'required|exists:subscriptions,id'
             ]);
-            
-        } catch (\Exception $e) {
-            // Extract validation errors from the exception message if present
-            $errors = [];
-            if (strpos($e->getMessage(), 'Validation error') !== false) {
-                $errors = json_decode(substr($e->getMessage(), strpos($e->getMessage(), ':') + 1), true);
+
+            if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validation error',
-                    'errors' => $errors
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
                 ], 422);
             }
-            
-            if (strpos($e->getMessage(), 'Billing record not found') !== false) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Billing record not found'
-                ], 404);
-            }
-            
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update billing record',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        try {
-            $result = $this->billingService->delete($id);
+            $invoice = $this->invoiceService->generateFromSubscription($request->subscription_id);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Billing record deleted successfully'
-            ]);
-            
+                'data' => $invoice,
+                'message' => 'Invoice generated successfully from subscription'
+            ], 201);
         } catch (\Exception $e) {
-            if (strpos($e->getMessage(), 'Billing record not found') !== false) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Billing record not found'
-                ], 404);
-            }
-            
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to delete billing record',
-                'error' => $e->getMessage()
+                'message' => $e->getMessage()
             ], 500);
         }
     }
 
     /**
-     * Search billing records with filters
+     * Generate invoice from purchase
      */
-    public function search(Request $request)
+    public function generateFromPurchase(Request $request): JsonResponse
     {
         try {
-            $billings = $this->billingService->search($request);
+            $validator = Validator::make($request->all(), [
+                'purchase_id' => 'required|exists:purchases,id'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $invoice = $this->invoiceService->generateFromPurchase($request->purchase_id);
 
             return response()->json([
                 'success' => true,
-                'data' => $billings,
-                'message' => 'Billing records retrieved successfully'
-            ]);
-            
+                'data' => $invoice,
+                'message' => 'Invoice generated successfully from purchase'
+            ], 201);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to search billing records',
-                'error' => $e->getMessage()
+                'message' => $e->getMessage()
             ], 500);
         }
     }
 
     /**
-     * Get billing summary statistics
+     * Get invoices by client
      */
-    public function summary()
+    public function getByClient(int $clientId): JsonResponse
     {
         try {
-            $summary = $this->billingService->getSummary();
+            $invoices = $this->invoiceService->getByClient($clientId);
 
             return response()->json([
                 'success' => true,
-                'data' => $summary,
-                'message' => 'Billing summary retrieved successfully'
+                'data' => $invoices
             ]);
-            
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to retrieve billing summary',
-                'error' => $e->getMessage()
+                'message' => $e->getMessage()
             ], 500);
         }
     }
 
     /**
-     * Download the bill as HTML
+     * Get invoices by status
      */
-    public function download($id)
+    public function getByStatus(string $status): JsonResponse
     {
         try {
-            $billing = $this->billingService->getById($id);
+            $invoices = $this->invoiceService->getByStatus($status);
 
-            if (!$billing) {
+            return response()->json([
+                'success' => true,
+                'data' => $invoices
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Download invoice as PDF
+     */
+    public function downloadInvoice(int $id): \Symfony\Component\HttpFoundation\Response
+    {
+        try {
+            $invoice = $this->invoiceService->getById($id);
+
+            if (!$invoice) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Billing record not found'
+                    'message' => 'Invoice not found'
                 ], 404);
             }
 
-            // Generate HTML
-            $html = $this->generateBillHTML($billing);
+            // Create a simple HTML invoice template
+            $html = $this->generateInvoiceHTML($invoice);
 
+            // For now, return the HTML as a response
+            // In a real implementation, you would use a PDF generator like DomPDF
             return response($html)
                 ->header('Content-Type', 'text/html')
-                ->header('Content-Disposition', 'attachment; filename="bill_' . $billing->bill_number . '.html"');
-
+                ->header('Content-Disposition', 'attachment; filename="invoice_' . $invoice->invoice_number . '.html"');
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to download bill',
-                'error' => $e->getMessage()
+                'message' => $e->getMessage()
             ], 500);
         }
     }
 
     /**
-     * Generate HTML for bill
+     * Generate HTML for invoice
      */
-    private function generateBillHTML($billing): string
+    /**
+     * Generate HTML for invoice
+     */
+    private function generateInvoiceHTML($invoice): string
     {
         $colors = [
             'primary' => '#2563eb', // Blue
@@ -263,23 +319,14 @@ class BillingManagementController extends Controller
         ];
 
         // Format dates
-        $billDate = date('d M, Y', strtotime($billing->bill_date));
-        $dueDate = date('d M, Y', strtotime($billing->due_date));
+        $issueDate = date('d M, Y', strtotime($invoice->issue_date));
+        $dueDate = date('d M, Y', strtotime($invoice->due_date));
         
-        // Client details
-        $clientName = $billing->client->company ?? $billing->client->name ?? $billing->client;
-        $clientAddress = $billing->client->address ?? 'N/A';
-        $clientEmail = $billing->client->email ?? 'N/A';
-        $clientPhone = $billing->client->phone ?? 'N/A';
-
-        // Products
-        $items = $billing->products ?? [];
-
         $html = '<!DOCTYPE html>
         <html>
         <head>
             <meta charset="utf-8">
-            <title>Bill - ' . $billing->bill_number . '</title>
+            <title>Invoice - ' . $invoice->invoice_number . '</title>
             <style>
                 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
                 
@@ -369,8 +416,8 @@ class BillingManagementController extends Controller
                     font-size: 12px;
                     font-weight: 600;
                     text-transform: uppercase;
-                    background-color: ' . ($billing->status == 'Completed' || $billing->status == 'Paid' ? '#dcfce7' : '#f1f5f9') . ';
-                    color: ' . ($billing->status == 'Completed' || $billing->status == 'Paid' ? '#166534' : '#475569') . ';
+                    background-color: ' . ($invoice->status == 'Paid' ? '#dcfce7' : '#f1f5f9') . ';
+                    color: ' . ($invoice->status == 'Paid' ? '#166534' : '#475569') . ';
                     margin-top: 8px;
                 }
                 
@@ -422,14 +469,14 @@ class BillingManagementController extends Controller
                     font-weight: 600;
                     text-transform: uppercase;
                     letter-spacing: 0.5px;
-                    padding: 12px 15px;
+                    padding: 12px 15px; /* Reduced vertical padding */
                     text-align: left;
                     border-top: 1px solid ' . $colors['border'] . ';
                     border-bottom: 1px solid ' . $colors['border'] . ';
                 }
                 
                 .items-table td {
-                    padding: 12px 15px;
+                    padding: 12px 15px; /* Reduced vertical padding */
                     border-bottom: 1px solid ' . $colors['border'] . ';
                     font-size: 14px;
                     color: ' . $colors['text'] . ';
@@ -458,7 +505,7 @@ class BillingManagementController extends Controller
                 .summary-row {
                     display: flex;
                     justify-content: space-between;
-                    margin-bottom: 8px;
+                    margin-bottom: 8px; /* Reduced margin */
                     font-size: 14px;
                     color: ' . $colors['text-light'] . ';
                 }
@@ -470,6 +517,24 @@ class BillingManagementController extends Controller
                     font-size: 18px;
                     font-weight: 700;
                     color: ' . $colors['primary'] . ';
+                }
+                
+                .notes-section {
+                    padding: 30px 40px;
+                    border-top: 1px solid ' . $colors['border'] . ';
+                }
+                
+                .notes-title {
+                    font-size: 14px;
+                    font-weight: 600;
+                    margin-bottom: 8px;
+                    color: ' . $colors['text'] . ';
+                }
+                
+                .notes-text {
+                    font-size: 13px;
+                    color: ' . $colors['text-light'] . ';
+                    line-height: 1.6;
                 }
                 
                 .footer {
@@ -502,22 +567,22 @@ class BillingManagementController extends Controller
                     </div>
                     
                     <div class="invoice-title">
-                        <h2>Bill</h2>
+                        <h2>Invoice</h2>
                         <div class="invoice-meta">
                             <div class="meta-row">
-                                <span class="meta-label">Bill #:</span>
-                                <span class="meta-value">' . $billing->bill_number . '</span>
+                                <span class="meta-label">Invoice #:</span>
+                                <span class="meta-value">' . $invoice->invoice_number . '</span>
                             </div>
                             <div class="meta-row">
                                 <span class="meta-label">Date:</span>
-                                <span class="meta-value">' . $billDate . '</span>
+                                <span class="meta-value">' . $issueDate . '</span>
                             </div>
                             <div class="meta-row">
                                 <span class="meta-label">Due Date:</span>
                                 <span class="meta-value">' . $dueDate . '</span>
                             </div>
                             <div class="status-badge">
-                                ' . $billing->status . '
+                                ' . $invoice->status . '
                             </div>
                         </div>
                     </div>
@@ -536,11 +601,11 @@ class BillingManagementController extends Controller
                     
                     <div class="address-block" style="text-align: right;">
                         <div class="address-title" style="text-align: right;">Bill To</div>
-                        <div class="address-name">' . $clientName . '</div>
+                        <div class="address-name">' . $invoice->client_name . '</div>
                         <div class="address-details">
-                            ' . ($clientAddress != 'N/A' && $clientAddress ? nl2br($clientAddress) . '<br>' : '') . '
-                            ' . ($clientPhone != 'N/A' && $clientPhone ? $clientPhone . '<br>' : '') . '
-                            ' . ($clientEmail != 'N/A' && $clientEmail ? $clientEmail : '') . '
+                            ' . ($invoice->client_address ? nl2br($invoice->client_address) . '<br>' : '') . '
+                            ' . ($invoice->client_phone ? $invoice->client_phone . '<br>' : '') . '
+                            ' . ($invoice->client_email ? $invoice->client_email : '') . '
                         </div>
                     </div>
                 </div>
@@ -556,21 +621,16 @@ class BillingManagementController extends Controller
                     </thead>
                     <tbody>';
         
-        if (count($items) > 0) {
-            foreach ($items as $item) {
-                $html .= '<tr>
-                    <td class="col-desc">
-                        <div style="font-weight: 500;">' . ($item['description'] ?? 'Item') . '</div>
-                    </td>
-                    <td class="col-qty">' . ($item['quantity'] ?? 1) . '</td>
-                    <td class="col-price">৳' . number_format($item['unit_price'] ?? 0, 2) . '</td>
-                    <td class="col-total">৳' . number_format($item['total'] ?? 0, 2) . '</td>
-                </tr>';
-            }
-        } else {
-             $html .= '<tr>
-                    <td colspan="4" style="text-align: center;">No items found</td>
-                </tr>';
+        foreach ($invoice->items as $item) {
+            $html .= '<tr>
+                <td class="col-desc">
+                    <div style="font-weight: 500;">' . ($item['name'] ?? 'Item') . '</div>
+                    <div style="font-size: 12px; color: ' . $colors['text-light'] . ';">' . ($item['description'] ?? '') . '</div>
+                </td>
+                <td class="col-qty">' . ($item['quantity'] ?? 1) . '</td>
+                <td class="col-price">৳' . number_format($item['unit_price'] ?? 0, 2) . '</td>
+                <td class="col-total">৳' . number_format(($item['quantity'] ?? 1) * ($item['unit_price'] ?? 0), 2) . '</td>
+            </tr>';
         }
         
         $html .= '</tbody>
@@ -578,25 +638,60 @@ class BillingManagementController extends Controller
                 
                 <div class="summary-section">
                     <div class="summary-table">
-                        <div class="summary-row total">
+                        <div class="summary-row">
+                            <span>Subtotal:</span>
+                            <span>৳' . number_format($invoice->sub_total, 2) . '</span>
+                        </div>';
+                        
+        if ($invoice->tax_amount > 0) {
+            $html .= '<div class="summary-row">
+                <span>Tax:</span>
+                <span>৳' . number_format($invoice->tax_amount, 2) . '</span>
+            </div>';
+        }
+        
+        if ($invoice->discount_amount > 0) {
+            $html .= '<div class="summary-row">
+                <span>Discount:</span>
+                <span>- ৳' . number_format($invoice->discount_amount, 2) . '</span>
+            </div>';
+        }
+                        
+        $html .= '<div class="summary-row total">
                             <span>Total Due:</span>
-                            <span>৳' . number_format($billing->total_amount, 2) . '</span>
+                            <span>৳' . number_format($invoice->total_amount, 2) . '</span>
                         </div>';
 
-        if ($billing->paid_amount > 0) {
+        if ($invoice->paid_amount > 0) {
             $html .= '<div class="summary-row" style="margin-top: 8px; color: #166534; font-weight: 500;">
                 <span>Paid:</span>
-                <span>৳' . number_format($billing->paid_amount, 2) . '</span>
+                <span>৳' . number_format($invoice->paid_amount, 2) . '</span>
             </div>
             <div class="summary-row" style="padding-top: 8px; border-top: 1px dashed #e2e8f0; font-weight: 600;">
                 <span>Balance Due:</span>
-                <span>৳' . number_format(max(0, $billing->total_amount - $billing->paid_amount), 2) . '</span>
+                <span>৳' . number_format($invoice->balance_amount, 2) . '</span>
             </div>';
         }
                         
         $html .= '</div>
                 </div>';
                 
+        if ($invoice->notes || $invoice->terms) {
+            $html .= '<div class="notes-section">';
+            
+            if ($invoice->notes) {
+                $html .= '<div class="notes-title">Notes</div>
+                <div class="notes-text" style="margin-bottom: 20px;">' . nl2br($invoice->notes) . '</div>';
+            }
+            
+            if ($invoice->terms) {
+                $html .= '<div class="notes-title">Terms & Conditions</div>
+                <div class="notes-text">' . nl2br($invoice->terms) . '</div>';
+            }
+            
+            $html .= '</div>';
+        }
+
         $html .= '<div class="footer">
                     Thank you for your business!
                 </div>

@@ -70,4 +70,12 @@ class Purchase extends Model
     {
         return $this->hasMany(Payment_management::class, 'purchase_id');
     }
+    
+    /**
+     * Get the invoice records for the purchase.
+     */
+    public function invoice()
+    {
+        return $this->hasMany(Invoice::class, 'purchase_id');
+    }
 }
