@@ -6,6 +6,9 @@ use App\Models\Client;
 use App\Models\Subscription;
 use App\Models\Billing_management;
 use App\Models\Payment_management;
+use App\Models\Vendor;
+use App\Models\Product;
+use App\Models\Purchase;
 use Illuminate\Http\Request;
 
 class DashboardService
@@ -15,11 +18,46 @@ class DashboardService
      */
     public function getDashboardData()
     {
-        // Get summary statistics
+        // Calculate date ranges for current and previous month
+        $currentMonthStart = now()->startOfMonth();
+        $currentMonthEnd = now()->endOfMonth();
+        $previousMonthStart = now()->subMonth()->startOfMonth();
+        $previousMonthEnd = now()->subMonth()->endOfMonth();
+        
+        // Get summary statistics for current period
         $totalClients = Client::count();
+        $totalVendors = Vendor::count();
+        $totalProducts = Product::count();
+        $totalPurchases = Purchase::count();
         $activeSubscriptions = Subscription::count();
         $pendingPayments = Billing_management::where('payment_status', 'Unpaid')->count();
         $monthlyRevenue = Billing_management::where('status', 'Completed')->sum('total_amount');
+        
+        // Get summary statistics for previous month to calculate changes
+        $prevTotalClients = Client::whereBetween('created_at', [$previousMonthStart, $previousMonthEnd])->count();
+        $prevTotalVendors = Vendor::whereBetween('created_at', [$previousMonthStart, $previousMonthEnd])->count();
+        $prevTotalProducts = Product::whereBetween('created_at', [$previousMonthStart, $previousMonthEnd])->count();
+        $prevTotalPurchases = Purchase::whereBetween('created_at', [$previousMonthStart, $previousMonthEnd])->count();
+        $prevActiveSubscriptions = Subscription::whereBetween('created_at', [$previousMonthStart, $previousMonthEnd])->count();
+        $prevPendingPayments = Billing_management::where('payment_status', 'Unpaid')->whereBetween('created_at', [$previousMonthStart, $previousMonthEnd])->count();
+        $prevMonthlyRevenue = Billing_management::where('status', 'Completed')->whereBetween('created_at', [$previousMonthStart, $previousMonthEnd])->sum('total_amount');
+        
+        // Calculate changes and trends
+        $totalClientsChange = $this->calculatePercentageChange($prevTotalClients, $totalClients);
+        $totalVendorsChange = $this->calculatePercentageChange($prevTotalVendors, $totalVendors);
+        $totalProductsChange = $this->calculatePercentageChange($prevTotalProducts, $totalProducts);
+        $totalPurchasesChange = $this->calculatePercentageChange($prevTotalPurchases, $totalPurchases);
+        $activeSubscriptionsChange = $this->calculatePercentageChange($prevActiveSubscriptions, $activeSubscriptions);
+        $pendingPaymentsChange = $this->calculatePercentageChange($prevPendingPayments, $pendingPayments);
+        $monthlyRevenueChange = $this->calculatePercentageChange($prevMonthlyRevenue, $monthlyRevenue);
+        
+        $totalClientsTrend = $this->getTrend($prevTotalClients, $totalClients);
+        $totalVendorsTrend = $this->getTrend($prevTotalVendors, $totalVendors);
+        $totalProductsTrend = $this->getTrend($prevTotalProducts, $totalProducts);
+        $totalPurchasesTrend = $this->getTrend($prevTotalPurchases, $totalPurchases);
+        $activeSubscriptionsTrend = $this->getTrend($prevActiveSubscriptions, $activeSubscriptions);
+        $pendingPaymentsTrend = $this->getTrend($prevPendingPayments, $pendingPayments);
+        $monthlyRevenueTrend = $this->getTrend($prevMonthlyRevenue, $monthlyRevenue);
         
         // Get recent data
         $recentClients = Client::orderBy('created_at', 'desc')->limit(5)->get();
@@ -34,9 +72,26 @@ class DashboardService
         return [
             'summary' => [
                 'totalClients' => $totalClients,
+                'totalVendors' => $totalVendors,
+                'totalProducts' => $totalProducts,
+                'totalPurchases' => $totalPurchases,
                 'activeSubscriptions' => $activeSubscriptions,
                 'pendingPayments' => $pendingPayments,
                 'monthlyRevenue' => $monthlyRevenue,
+                'totalClientsChange' => $totalClientsChange,
+                'totalVendorsChange' => $totalVendorsChange,
+                'totalProductsChange' => $totalProductsChange,
+                'totalPurchasesChange' => $totalPurchasesChange,
+                'activeSubscriptionsChange' => $activeSubscriptionsChange,
+                'pendingPaymentsChange' => $pendingPaymentsChange,
+                'monthlyRevenueChange' => $monthlyRevenueChange,
+                'totalClientsTrend' => $totalClientsTrend,
+                'totalVendorsTrend' => $totalVendorsTrend,
+                'totalProductsTrend' => $totalProductsTrend,
+                'totalPurchasesTrend' => $totalPurchasesTrend,
+                'activeSubscriptionsTrend' => $activeSubscriptionsTrend,
+                'pendingPaymentsTrend' => $pendingPaymentsTrend,
+                'monthlyRevenueTrend' => $monthlyRevenueTrend,
                 'paymentRate' => $paymentRate . '%',
                 'totalBills' => $totalBills
             ],
@@ -46,6 +101,33 @@ class DashboardService
                 'recentBills' => $recentBills
             ]
         ];
+    }
+
+    /**
+     * Calculate percentage change between previous and current values
+     */
+    private function calculatePercentageChange($previousValue, $currentValue)
+    {
+        if ($previousValue == 0) {
+            return $currentValue > 0 ? '+100%' : '0%';
+        }
+        
+        $change = (($currentValue - $previousValue) / $previousValue) * 100;
+        $sign = $change >= 0 ? '+' : '';
+        
+        return $sign . round($change, 1) . '%';
+    }
+
+    /**
+     * Determine trend based on previous and current values
+     */
+    private function getTrend($previousValue, $currentValue)
+    {
+        if ($previousValue == 0) {
+            return $currentValue > 0 ? 'up' : 'flat';
+        }
+        
+        return $currentValue > $previousValue ? 'up' : ($currentValue < $previousValue ? 'down' : 'flat');
     }
 
     /**

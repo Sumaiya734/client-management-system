@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Billing_management;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Cache;
 
 class BillingManagementService extends BaseService
 {
@@ -120,7 +121,12 @@ class BillingManagementService extends BaseService
             throw new \Exception('Validation error: ' . json_encode($validator->errors()));
         }
 
-        return $this->model->create($data);
+        $billing = $this->model->create($data);
+        
+        // Clear payment statistics cache when new billing is created
+        Cache::forget('payment_statistics');
+        
+        return $billing;
     }
 
     /**
@@ -152,6 +158,10 @@ class BillingManagementService extends BaseService
         }
 
         $billing->update($data);
+        
+        // Clear payment statistics cache when billing is updated
+        Cache::forget('payment_statistics');
+        
         return $billing;
     }
 
@@ -166,7 +176,12 @@ class BillingManagementService extends BaseService
             throw new \Exception('Billing record not found');
         }
 
-        return $billing->delete();
+        $result = $billing->delete();
+        
+        // Clear payment statistics cache when billing is deleted
+        Cache::forget('payment_statistics');
+        
+        return $result;
     }
 
     /**

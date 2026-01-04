@@ -10,6 +10,19 @@ const GlobalSearch = ({ placeholder = "Search...", className = "" }) => {
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const searchRef = useRef(null);
+  
+  // Debounce search requests to avoid too many API calls
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 300); // 300ms delay
+    
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchQuery]);
 
   // Handle click outside to close results
   useEffect(() => {
@@ -24,10 +37,33 @@ const GlobalSearch = ({ placeholder = "Search...", className = "" }) => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+  
+  // Perform search when debounced query changes
+  useEffect(() => {
+    if (debouncedQuery.trim() && debouncedQuery.trim().length >= 2) {
+      performSearch(debouncedQuery);
+      setShowResults(true);
+    } else {
+      setSearchResults({});
+      if (!searchQuery.trim()) { // Only hide results when user clears the search completely
+        setShowResults(false);
+      } else {
+        setShowResults(debouncedQuery.trim().length >= 1); // Show results container if there's input but less than 2 chars
+      }
+    }
+  }, [debouncedQuery]);
 
   const performSearch = async (query) => {
     if (!query.trim()) {
       setSearchResults({});
+      setError(''); // Clear error when query is empty
+      return;
+    }
+    
+    // Minimum query length to prevent too broad searches
+    if (query.trim().length < 2) {
+      setSearchResults({});
+      setError(''); // Don't show error for queries with 1 character
       return;
     }
 
@@ -62,13 +98,11 @@ const GlobalSearch = ({ placeholder = "Search...", className = "" }) => {
   const handleInputChange = (e) => {
     const value = e.target.value;
     setSearchQuery(value);
-
-    if (value.trim()) {
-      performSearch(value);
-      setShowResults(true);
-    } else {
-      setShowResults(false);
+    // The actual search will be performed via the debounced effect
+    
+    if (!value.trim()) {
       setSearchResults({});
+      setShowResults(false);
     }
   };
 
@@ -80,6 +114,17 @@ const GlobalSearch = ({ placeholder = "Search...", className = "" }) => {
   };
 
   const renderResults = () => {
+    // If search query is less than 2 characters, show a message
+    if (searchQuery.length < 2) {
+      return (
+        <div className="px-4 py-2 text-gray-500">
+          {searchQuery.length === 0 
+            ? 'Enter at least 2 characters to search' 
+            : 'Enter at least 2 characters to search'}
+        </div>
+      );
+    }
+    
     if (Object.keys(searchResults).length === 0) {
       return <p className="text-gray-500 px-4 py-2">No results found</p>;
     }

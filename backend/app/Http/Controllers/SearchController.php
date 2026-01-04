@@ -37,6 +37,15 @@ class SearchController extends Controller
                     'data' => []
                 ], 400);
             }
+            
+            // Minimum query length to prevent too broad searches
+            if (strlen($query) < 2) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Search query must be at least 2 characters',
+                    'data' => []
+                ], 400);
+            }
 
             // Ensure models is an array if provided
             if (!is_array($models)) {

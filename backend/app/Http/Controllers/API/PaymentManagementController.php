@@ -194,4 +194,26 @@ class PaymentManagementController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Refresh payment statistics
+     */
+    public function refreshStatistics(): JsonResponse
+    {
+        try {
+            $statistics = $this->paymentService->refreshPaymentStatistics();
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Statistics refreshed successfully',
+                'data' => $statistics
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to refresh payment statistics',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

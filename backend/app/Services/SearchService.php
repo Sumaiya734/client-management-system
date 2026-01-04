@@ -9,6 +9,7 @@ use App\Models\Purchase;
 use App\Models\Subscription;
 use App\Models\Vendor;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class SearchService
 {
@@ -35,6 +36,20 @@ class SearchService
         if (empty($query)) {
             return [];
         }
+        
+        // Minimum query length to prevent too broad searches
+        if (strlen($query) < 2) {
+            return [];
+        }
+
+        // Create cache key based on query, models, and limit
+        $cacheKey = 'search_results_' . md5($query . '_' . serialize($models) . '_' . $limit);
+        
+        // Try to get results from cache
+        $cachedResults = Cache::get($cacheKey);
+        if ($cachedResults !== null) {
+            return $cachedResults;
+        }
 
         // If no specific models provided, search all
         if (empty($models)) {
@@ -59,6 +74,9 @@ class SearchService
             }
         }
 
+        // Cache results for 5 minutes
+        Cache::put($cacheKey, $results, now()->addMinutes(5));
+
         return $results;
     }
 
@@ -72,6 +90,15 @@ class SearchService
      */
     private function searchInModel($modelClass, $query, $limit)
     {
+        // Create cache key for this specific model search
+        $cacheKey = 'search_model_results_' . md5($modelClass . '_' . $query . '_' . $limit);
+        
+        // Try to get results from cache
+        $cachedResults = Cache::get($cacheKey);
+        if ($cachedResults !== null) {
+            return $cachedResults;
+        }
+        
         $model = new $modelClass();
         
         // Define searchable fields for each model
@@ -129,7 +156,12 @@ class SearchService
         }
 
         try {
-            return $queryBuilder->limit($limit)->get()->toArray();
+            $results = $queryBuilder->limit($limit)->get()->toArray();
+            
+            // Cache results for 2 minutes (shorter cache for individual models)
+            Cache::put($cacheKey, $results, now()->addMinutes(2));
+            
+            return $results;
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Search query failed: ' . $e->getMessage());
             \Illuminate\Support\Facades\Log::error('Query SQL: ' . $queryBuilder->toSql(), $queryBuilder->getBindings());

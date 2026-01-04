@@ -108,6 +108,7 @@ Route::apiResource('subscriptions', \App\Http\Controllers\Api\SubscriptionContro
 // Payment Management Routes
 Route::apiResource('payment-managements', \App\Http\Controllers\Api\PaymentManagementController::class);
 Route::get('payment-managements-statistics', [\App\Http\Controllers\Api\PaymentManagementController::class, 'getStatistics']);
+Route::post('payment-managements-refresh-statistics', [\App\Http\Controllers\Api\PaymentManagementController::class, 'refreshStatistics']);
 
 // Vendor Management Routes
 Route::apiResource('vendors', \App\Http\Controllers\Api\VendorController::class);

@@ -28,11 +28,14 @@ api.interceptors.response.use(
 
     // If the response has our standard format {success: true, data: ..., statistics: ...}
     if (response.data && response.data.hasOwnProperty('success')) {
-      // For payment management endpoints that include statistics
+      // For payment management endpoints that include statistics, preserve both data and statistics
       if (response.data.data !== undefined && response.data.statistics !== undefined) {
         return {
           ...response,
-          data: response.data.data, // Just return the data array
+          data: {
+            data: response.data.data,
+            statistics: response.data.statistics
+          }
         };
       }
       // For responses with data property

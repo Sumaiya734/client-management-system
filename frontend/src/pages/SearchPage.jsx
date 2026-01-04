@@ -10,15 +10,35 @@ const SearchPage = () => {
   const [searchableModels, setSearchableModels] = useState([]);
   const [selectedModels, setSelectedModels] = useState([]);
   const [searchParams] = useSearchParams();
+  
+  // Debounce search requests to avoid too many API calls
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 300); // 300ms delay
+    
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchQuery]);
 
   // Get initial search query from URL params
   useEffect(() => {
     const query = searchParams.get('q');
     if (query) {
       setSearchQuery(query);
-      performSearch(query);
+      setDebouncedQuery(query); // Trigger the debounced search
     }
   }, [searchParams]);
+  
+  // Perform search when debounced query changes
+  useEffect(() => {
+    if (debouncedQuery.trim() && debouncedQuery.trim().length >= 2) {
+      performSearch(debouncedQuery);
+    }
+  }, [debouncedQuery]);
 
   // Get searchable models on component mount
   useEffect(() => {
@@ -42,7 +62,14 @@ const SearchPage = () => {
   const performSearch = async (query) => {
     if (!query.trim()) {
       setSearchResults({});
-      setError('Please enter a search query');
+      setError(''); // Clear error when query is empty
+      return;
+    }
+    
+    // Minimum query length to prevent too broad searches
+    if (query.trim().length < 2) {
+      setSearchResults({});
+      setError(''); // Don't show error for queries with 1 character
       return;
     }
 
@@ -83,6 +110,11 @@ const SearchPage = () => {
   };
 
   const renderResults = () => {
+    // If search query is less than 2 characters, show a message
+    if (searchQuery.length < 2 && searchQuery.length > 0) {
+      return <p className="text-gray-500 text-center py-8">Please enter at least 2 characters to search</p>;
+    }
+    
     if (Object.keys(searchResults).length === 0) {
       return <p className="text-gray-500 text-center py-8">No results found</p>;
     }

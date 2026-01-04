@@ -8,6 +8,7 @@ use App\Models\Billing_management;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Cache;
 
 class PaymentManagementService extends BaseService
 {
@@ -47,7 +48,8 @@ class PaymentManagementService extends BaseService
             'method' => 'required|string',
             'transaction_id' => 'required|string',
             'status' => 'required|string',
-            'receipt' => 'required|string'
+            'receipt' => 'required|string',
+            'billing_id' => 'nullable|exists:billing_managements,id'
         ]);
         
         if ($validator->fails()) {
@@ -60,6 +62,9 @@ class PaymentManagementService extends BaseService
         if (isset($data['billing_id']) && $data['billing_id']) {
             $this->updateBillingPaymentStatus($data['billing_id'], $data['amount']);
         }
+        
+        // Clear cached statistics
+        Cache::forget('payment_statistics');
         
         return $payment;
     }
@@ -83,7 +88,8 @@ class PaymentManagementService extends BaseService
             'method' => 'sometimes|string',
             'transaction_id' => 'sometimes|string',
             'status' => 'sometimes|string',
-            'receipt' => 'sometimes|string'
+            'receipt' => 'sometimes|string',
+            'billing_id' => 'nullable|exists:billing_managements,id'
         ]);
         
         if ($validator->fails()) {
@@ -91,12 +97,26 @@ class PaymentManagementService extends BaseService
         }
         
         $oldAmount = $payment->amount;
+        $oldBillingId = $payment->billing_id;
+        
         $payment->update($data);
         
-        // Update billing record if payment is linked to a billing record
-        if (isset($data['billing_id']) && $data['billing_id']) {
-            $this->updateBillingPaymentStatus($data['billing_id'], $data['amount'] - $oldAmount);
+        // Handle billing updates
+        $newBillingId = $data['billing_id'] ?? $payment->billing_id;
+        $newAmount = $data['amount'] ?? $payment->amount;
+        
+        // If billing ID changed, update both old and new billing records
+        if ($oldBillingId && $oldBillingId != $newBillingId) {
+            $this->updateBillingPaymentStatus($oldBillingId, -$oldAmount);
         }
+        
+        if ($newBillingId) {
+            $amountChange = $oldBillingId == $newBillingId ? ($newAmount - $oldAmount) : $newAmount;
+            $this->updateBillingPaymentStatus($newBillingId, $amountChange);
+        }
+        
+        // Clear cached statistics
+        Cache::forget('payment_statistics');
         
         return $payment;
     }
@@ -112,12 +132,15 @@ class PaymentManagementService extends BaseService
             throw new \Exception('Payment not found');
         }
         
-        $result = $payment->delete();
-        
         // Update billing record if payment was linked to a billing record
         if ($payment->billing_id) {
             $this->updateBillingPaymentStatus($payment->billing_id, -$payment->amount);
         }
+        
+        $result = $payment->delete();
+        
+        // Clear cached statistics
+        Cache::forget('payment_statistics');
         
         return $result;
     }
@@ -127,51 +150,56 @@ class PaymentManagementService extends BaseService
      */
     public function refreshPaymentStatistics()
     {
-        // This method can be called from other services when billing records change
-        // It returns the updated statistics
+        // Clear cached statistics to force refresh
+        Cache::forget('payment_statistics');
+        
+        // Return fresh statistics
         return $this->getPaymentStatistics();
     }
     
     /**
-     * Get payment statistics
+     * Get payment statistics with caching
      */
     public function getPaymentStatistics()
     {
-        $completedPayments = $this->model->where('status', 'Completed')->get();
-        $pendingPayments = $this->model->where('status', 'Pending')->get();
-        
-        $totalReceived = $completedPayments->sum('amount');
-        $pendingAmount = $pendingPayments->sum('amount');
-        
-        // Calculate outstanding amounts from billing records
-        $outstandingAmount = Billing_management::where('payment_status', '!=', 'Paid')->sum('total_amount') - 
-                            Billing_management::where('payment_status', '!=', 'Paid')->sum('paid_amount');
-        
-        return [
-            'total_received' => $totalReceived,
-            'pending_payments' => $pendingAmount,
-            'outstanding_balance' => $outstandingAmount,
-            'upcoming_payments' => $this->calculateUpcomingPayments(),
-            'total_transactions' => $this->model->count()
-        ];
-    }
-    
-    /**
-     * Calculate upcoming payments based on next delivery dates
-     */
-    private function calculateUpcomingPayments()
-    {
-        // Get purchases with future delivery dates
-        $futureDeliveries = \App\Models\Purchase::where('delivery_date', '>', now())
-            ->where('status', '!=', 'Completed')
-            ->sum('total_amount');
-        
-        // Get billing records with future due dates that are not paid
-        $futureBills = Billing_management::where('due_date', '>', now())
-            ->where('payment_status', '!=', 'Paid')
-            ->sum('total_amount');
-        
-        return $futureDeliveries + $futureBills;
+        return Cache::remember('payment_statistics', 300, function () {
+            // Get payment statistics
+            $completedPayments = $this->model->where('status', 'Completed')->sum('amount');
+            $pendingPayments = $this->model->where('status', 'Pending')->sum('amount');
+            $totalPayments = $this->model->sum('amount');
+            
+            // Calculate billing statistics
+            $totalBillAmount = Billing_management::sum('total_amount');
+            $totalPaidAmount = Billing_management::sum('paid_amount');
+            $outstandingAmount = $totalBillAmount - $totalPaidAmount;
+            
+            // Get upcoming payments (bills due in next 30 days that aren't fully paid)
+            $upcomingPayments = Billing_management::where('due_date', '>', now())
+                ->where('due_date', '<=', now()->addDays(30))
+                ->where('payment_status', '!=', 'Paid')
+                ->sum('total_amount') - Billing_management::where('due_date', '>', now())
+                ->where('due_date', '<=', now()->addDays(30))
+                ->where('payment_status', '!=', 'Paid')
+                ->sum('paid_amount');
+            
+            // Get overdue amounts
+            $overdueAmount = Billing_management::where('due_date', '<', now())
+                ->where('payment_status', '!=', 'Paid')
+                ->sum('total_amount') - Billing_management::where('due_date', '<', now())
+                ->where('payment_status', '!=', 'Paid')
+                ->sum('paid_amount');
+            
+            return [
+                'total_received' => round($completedPayments, 2),
+                'pending_payments' => round($pendingPayments, 2),
+                'outstanding_balance' => round($outstandingAmount, 2),
+                'upcoming_payments' => round($upcomingPayments, 2),
+                'overdue_amount' => round($overdueAmount, 2),
+                'total_transactions' => $this->model->count(),
+                'total_bill_amount' => round($totalBillAmount, 2),
+                'collection_rate' => $totalBillAmount > 0 ? round(($totalPaidAmount / $totalBillAmount) * 100, 2) : 0
+            ];
+        });
     }
     
     /**
@@ -182,14 +210,19 @@ class PaymentManagementService extends BaseService
         $billing = Billing_management::find($billingId);
         if (!$billing) return;
         
-        $billing->paid_amount += $amountChange;
+        // Update paid amount
+        $billing->paid_amount = max(0, $billing->paid_amount + $amountChange);
+        
+        // Ensure paid amount doesn't exceed total amount
+        if ($billing->paid_amount > $billing->total_amount) {
+            $billing->paid_amount = $billing->total_amount;
+        }
         
         // Update payment status based on paid amount
         if ($billing->paid_amount >= $billing->total_amount) {
-            $billing->paid_amount = $billing->total_amount; // Cap at total amount
             $billing->payment_status = 'Paid';
             $billing->status = 'Completed';
-        } elseif ($billing->paid_amount > 0 && $billing->paid_amount < $billing->total_amount) {
+        } elseif ($billing->paid_amount > 0) {
             $billing->payment_status = 'Partially Paid';
             $billing->status = 'Partially Paid';
         } else {
@@ -197,6 +230,14 @@ class PaymentManagementService extends BaseService
             $billing->status = 'Pending';
         }
         
+        // Check if overdue
+        if ($billing->due_date < now() && $billing->payment_status !== 'Paid') {
+            $billing->status = 'Overdue';
+        }
+        
         $billing->save();
+        
+        // Clear any cached statistics
+        Cache::forget('payment_statistics');
     }
 }

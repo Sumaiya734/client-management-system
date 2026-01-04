@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, DollarSign, FileText, CheckCircle, AlertTriangle, Calendar } from 'lucide-react';
+import { Plus, Edit, Trash2, DollarSign, CheckCircle, AlertTriangle, Calendar, RefreshCw } from 'lucide-react';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { SearchFilter } from '../../components/ui/SearchFilter';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../../components/ui/Card';
@@ -16,14 +16,15 @@ export default function PaymentManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [loading, setLoading] = useState(true);
-  
+  const [statisticsLoading, setStatisticsLoading] = useState(false);
+
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
     item: null,
     action: null
   });
-  
+
   // Payment popup state
   const [isPaymentPopupOpen, setIsPaymentPopupOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState(null);
@@ -43,16 +44,51 @@ export default function PaymentManagement() {
     fetchPayments();
   }, []);
 
+  // Set up periodic statistics refresh (every 30 seconds)
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     if (!statisticsLoading) {
+  //       fetchStatistics();
+  //     }
+  //   }, 30000); // 30 seconds
+
+  //   return () => clearInterval(interval);
+  // }, [statisticsLoading]);
+
   // Separate function to fetch statistics only
   const fetchStatistics = async () => {
     try {
+      setStatisticsLoading(true);
       const statsResponse = await api.get('/payment-managements-statistics');
+      console.log('Statistics response:', statsResponse);
+      
       if (statsResponse.data && statsResponse.data.data) {
         setStatistics(statsResponse.data.data);
         console.log('Statistics updated:', statsResponse.data.data);
+      } else if (statsResponse.data) {
+        setStatistics(statsResponse.data);
+        console.log('Statistics updated directly:', statsResponse.data);
       }
     } catch (error) {
       console.error('Error fetching statistics:', error);
+      showError('Failed to fetch statistics');
+    } finally {
+      setStatisticsLoading(false);
+    }
+  };
+
+  // Function to refresh statistics manually
+  const refreshStatistics = async () => {
+    try {
+      setStatisticsLoading(true);
+      await api.post('/payment-managements-refresh-statistics');
+      await fetchStatistics();
+      showSuccess('Statistics refreshed successfully');
+    } catch (error) {
+      console.error('Error refreshing statistics:', error);
+      showError('Failed to refresh statistics');
+    } finally {
+      setStatisticsLoading(false);
     }
   };
 
@@ -60,19 +96,24 @@ export default function PaymentManagement() {
     try {
       setLoading(true);
       console.log('Fetching payments from API...');
-      
+
       // Fetch payments and statistics separately
       const [paymentsResponse, statsResponse] = await Promise.all([
         api.get('/payment-managements'),
         api.get('/payment-managements-statistics')
       ]);
-      
+
       console.log('Payments API Response:', paymentsResponse);
       console.log('Statistics API Response:', statsResponse);
 
-      // Handle payments data
+      // Handle payments data - check if response includes both data and statistics
       let paymentsData = [];
-      if (Array.isArray(paymentsResponse.data)) {
+      if (paymentsResponse.data && paymentsResponse.data.data && paymentsResponse.data.statistics) {
+        // Response includes both data and statistics
+        paymentsData = paymentsResponse.data.data;
+        setStatistics(paymentsResponse.data.statistics);
+        console.log('Statistics from payments response:', paymentsResponse.data.statistics);
+      } else if (Array.isArray(paymentsResponse.data)) {
         paymentsData = paymentsResponse.data;
         console.log('Payments data is array:', paymentsData);
       } else if (paymentsResponse.data && typeof paymentsResponse.data === 'object') {
@@ -84,10 +125,13 @@ export default function PaymentManagement() {
         console.log('Payments data from object:', paymentsData);
       }
 
-      // Handle statistics data
+      // Handle statistics data from separate call
       if (statsResponse.data && statsResponse.data.data) {
         setStatistics(statsResponse.data.data);
-        console.log('Statistics set:', statsResponse.data.data);
+        console.log('Statistics set from separate call:', statsResponse.data.data);
+      } else if (statsResponse.data) {
+        setStatistics(statsResponse.data);
+        console.log('Statistics set directly:', statsResponse.data);
       }
 
       console.log('Payments data before transformation:', paymentsData);
@@ -122,25 +166,25 @@ export default function PaymentManagement() {
     }
   };
 
-  const summaryStats = [
+  const summaryStats = [    //statistices cards
     {
       title: 'Total Received',
-      value: `৳${statistics.total_received.toFixed(2)}`,
+      value: `৳${(statistics?.total_received || 0).toFixed(2)}`,
       icon: DollarSign,
     },
     {
       title: 'Pending Payments',
-      value: `৳${statistics.pending_payments.toFixed(2)}`,
+      value: `৳${(statistics?.pending_payments || 0).toFixed(2)}`,
       icon: AlertTriangle,
     },
     {
       title: 'Outstanding Balance',
-      value: `৳${statistics.outstanding_balance.toFixed(2)}`,
+      value: `৳${(statistics?.outstanding_balance || 0).toFixed(2)}`,
       icon: CheckCircle,
     },
     {
       title: 'Upcoming Payments',
-      value: `৳${statistics.upcoming_payments.toFixed(2)}`,
+      value: `৳${(statistics?.upcoming_payments || 0).toFixed(2)}`,
       icon: Calendar,
     }
   ];
@@ -213,61 +257,72 @@ export default function PaymentManagement() {
   };
 
   // Handle payment submit (both create and update)
- const handlePaymentSubmit = async (paymentData) => {
-  try {
-    const paymentPayload = {
-      po_number: paymentData.poNumber,
-      client_id: paymentData.client_id || 1,
-      date: paymentData.date,
-      amount: parseFloat(paymentData.amount),
-      method: paymentData.method,
-      transaction_id: paymentData.transactionId,
-      status: paymentData.status,
-      receipt: paymentData.receipt,
-      billing_id: paymentData.billing_id || null  // এটা যোগ করো
-    };
+  const handlePaymentSubmit = async (paymentData) => {
+    try {
+      const paymentPayload = {
+        po_number: paymentData.poNumber,
+        client_id: paymentData.client_id || 1,
+        date: paymentData.date,
+        amount: parseFloat(paymentData.amount),
+        method: paymentData.method,
+        transaction_id: paymentData.transactionId,
+        status: paymentData.status,
+        receipt: paymentData.receipt,
+        billing_id: paymentData.billing_id || null  // 
+      };
 
-    // Validation
-    if (!paymentPayload.po_number?.trim()) {
-      showError('Purchase Order is required');
-      return;
-    }
-    if (!paymentPayload.transaction_id?.trim()) {
-      showError('Transaction ID is required');
-      return;
-    }
-
-    let response;
-    if (isEditMode) {
-      response = await api.put(`/payment-managements/${paymentData.id}`, paymentPayload);
-    } else {
-      response = await api.post('/payment-managements', paymentPayload);
-    }
-
-    // Refresh both payments and statistics after successful operation
-    fetchPayments();
-    showSuccess(isEditMode ? 'Payment updated successfully' : 'Payment recorded successfully');
-    handleClosePaymentPopup();
-
-  } catch (error) {
-    console.error('Error saving payment:', error);
-    let errorMessage = 'Failed to save payment';
-    
-    if (error.response?.data?.errors) {
-      // Handle validation errors
-      const errors = error.response.data.errors;
-      if (typeof errors === 'object') {
-        errorMessage = Object.values(errors).flat().join(', ');
-      } else {
-        errorMessage = errors;
+      // Validation
+      if (!paymentPayload.po_number?.trim()) {
+        showError('Purchase Order is required');
+        return;
       }
-    } else if (error.response?.data?.message) {
-      errorMessage = error.response.data.message;
+      if (!paymentPayload.transaction_id?.trim()) {
+        showError('Transaction ID is required');
+        return;
+      }
+
+      let response;
+      if (isEditMode) {
+        response = await api.put(`/payment-managements/${paymentData.id}`, paymentPayload);
+      } else {
+        response = await api.post('/payment-managements', paymentPayload);
+      }
+
+      console.log('Payment operation response:', response);
+
+      // Check if the response includes updated statistics
+      if (response.data && response.data.statistics) {
+        setStatistics(response.data.statistics);
+        console.log('Statistics updated from response:', response.data.statistics);
+      } else {
+        // Fallback: fetch statistics separately
+        await fetchStatistics();
+      }
+
+      // Refresh payments list
+      await fetchPayments();
+      showSuccess(isEditMode ? 'Payment updated successfully' : 'Payment recorded successfully');
+      handleClosePaymentPopup();
+
+    } catch (error) {
+      console.error('Error saving payment:', error);
+      let errorMessage = 'Failed to save payment';
+
+      if (error.response?.data?.errors) {
+        // Handle validation errors
+        const errors = error.response.data.errors;
+        if (typeof errors === 'object') {
+          errorMessage = Object.values(errors).flat().join(', ');
+        } else {
+          errorMessage = errors;
+        }
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+
+      showError(errorMessage);
     }
-    
-    showError(errorMessage);
-  }
-};
+  };
 
   // Handle payment deletion
   const handleDeletePayment = (payment) => {
@@ -282,17 +337,28 @@ export default function PaymentManagement() {
   const confirmDeletePayment = async () => {
     const payment = confirmDialog.item;
     try {
-      await api.delete(`/payment-managements/${payment.id}`);
-      
-      // Refresh both payments and statistics
-      fetchPayments();
+      const response = await api.delete(`/payment-managements/${payment.id}`);
+
+      console.log('Payment delete response:', response);
+
+      // Check if the response includes updated statistics
+      if (response.data && response.data.statistics) {
+        setStatistics(response.data.statistics);
+        console.log('Statistics updated from delete response:', response.data.statistics);
+      } else {
+        // Fallback: fetch statistics separately
+        await fetchStatistics();
+      }
+
+      // Refresh payments list
+      await fetchPayments();
       showSuccess('Payment deleted successfully');
       setConfirmDialog({ isOpen: false, item: null, action: null });
       console.log('Deleted payment:', payment);
     } catch (error) {
       console.error('Error deleting payment:', error);
       let errorMessage = 'Failed to delete payment';
-      
+
       if (error.response?.data?.errors) {
         // Handle validation errors
         const errors = error.response.data.errors;
@@ -304,7 +370,7 @@ export default function PaymentManagement() {
       } else if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
       }
-      
+
       showError(errorMessage);
       setConfirmDialog({ isOpen: false, item: null, action: null });
     }
@@ -326,12 +392,23 @@ export default function PaymentManagement() {
         title="Payment Management"
         subtitle="Record payments and track outstanding balances"
         actions={
-          <Button 
-            icon={<Plus className="h-4 w-4" />}
-            onClick={handleRecordPayment}
-          >
-            Record Payment
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              icon={<RefreshCw className={`h-4 w-4 ${statisticsLoading ? 'animate-spin' : ''}`} />}
+              onClick={refreshStatistics}
+              disabled={statisticsLoading}
+              title="Refresh Statistics"
+            >
+              {statisticsLoading ? 'Refreshing...' : 'Refresh'}
+            </Button>
+            <Button
+              icon={<Plus className="h-4 w-4" />}
+              onClick={handleRecordPayment}
+            >
+              Record Payment
+            </Button>
+          </div>
         }
       />
 
@@ -344,10 +421,15 @@ export default function PaymentManagement() {
                 <div className="p-2 bg-gray-50 rounded-lg">
                   <stat.icon className="h-5 w-5 text-gray-600" />
                 </div>
+                {statisticsLoading && (
+                  <RefreshCw className="h-4 w-4 text-gray-400 animate-spin" />
+                )}
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-600 mb-1">{stat.title}</p>
-                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {statisticsLoading ? '...' : stat.value}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -420,16 +502,16 @@ export default function PaymentManagement() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="icon"
                           title="Edit payment"
                           onClick={() => handleEditPayment(payment)}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="icon"
                           title="Delete payment"
                           onClick={() => handleDeletePayment(payment)}
@@ -456,7 +538,7 @@ export default function PaymentManagement() {
           isEditMode={isEditMode}
         />
       )}
-      
+
       {/* Confirmation Dialog */}
       {confirmDialog.isOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

@@ -35,32 +35,56 @@ export default function Dashboard() {
     { 
       name: 'Total Clients', 
       value: summary.totalClients || 0, 
-      change: '+12%', 
-      trend: 'up',
+      change: summary.totalClientsChange || '+0%', 
+      trend: summary.totalClientsTrend || 'up',
       icon: Users, 
+      description: 'from last month' 
+    },
+    { 
+      name: 'Total Vendors', 
+      value: summary.totalVendors || 0, 
+      change: summary.totalVendorsChange || '+0%', 
+      trend: summary.totalVendorsTrend || 'up',
+      icon: Package, 
+      description: 'from last month' 
+    },
+    { 
+      name: 'Total Products', 
+      value: summary.totalProducts || 0, 
+      change: summary.totalProductsChange || '+0%', 
+      trend: summary.totalProductsTrend || 'up',
+      icon: Package, 
+      description: 'from last month' 
+    },
+    { 
+      name: 'Total Purchases', 
+      value: summary.totalPurchases || 0, 
+      change: summary.totalPurchasesChange || '+0%', 
+      trend: summary.totalPurchasesTrend || 'up',
+      icon: Package, 
       description: 'from last month' 
     },
     { 
       name: 'Active Subscriptions', 
       value: summary.activeSubscriptions || 0, 
-      change: '+8%', 
-      trend: 'up',
+      change: summary.activeSubscriptionsChange || '+0%', 
+      trend: summary.activeSubscriptionsTrend || 'up',
       icon: Package, 
       description: 'from last month' 
     },
     { 
       name: 'Pending Payments', 
       value: summary.pendingPayments || 0, 
-      change: '-3%', 
-      trend: 'down',
+      change: summary.pendingPaymentsChange || '+0%', 
+      trend: summary.pendingPaymentsTrend || 'up',
       icon: FileText, 
       description: 'from last month' 
     },
     { 
       name: 'Monthly Revenue', 
       value: summary.monthlyRevenue ? `$${summary.monthlyRevenue.toLocaleString()}` : '$0', 
-      change: '+15%', 
-      trend: 'up',
+      change: summary.monthlyRevenueChange || '+0%', 
+      trend: summary.monthlyRevenueTrend || 'up',
       icon: DollarSign, 
       description: 'from last month' 
     },
