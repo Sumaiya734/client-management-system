@@ -29,18 +29,18 @@ const SubscriptionModal = ({
     if (isOpen && previousSubscription) {
       // Use dates from previousSubscription if available, otherwise try to get from selectedProductForEdit or originalSubscription
       const productToUse = selectedProductForEdit || originalSubscription?.products?.[0];
-      
-      setStartDate(previousSubscription.start_date?.split('T')[0] || 
-                   (productToUse?.subscription_start || ''));
-      setEndDate(previousSubscription.end_date?.split('T')[0] || 
-                 (productToUse?.subscription_end || ''));
-      setDeliveryDate(previousSubscription.delivery_date?.split('T')[0] || 
-                      (productToUse?.delivery_date || ''));
+
+      setStartDate(previousSubscription.start_date?.split('T')[0] ||
+        (productToUse?.subscription_start || ''));
+      setEndDate(previousSubscription.end_date?.split('T')[0] ||
+        (productToUse?.subscription_end || ''));
+      setDeliveryDate(previousSubscription.delivery_date?.split('T')[0] ||
+        (productToUse?.delivery_date || ''));
       setNotes(previousSubscription.notes || originalSubscription?.notes || '');
-      
+
       // Calculate product-specific total amount if available
       const productPrice = productToUse?.price || (productToUse?.sub_total ? productToUse.sub_total / productToUse?.quantity : null);
-      
+
       setCustomTotal(previousSubscription.total_amount ?? productPrice ?? originalSubscription?.total_amount ?? initialTotalAmount);
       setCustomPrice(!!previousSubscription.custom_price);
       setAttachment(null);
@@ -103,9 +103,8 @@ const SubscriptionModal = ({
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 px-4 transition-opacity duration-300 ${
-        isAnimating ? 'opacity-100' : 'opacity-0'
-      }`}
+      className={`fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 px-4 transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0'
+        }`}
       onClick={onRequestClose}
     >
       <PopupAnimation animationType="zoomIn" duration="0.3s">
@@ -124,7 +123,7 @@ const SubscriptionModal = ({
               </p>
               {originalSubscription && (
                 <p className="text-xs text-gray-500">
-                  PO: {originalSubscription.poNumber || 'N/A'} | 
+                  PO: {originalSubscription.poNumber || 'N/A'} |
                   Client: {originalSubscription.client?.company || originalSubscription.client?.cli_name || 'N/A'}
                 </p>
               )}

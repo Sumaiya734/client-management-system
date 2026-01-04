@@ -110,6 +110,12 @@ const GlobalSearch = ({ placeholder = "Search...", className = "" }) => {
                   case 'subscriptions':
                     path = `/subscriptions`;
                     break;
+                  case 'invoices':
+                    path = `/invoices`;
+                    break;
+                  case 'vendors':
+                    path = `/vendors`;
+                    break;
                   default:
                     path = `/search?q=${encodeURIComponent(searchQuery)}`;
                 }
@@ -167,6 +173,20 @@ const GlobalSearch = ({ placeholder = "Search...", className = "" }) => {
           <div>
             <div className="font-medium text-gray-900">PO: {item.po_number}</div>
             <div className="text-sm text-gray-500">Status: {item.status}</div>
+          </div>
+        );
+      case 'invoices':
+        return (
+          <div>
+            <div className="font-medium text-gray-900">Invoice: {item.invoice_number}</div>
+            <div className="text-sm text-gray-500">PO: {item.po_number} | Status: {item.payment_status}</div>
+          </div>
+        );
+      case 'vendors':
+        return (
+          <div>
+            <div className="font-medium text-gray-900">{item.name || item.company}</div>
+            <div className="text-sm text-gray-500">{item.email || item.contact_person}</div>
           </div>
         );
       default:

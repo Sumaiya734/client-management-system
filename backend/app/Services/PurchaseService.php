@@ -169,7 +169,7 @@ class PurchaseService
                 'total_amount' => $totalAmount,
                 'status' => $data['status'] ?? $purchase->status,
                 'subscription_active' => $this->getBooleanValue($data['subscription_active'] ?? $purchase->subscription_active),
-                'subscription_type' => $data['subscription_type'] ?? $purchase->subscription_type,
+                'subscription_type' => $data['subscription_type'] ?? $purchase->subscription_type ?? null,
                 'recurring_count' => $data['recurring_count'] ?? $purchase->recurring_count,
                 'delivery_date' => $data['delivery_date'] ?? $purchase->delivery_date,
                 'po_details' => $data['po_details'] ?? $purchase->po_details,

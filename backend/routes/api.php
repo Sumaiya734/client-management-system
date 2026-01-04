@@ -121,9 +121,11 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // Search Routes
-Route::get('search', [\App\Http\Controllers\SearchController::class, 'search']);
-Route::post('search', [\App\Http\Controllers\SearchController::class, 'search']);
-Route::get('searchable-models', [\App\Http\Controllers\SearchController::class, 'getSearchableModels']);
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('search', [\App\Http\Controllers\SearchController::class, 'search']);
+    Route::post('search', [\App\Http\Controllers\SearchController::class, 'search']);
+    Route::get('searchable-models', [\App\Http\Controllers\SearchController::class, 'getSearchableModels']);
+});
 
 // Invoice Management Routes
 Route::apiResource('invoices', \App\Http\Controllers\InvoiceController::class);
