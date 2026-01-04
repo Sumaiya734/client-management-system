@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Calendar, ChevronDown } from 'lucide-react';
+import { X, ChevronDown } from 'lucide-react';
 import api from '../../api';
 import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
 
 interface Payment {
-  id: number;
+  id?: number;
   poNumber: string;
   client_id: number;
   client: {
@@ -18,21 +18,22 @@ interface Payment {
   transactionId: string;
   status: string;
   receipt: string;
+  billing_id?: number | null;
 }
 
 interface PurchaseOrder {
   id: number;
   po_number: string;
+  client_id: number;
   client: string;
   total_amount: number;
-  outstanding_amount: number;
 }
 
 interface EditPaymentPopupProps {
   payment: Payment | null;
   isOpen: boolean;
   onClose: () => void;
-  onUpdate: (payment: Payment) => void;
+  onUpdate: (payment: Payment & { billing_id?: number | null }) => void;
   isEditMode?: boolean;
 }
 
@@ -45,21 +46,26 @@ const EditPaymentPopup: React.FC<EditPaymentPopupProps> = ({
 }) => {
   const [formData, setFormData] = useState({
     purchaseOrder: '',
+    purchaseOrderId: null as number | null,
+    clientId: null as number | null,
     paymentDate: '',
     amount: '',
-    paymentMethod: '',
+    paymentMethod: 'Credit Card',
     transactionId: '',
-    status: 'Completed'
+    status: 'Completed',
+    outstandingAmount: 0,
+    billingId: null as number | null,
   });
 
   const [dropdownStates, setDropdownStates] = useState({
     purchaseOrder: false,
     paymentMethod: false,
-    status: false
+    status: false,
   });
 
   const [loading, setLoading] = useState(false);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [outstandingAmount, setOutstandingAmount] = useState(0);
 
   const paymentMethods = ['Credit Card', 'Bank Transfer', 'Check', 'Cash', 'Wire Transfer'];
   const statusOptions = ['Completed', 'Pending', 'Failed', 'Cancelled'];
@@ -75,14 +81,12 @@ const EditPaymentPopup: React.FC<EditPaymentPopupProps> = ({
     try {
       setLoading(true);
       const response = await api.get('/purchases');
-      // After response interceptor normalization, response.data is the array of purchases
-      // Transform the API response to match the expected format
       const transformedPOs = response.data.map((po: any) => ({
         id: po.id,
         po_number: po.po_number,
+        client_id: po.client_id || po.client?.id || 1,
         client: po.client?.company || po.client || 'N/A',
-        total_amount: typeof po.total_amount === 'number' ? po.total_amount : parseFloat(po.total_amount || 0),
-        outstanding_amount: 0 // This would be calculated based on unpaid bills
+        total_amount: parseFloat(po.total_amount || 0),
       }));
       setPurchaseOrders(transformedPOs);
     } catch (error) {
@@ -92,96 +96,175 @@ const EditPaymentPopup: React.FC<EditPaymentPopupProps> = ({
     }
   };
 
-  // Update form data when payment changes
+  // Fetch billing info based on selected PO number
+  const fetchBillingInfo = async (poNumber: string | number) => {
+    try {
+      const response = await api.get('/billing-managements');
+      const billing = response.data.find(
+        (bill: any) =>
+          bill.po_number === poNumber || bill.po_number.toString() === poNumber.toString()
+      );
+
+      if (billing) {
+        const outstanding = parseFloat(billing.total_amount || 0) - parseFloat(billing.paid_amount || 0);
+        setOutstandingAmount(outstanding);
+        setFormData((prev) => ({
+          ...prev,
+          outstandingAmount: outstanding,
+          billingId: billing.id,
+        }));
+      } else {
+        setOutstandingAmount(0);
+        setFormData((prev) => ({
+          ...prev,
+          outstandingAmount: 0,
+          billingId: null,
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching billing info:', error);
+      setOutstandingAmount(0);
+      setFormData((prev) => ({ ...prev, outstandingAmount: 0, billingId: null }));
+    }
+  };
+
+  // Reset or populate form when payment prop changes
   useEffect(() => {
-    if (payment) {
-      const selectedPO = purchaseOrders.find(po => po.po_number.toString() === payment.poNumber.toString());
+    if (payment && purchaseOrders.length > 0) {
+      const selectedPO = purchaseOrders.find(
+        (po) => po.po_number.toString() === payment.poNumber.toString()
+      );
+
+      const displayText = selectedPO
+        ? `${selectedPO.po_number} - ${selectedPO.client} ($${selectedPO.total_amount.toFixed(2)})`
+        : payment.poNumber;
+
       setFormData({
-        purchaseOrder: selectedPO ? `${selectedPO.po_number.toString()} - ${selectedPO.client} ($${parseFloat(selectedPO.total_amount || 0).toFixed(2)} - Outstanding: $${parseFloat(selectedPO.outstanding_amount || 0).toFixed(2)})` : '',
+        purchaseOrder: displayText,
+        purchaseOrderId: selectedPO?.id || null,
+        clientId: payment.client_id,
         paymentDate: payment.date,
-        amount: typeof payment.amount === 'string' ? payment.amount.replace('$', '') : (payment.amount ? parseFloat(payment.amount).toString() : '0'),
+        amount: payment.amount.replace(/[৳$,]/g, ''),
         paymentMethod: payment.method || 'Credit Card',
         transactionId: payment.transactionId,
-        status: payment.status
+        status: payment.status,
+        outstandingAmount: 0,
+        billingId: payment.billing_id || null,
       });
-    } else {
-      // Reset form for new payment
+
+      // If editing, fetch billing info
+      if (selectedPO) fetchBillingInfo(selectedPO.po_number);
+    } else if (!payment) {
+      // New payment mode
+      const today = new Date().toISOString().split('T')[0];
       setFormData({
         purchaseOrder: '',
-        paymentDate: new Date().toISOString().split('T')[0],
+        purchaseOrderId: null,
+        clientId: null,
+        paymentDate: today,
         amount: '',
         paymentMethod: 'Credit Card',
         transactionId: '',
-        status: 'Completed'
+        status: 'Completed',
+        outstandingAmount: 0,
+        billingId: null,
       });
     }
   }, [payment, purchaseOrders]);
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
+  const handleInputChange = (field: string, value: string | number) => {
+    setFormData((prev) => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
 
   const toggleDropdown = (dropdown: string) => {
-    setDropdownStates(prev => ({
+    setDropdownStates((prev) => ({
       ...prev,
-      [dropdown]: !prev[dropdown as keyof typeof prev]
+      [dropdown]: !prev[dropdown as keyof typeof prev],
     }));
   };
 
   const selectOption = (dropdown: string, value: string) => {
     if (dropdown === 'purchaseOrder') {
-      const selectedPO = purchaseOrders.find(po => po.po_number.toString() === value);
+      const selectedPO = purchaseOrders.find((po) => po.po_number.toString() === value);
       if (selectedPO) {
-        handleInputChange('purchaseOrder', `${selectedPO.po_number.toString()} - ${selectedPO.client} ($${parseFloat(selectedPO.total_amount || 0).toFixed(2)} - Outstanding: $${parseFloat(selectedPO.outstanding_amount || 0).toFixed(2)})`);
+        const displayText = `${selectedPO.po_number} - ${selectedPO.client} ($${selectedPO.total_amount.toFixed(2)})`;
+        handleInputChange('purchaseOrder', displayText);
+        handleInputChange('purchaseOrderId', selectedPO.id);
+        handleInputChange('clientId', selectedPO.client_id);
+
+        // অটো Transaction ID = PO Number
+        handleInputChange('transactionId', selectedPO.po_number.toString());
+
+        // Fetch billing info
+        fetchBillingInfo(selectedPO.po_number);
       }
     } else {
       handleInputChange(dropdown, value);
     }
-    
-    setDropdownStates(prev => ({
-      ...prev,
-      [dropdown]: false
-    }));
-  };
 
-  const generateTransactionId = () => {
-    const prefix = formData.paymentMethod === 'Check' ? 'CHK' : 'TXN';
-    const year = new Date().getFullYear();
-    const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    const newTransactionId = `${prefix}-${year}-${randomNum}`;
-    handleInputChange('transactionId', newTransactionId);
+    setDropdownStates((prev) => ({
+      ...prev,
+      [dropdown]: false,
+    }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Extract the PO number from the formatted string
-    const poNumber = formData.purchaseOrder.split(' - ')[0];
-    
-    const updatedPayment: Payment = {
-      id: payment?.id || Date.now(),
+
+    // Extract PO number
+    let poNumber = '';
+    if (formData.purchaseOrder.includes(' - ')) {
+      poNumber = formData.purchaseOrder.split(' - ')[0];
+    } else {
+      poNumber = formData.purchaseOrder;
+    }
+
+    if (!poNumber.trim()) {
+      alert('Purchase Order is required');
+      return;
+    }
+
+    if (!formData.paymentDate) {
+      alert('Payment date is required');
+      return;
+    }
+
+    const amount = parseFloat(formData.amount);
+    if (isNaN(amount) || amount <= 0) {
+      alert('Valid amount is required');
+      return;
+    }
+
+    // Optional: Warn if exceeding outstanding
+    if (outstandingAmount > 0 && amount > outstandingAmount) {
+      if (!confirm(`Amount exceeds outstanding balance ($${outstandingAmount.toFixed(2)}). Continue?`)) {
+        return;
+      }
+    }
+
+    const clientId = formData.clientId || payment?.client_id || 1;
+
+    const updatedPayment: Payment & { billing_id?: number | null } = {
+      id: payment?.id,
       poNumber: poNumber,
-      client_id: payment?.client_id || 1,
+      client_id: clientId,
       client: {
         company: payment?.client.company || 'Unknown Company',
-        contact: payment?.client.contact || 'Unknown Contact'
+        contact: payment?.client.contact || 'Unknown Contact',
       },
       date: formData.paymentDate,
-      amount: parseFloat(formData.amount || 0).toFixed(2),
+      amount: amount.toFixed(2),
       method: formData.paymentMethod,
-      transactionId: formData.transactionId,
+      transactionId: formData.transactionId || poNumber, // fallback to PO
       status: formData.status,
-      receipt: formData.status === 'Completed' ? 'Generated' : 'Not Generated'
+      receipt: formData.status === 'Completed' ? 'Generated' : 'Not Generated',
+      billing_id: formData.billingId,
     };
 
     onUpdate(updatedPayment);
-    onClose();
-  };
-
-  const handleCancel = () => {
     onClose();
   };
 
@@ -190,215 +273,197 @@ const EditPaymentPopup: React.FC<EditPaymentPopupProps> = ({
   if (!isVisible) return null;
 
   return createPortal(
-    <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+    <div
+      className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] transition-opacity duration-300 ${
+        isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'
+      }`}
+    >
       <PopupAnimation animationType="zoomIn" duration="0.3s">
         <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">
-              {isEditMode ? 'Edit Payment' : 'Record Payment'}
-            </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              {isEditMode ? 'Update payment information' : 'Record a new payment transaction'}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X size={24} />
-          </button>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6">
-          <div className="space-y-6">
-            {/* Purchase Order */}
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <div>
-              <label htmlFor="purchaseOrder" className="block text-sm font-medium text-gray-700 mb-2">
-                Purchase Order
-              </label>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => toggleDropdown('purchaseOrder')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between"
-                >
-                  <span className={formData.purchaseOrder ? 'text-gray-900' : 'text-gray-500'}>
-                    {formData.purchaseOrder || 'Select purchase order'}
-                  </span>
-                  <ChevronDown size={16} className={`transition-transform ${dropdownStates.purchaseOrder ? 'rotate-180' : ''}`} />
-                </button>
-                {dropdownStates.purchaseOrder && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
-                    {loading ? (
-                      <div className="px-3 py-2 text-center text-gray-500">Loading purchase orders...</div>
-                    ) : purchaseOrders.length === 0 ? (
-                      <div className="px-3 py-2 text-center text-gray-500">No purchase orders found</div>
-                    ) : (
-                      purchaseOrders.map((po) => (
-                        <button
-                          key={po.id}
-                          type="button"
-                          onClick={() => selectOption('purchaseOrder', po.po_number)}
-                          className="w-full px-3 py-2 text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50"
-                        >
-                          <div className="font-medium">{po.po_number.toString()} - {po.client}</div>
-                          <div className="text-sm text-gray-600">
-                            {'$' + parseFloat(po.total_amount || 0).toFixed(2)} - Outstanding: {'$' + parseFloat(po.outstanding_amount || 0).toFixed(2)}
-                          </div>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
+              <h2 className="text-xl font-semibold text-gray-900">
+                {isEditMode ? 'Edit Payment' : 'Record Payment'}
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                {isEditMode ? 'Update payment information' : 'Record a new payment transaction'}
+              </p>
             </div>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <X size={24} />
+            </button>
+          </div>
 
-            {/* Payment Date and Amount Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="p-6">
+            <div className="space-y-6">
+              {/* Purchase Order Dropdown */}
               <div>
-                <label htmlFor="paymentDate" className="block text-sm font-medium text-gray-700 mb-2">
-                  Payment Date
-                </label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    id="paymentDate"
-                    value={formData.paymentDate}
-                    onChange={(e) => handleInputChange('paymentDate', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  />
-                  
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-2">
-                  Amount
-                </label>
-                <input
-                  type="number"
-                  id="amount"
-                  value={formData.amount}
-                  onChange={(e) => handleInputChange('amount', e.target.value)}
-                  step="0.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="0.00"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Payment Method and Transaction ID Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label htmlFor="paymentMethod" className="block text-sm font-medium text-gray-700 mb-2">
-                  Payment Method
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Purchase Order *</label>
                 <div className="relative">
                   <button
                     type="button"
-                    onClick={() => toggleDropdown('paymentMethod')}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between"
+                    onClick={() => toggleDropdown('purchaseOrder')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between"
                   >
-                    <span>{formData.paymentMethod}</span>
-                    <ChevronDown size={16} className={`transition-transform ${dropdownStates.paymentMethod ? 'rotate-180' : ''}`} />
+                    <span className={formData.purchaseOrder ? 'text-gray-900' : 'text-gray-500'}>
+                      {formData.purchaseOrder || 'Select purchase order'}
+                    </span>
+                    <ChevronDown size={16} className={`transition-transform ${dropdownStates.purchaseOrder ? 'rotate-180' : ''}`} />
                   </button>
-                  {dropdownStates.paymentMethod && (
+
+                  {dropdownStates.purchaseOrder && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                      {loading ? (
+                        <div className="px-3 py-2 text-center text-gray-500">Loading...</div>
+                      ) : purchaseOrders.length === 0 ? (
+                        <div className="px-3 py-2 text-center text-gray-500">No purchase orders found</div>
+                      ) : (
+                        purchaseOrders.map((po) => (
+                          <button
+                            key={po.id}
+                            type="button"
+                            onClick={() => selectOption('purchaseOrder', po.po_number.toString())}
+                            className="w-full px-3 py-2 text-left hover:bg-gray-50"
+                          >
+                            <div className="font-medium">{po.po_number} - {po.client}</div>
+                            <div className="text-sm text-gray-600">${po.total_amount.toFixed(2)}</div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Outstanding Amount Display */}
+              {outstandingAmount > 0 && (
+                <div className="bg-blue-50 p-3 rounded-md">
+                  <p className="text-sm font-medium text-blue-900">
+                    Outstanding Amount: <span className="font-bold">${outstandingAmount.toFixed(2)}</span>
+                  </p>
+                </div>
+              )}
+
+              {/* Payment Date & Amount */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Payment Date *</label>
+                  <input
+                    type="date"
+                    value={formData.paymentDate}
+                    onChange={(e) => handleInputChange('paymentDate', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Amount *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.amount}
+                    onChange={(e) => handleInputChange('amount', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Payment Method & Transaction ID */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method *</label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => toggleDropdown('paymentMethod')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-left focus:ring-blue-500 flex justify-between items-center"
+                    >
+                      <span>{formData.paymentMethod}</span>
+                      <ChevronDown size={16} className={`transition-transform ${dropdownStates.paymentMethod ? 'rotate-180' : ''}`} />
+                    </button>
+                    {dropdownStates.paymentMethod && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+                        {paymentMethods.map((method) => (
+                          <button
+                            key={method}
+                            type="button"
+                            onClick={() => selectOption('paymentMethod', method)}
+                            className="w-full px-3 py-2 text-left hover:bg-gray-50"
+                          >
+                            {method}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Transaction ID *</label>
+                  <input
+                    type="text"
+                    value={formData.transactionId}
+                    onChange={(e) => handleInputChange('transactionId', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Auto-filled from PO"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Status */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Status *</label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => toggleDropdown('status')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-left focus:ring-blue-500 flex justify-between items-center"
+                  >
+                    <span>{formData.status}</span>
+                    <ChevronDown size={16} className={`transition-transform ${dropdownStates.status ? 'rotate-180' : ''}`} />
+                  </button>
+                  {dropdownStates.status && (
                     <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
-                      {paymentMethods.map((method) => (
+                      {statusOptions.map((status) => (
                         <button
-                          key={method}
+                          key={status}
                           type="button"
-                          onClick={() => selectOption('paymentMethod', method)}
-                          className="w-full px-3 py-2 text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50"
+                          onClick={() => selectOption('status', status)}
+                          className="w-full px-3 py-2 text-left hover:bg-gray-50"
                         >
-                          {method}
+                          {status}
                         </button>
                       ))}
                     </div>
                   )}
                 </div>
               </div>
-
-              <div>
-                <label htmlFor="transactionId" className="block text-sm font-medium text-gray-700 mb-2">
-                  Transaction ID
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    id="transactionId"
-                    value={formData.transactionId}
-                    onChange={(e) => handleInputChange('transactionId', e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Enter or generate ID"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={generateTransactionId}
-                    className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    Generate
-                  </button>
-                </div>
-              </div>
             </div>
 
-            {/* Status */}
-            <div>
-              <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2">
-                Status
-              </label>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => toggleDropdown('status')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between"
-                >
-                  <span>{formData.status}</span>
-                  <ChevronDown size={16} className={`transition-transform ${dropdownStates.status ? 'rotate-180' : ''}`} />
-                </button>
-                {dropdownStates.status && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
-                    {statusOptions.map((status) => (
-                      <button
-                        key={status}
-                        type="button"
-                        onClick={() => selectOption('status', status)}
-                        className="w-full px-3 py-2 text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50"
-                      >
-                        {status}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+            {/* Footer */}
+            <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-md hover:bg-gray-800"
+              >
+                {isEditMode ? 'Update Payment' : 'Record Payment'}
+              </button>
             </div>
-          </div>
-
-          {/* Footer */}
-          <div className="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-gray-900 border border-transparent rounded-md shadow-sm hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-            >
-              {isEditMode ? 'Update Payment' : 'Record Payment'}
-            </button>
-          </div>
-        </form>
-      </div>
+          </form>
+        </div>
       </PopupAnimation>
     </div>,
     document.body

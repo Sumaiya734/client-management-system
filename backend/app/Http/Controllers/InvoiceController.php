@@ -562,7 +562,7 @@ class InvoiceController extends Controller
             <div class="invoice-container">
                 <div class="header-banner">
                     <div class="logo-area">
-                        <h1>Nano InfoTech</h1>
+                        <h1>Nanosoft InfoTech</h1>
                         <p>Tech Solutions & Management</p>
                     </div>
                     
@@ -591,7 +591,7 @@ class InvoiceController extends Controller
                 <div class="addresses">
                     <div class="address-block">
                         <div class="address-title">From</div>
-                        <div class="address-name">Nano InfoTech</div>
+                        <div class="address-name">Nanosoft InfoTech</div>
                         <div class="address-details">
                             Dhaka, Bangladesh<br>
                             Phone: +880 1234 567890<br>

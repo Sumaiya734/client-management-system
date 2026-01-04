@@ -8,8 +8,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import CreatePurchaseOrderPopup from '../../components/PurchaseOrders/CreatePurchaseOrderPopup';
 import ViewPurchaseOrderPopup from '../../components/PurchaseOrders/ViewPurchaseOrderPopup';
-import api from '../../api';
-import { invoiceApi } from '../../api';
+import api, { purchaseApi, invoiceApi } from '../../api';
 import { formatDate, formatDateRange } from '../../utils/dateUtils';
 import { useNotification } from '../../components/Notifications';
 
@@ -109,6 +108,7 @@ export default function PurchaseOrders() {
         const formData = new FormData();
         formData.append('status', orderData.status);
         formData.append('client_id', orderData.client_id.toString());
+        formData.append('po_number', orderData.po_number);
         
         // Handle products array
         if (orderData.products && Array.isArray(orderData.products)) {
@@ -324,7 +324,7 @@ export default function PurchaseOrders() {
                       <div> 
                         <div className="font-semibold text-gray-900">{po.po_number}</div>
                         <div className="text-sm text-gray-600">
-                          Created: {formatDate(po.created_at)}
+                          Delivery Date: {formatDate(po.delivery_date)}
                         </div>
                       </div>
                     </TableCell>
@@ -339,21 +339,29 @@ export default function PurchaseOrders() {
                         {po.products && po.products.length > 0 ? (
                           po.products.map((product, index) => (
                             <div key={index} className="border-b border-gray-100 last:border-b-0 pb-2 last:pb-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="font-medium text-gray-900">
-                                  {product.product_name || 'N/A'}
-                                </span>
-                                <span className="text-xs bg-gray-900 text-white px-2 py-1 rounded">
-                                  x{product.quantity || 1}
-                                </span>
-                              </div>
-                              <div className="text-sm text-gray-600">
-                                {product.subscription_start && product.subscription_end 
-                                  ? formatDateRange(product.subscription_start, product.subscription_end)
-                                  : product.delivery_date 
-                                    ? `Delivery: ${formatDate(product.delivery_date)}`
-                                    : 'N/A'
-                                }
+                              <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-gray-900">
+                                    {product.product_name || 'N/A'}
+                                  </span>
+                                  <span className="text-xs bg-gray-900 text-white px-2 py-1 rounded">
+                                    x{product.quantity || 1}
+                                  </span>
+                                </div>
+                                <div className="text-sm">
+                                  <span className="font-medium text-gray-900">
+                                    {'৳' + (product.sub_total || product.price * product.quantity || 0).toFixed(2)}
+                                  </span>
+                                  {/* <span className="text-gray-500 mx-2">•</span> */}
+                                  {/* <span className="text-gray-600">
+                                    {product.subscription_start && product.subscription_end 
+                                      ? formatDateRange(product.subscription_start, product.subscription_end)
+                                      : product.delivery_date 
+                                        ? `Delivery: ${formatDate(product.delivery_date)}`
+                                        : 'N/A'
+                                    }
+                                  </span> */}
+                                </div>
                               </div>
                             </div>
                           ))

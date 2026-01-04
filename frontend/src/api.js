@@ -25,9 +25,16 @@ api.interceptors.response.use(
     if (response.config.url.endsWith('/login')) {
       return response; // Return original response for login
     }
-    
-    // If the response has our standard format {success: true, data: ...}, normalize it
+
+    // If the response has our standard format {success: true, data: ..., statistics: ...}
     if (response.data && response.data.hasOwnProperty('success')) {
+      // For payment management endpoints that include statistics
+      if (response.data.data !== undefined && response.data.statistics !== undefined) {
+        return {
+          ...response,
+          data: response.data.data, // Just return the data array
+        };
+      }
       // For responses with data property
       if (response.data.data !== undefined) {
         return {
@@ -49,9 +56,9 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       // Remove auth token
       localStorage.removeItem('authToken');
-      // Remove the Authorization header
+      // Remove Authorization header
       delete api.defaults.headers.common['Authorization'];
-      // Dispatch a custom event to notify the app of auth failure
+      // Dispatch a custom event to notify app of auth failure
       window.dispatchEvent(new Event('auth-expired'));
     }
     return Promise.reject(error);
@@ -135,6 +142,19 @@ export const invoiceApi = {
       responseType: 'blob' 
     });
   },
+};
+
+// Purchase API functions
+export const purchaseApi = {
+  getAll: () => api.get('/purchases'),
+  getById: (id) => api.get(`/purchases/${id}`),
+  create: (data) => api.post('/purchases', data),
+  update: (id, data) => api.put(`/purchases/${id}`, data),
+  delete: (id) => api.delete(`/purchases/${id}`),
+  getByClient: (clientId) => api.get(`/purchases/client/${clientId}`),
+  getByPoNumber: (poNumber) => api.get(`/purchases/po/${poNumber}`),
+  getWithRelatedData: (id) => api.get(`/purchases/${id}/with-related`),
+  generatePoNumber: () => api.get('/purchases/generate-po'),
 };
 
 // Authentication API functions

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, DollarSign, FileText, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Plus, Edit, Trash2, DollarSign, FileText, CheckCircle, AlertTriangle, Calendar } from 'lucide-react';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { SearchFilter } from '../../components/ui/SearchFilter';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../../components/ui/Card';
@@ -30,19 +30,71 @@ export default function PaymentManagement() {
   const [isEditMode, setIsEditMode] = useState(false);
 
   const [payments, setPayments] = useState([]);
+  const [statistics, setStatistics] = useState({
+    total_received: 0,
+    pending_payments: 0,
+    outstanding_balance: 0,
+    upcoming_payments: 0,
+    total_transactions: 0
+  });
 
   // Fetch payments from API
   useEffect(() => {
     fetchPayments();
   }, []);
 
+  // Separate function to fetch statistics only
+  const fetchStatistics = async () => {
+    try {
+      const statsResponse = await api.get('/payment-managements-statistics');
+      if (statsResponse.data && statsResponse.data.data) {
+        setStatistics(statsResponse.data.data);
+        console.log('Statistics updated:', statsResponse.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching statistics:', error);
+    }
+  };
+
   const fetchPayments = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/payment-managements');
-      // After response interceptor normalization, response.data is the array of payments
+      console.log('Fetching payments from API...');
+      
+      // Fetch payments and statistics separately
+      const [paymentsResponse, statsResponse] = await Promise.all([
+        api.get('/payment-managements'),
+        api.get('/payment-managements-statistics')
+      ]);
+      
+      console.log('Payments API Response:', paymentsResponse);
+      console.log('Statistics API Response:', statsResponse);
+
+      // Handle payments data
+      let paymentsData = [];
+      if (Array.isArray(paymentsResponse.data)) {
+        paymentsData = paymentsResponse.data;
+        console.log('Payments data is array:', paymentsData);
+      } else if (paymentsResponse.data && typeof paymentsResponse.data === 'object') {
+        if (paymentsResponse.data.data) {
+          paymentsData = paymentsResponse.data.data;
+        } else {
+          paymentsData = [paymentsResponse.data];
+        }
+        console.log('Payments data from object:', paymentsData);
+      }
+
+      // Handle statistics data
+      if (statsResponse.data && statsResponse.data.data) {
+        setStatistics(statsResponse.data.data);
+        console.log('Statistics set:', statsResponse.data.data);
+      }
+
+      console.log('Payments data before transformation:', paymentsData);
+
       // Transform the API response to match the expected format
-      const transformedPayments = response.data.map(payment => {
+      const transformedPayments = paymentsData.map(payment => {
+        console.log('Processing payment:', payment);
         return {
           id: payment.id,
           poNumber: payment.po_number,
@@ -59,9 +111,12 @@ export default function PaymentManagement() {
           receipt: payment.receipt || 'Not Generated'
         };
       });
+      console.log('Transformed payments:', transformedPayments);
       setPayments(transformedPayments);
     } catch (error) {
       console.error('Error fetching payments:', error);
+      console.error('Error details:', error.response || error.message);
+      showError('Failed to fetch payments and statistics');
     } finally {
       setLoading(false);
     }
@@ -70,37 +125,23 @@ export default function PaymentManagement() {
   const summaryStats = [
     {
       title: 'Total Received',
-      value: payments
-        .filter(p => p.status === 'Completed')
-        .reduce((sum, p) => {
-          const amountStr = p.amount.replace('৳', '');
-          const amountNum = parseFloat(amountStr);
-          return sum + (isNaN(amountNum) ? 0 : amountNum);
-        }, 0)
-        .toFixed(2),
+      value: `৳${statistics.total_received.toFixed(2)}`,
       icon: DollarSign,
     },
     {
       title: 'Pending Payments',
-      value: payments
-        .filter(p => p.status === 'Pending')
-        .reduce((sum, p) => {
-          const amountStr = p.amount.replace('৳', '');
-          const amountNum = parseFloat(amountStr);
-          return sum + (isNaN(amountNum) ? 0 : amountNum);
-        }, 0)
-        .toFixed(2),
+      value: `৳${statistics.pending_payments.toFixed(2)}`,
       icon: AlertTriangle,
     },
     {
       title: 'Outstanding Balance',
-      value: '৳0.00', // This would be calculated based on unpaid bills
+      value: `৳${statistics.outstanding_balance.toFixed(2)}`,
       icon: CheckCircle,
     },
     {
-      title: 'Total Transactions',
-      value: payments.length.toString(),
-      icon: FileText,
+      title: 'Upcoming Payments',
+      value: `৳${statistics.upcoming_payments.toFixed(2)}`,
+      icon: Calendar,
     }
   ];
 
@@ -135,6 +176,16 @@ export default function PaymentManagement() {
     receipt: 'Not Generated'
   });
 
+  // Debug function to test API connection
+  const testApi = async () => {
+    try {
+      const response = await api.get('/payment-managements');
+      console.log('Direct API response:', response);
+    } catch (error) {
+      console.error('Direct API error:', error);
+    }
+  };
+
   // Handle opening popup for recording new payment
   const handleRecordPayment = () => {
     setEditingPayment(createEmptyPayment());
@@ -162,57 +213,61 @@ export default function PaymentManagement() {
   };
 
   // Handle payment submit (both create and update)
-  const handlePaymentSubmit = async (paymentData) => {
-    try {
-      // Prepare payment data for API
-      const paymentPayload = {
-        po_number: paymentData.poNumber,
-        client_id: paymentData.client_id || 1, // Use client_id from payment data if available, fallback to 1
-        date: paymentData.date,
-        amount: parseFloat(paymentData.amount.toString().replace('৳', '')),
-        method: paymentData.method,
-        transaction_id: paymentData.transactionId,
-        status: paymentData.status,
-        receipt: paymentData.receipt
-      };
-      
-      let response;
-      if (isEditMode) {
-        // Update existing payment
-        response = await api.put(`/payment-managements/${paymentData.id}`, paymentPayload);
-        // After response interceptor normalization, response.data contains the updated payment
-        console.log('Updated payment:', response.data);
-        // Refresh the payments list
-        fetchPayments();
-      } else {
-        // Create new payment
-        response = await api.post('/payment-managements', paymentPayload);
-        // After response interceptor normalization, response.data contains the created payment
-        console.log('Recorded new payment:', response.data);
-        // Refresh the payments list
-        fetchPayments();
-      }
-      
-      handleClosePaymentPopup();
-    } catch (error) {
-      console.error('Error saving payment:', error);
-      let errorMessage = 'Failed to save payment';
-      
-      if (error.response?.data?.errors) {
-        // Handle validation errors
-        const errors = error.response.data.errors;
-        if (typeof errors === 'object') {
-          errorMessage = Object.values(errors).flat().join(', ');
-        } else {
-          errorMessage = errors;
-        }
-      } else if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      }
-      
-      showError(errorMessage);
+ const handlePaymentSubmit = async (paymentData) => {
+  try {
+    const paymentPayload = {
+      po_number: paymentData.poNumber,
+      client_id: paymentData.client_id || 1,
+      date: paymentData.date,
+      amount: parseFloat(paymentData.amount),
+      method: paymentData.method,
+      transaction_id: paymentData.transactionId,
+      status: paymentData.status,
+      receipt: paymentData.receipt,
+      billing_id: paymentData.billing_id || null  // এটা যোগ করো
+    };
+
+    // Validation
+    if (!paymentPayload.po_number?.trim()) {
+      showError('Purchase Order is required');
+      return;
     }
-  };
+    if (!paymentPayload.transaction_id?.trim()) {
+      showError('Transaction ID is required');
+      return;
+    }
+
+    let response;
+    if (isEditMode) {
+      response = await api.put(`/payment-managements/${paymentData.id}`, paymentPayload);
+    } else {
+      response = await api.post('/payment-managements', paymentPayload);
+    }
+
+    // Refresh both payments and statistics after successful operation
+    fetchPayments();
+    showSuccess(isEditMode ? 'Payment updated successfully' : 'Payment recorded successfully');
+    handleClosePaymentPopup();
+
+  } catch (error) {
+    console.error('Error saving payment:', error);
+    let errorMessage = 'Failed to save payment';
+    
+    if (error.response?.data?.errors) {
+      // Handle validation errors
+      const errors = error.response.data.errors;
+      if (typeof errors === 'object') {
+        errorMessage = Object.values(errors).flat().join(', ');
+      } else {
+        errorMessage = errors;
+      }
+    } else if (error.response?.data?.message) {
+      errorMessage = error.response.data.message;
+    }
+    
+    showError(errorMessage);
+  }
+};
 
   // Handle payment deletion
   const handleDeletePayment = (payment) => {
@@ -227,9 +282,9 @@ export default function PaymentManagement() {
   const confirmDeletePayment = async () => {
     const payment = confirmDialog.item;
     try {
-      const response = await api.delete(`/payment-managements/${payment.id}`);
-      // After response interceptor normalization, response.data contains the result
-      // Refresh the payments list
+      await api.delete(`/payment-managements/${payment.id}`);
+      
+      // Refresh both payments and statistics
       fetchPayments();
       showSuccess('Payment deleted successfully');
       setConfirmDialog({ isOpen: false, item: null, action: null });
@@ -259,6 +314,11 @@ export default function PaymentManagement() {
   const closeConfirmDialog = () => {
     setConfirmDialog({ isOpen: false, item: null, action: null });
   };
+
+  // Test API connection on component mount
+  useEffect(() => {
+    testApi();
+  }, []);
 
   return (
     <div className="space-y-6">

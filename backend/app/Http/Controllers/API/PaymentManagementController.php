@@ -23,10 +23,12 @@ class PaymentManagementController extends Controller
     {
         try {
             $payments = $this->paymentService->getAll();
+            $statistics = $this->paymentService->getPaymentStatistics();
             
             return response()->json([
                 'success' => true,
-                'data' => $payments
+                'data' => $payments,
+                'statistics' => $statistics
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -44,11 +46,13 @@ class PaymentManagementController extends Controller
     {
         try {
             $payment = $this->paymentService->create($request->all());
+            $statistics = $this->paymentService->getPaymentStatistics();
             
             return response()->json([
                 'success' => true,
                 'message' => 'Payment created successfully',
-                'data' => $payment
+                'data' => $payment,
+                'statistics' => $statistics
             ], 201);
         } catch (\Exception $e) {
             // Extract validation errors from the exception message if present
@@ -105,11 +109,13 @@ class PaymentManagementController extends Controller
     {
         try {
             $payment = $this->paymentService->update($id, $request->all());
+            $statistics = $this->paymentService->getPaymentStatistics();
             
             return response()->json([
                 'success' => true,
                 'message' => 'Payment updated successfully',
-                'data' => $payment
+                'data' => $payment,
+                'statistics' => $statistics
             ]);
         } catch (\Exception $e) {
             // Extract validation errors from the exception message if present
@@ -145,10 +151,12 @@ class PaymentManagementController extends Controller
     {
         try {
             $result = $this->paymentService->delete($id);
+            $statistics = $this->paymentService->getPaymentStatistics();
             
             return response()->json([
                 'success' => true,
-                'message' => 'Payment deleted successfully'
+                'message' => 'Payment deleted successfully',
+                'statistics' => $statistics
             ]);
         } catch (\Exception $e) {
             if (strpos($e->getMessage(), 'Payment not found') !== false) {
@@ -161,6 +169,27 @@ class PaymentManagementController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete payment',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get payment statistics
+     */
+    public function getStatistics(): JsonResponse
+    {
+        try {
+            $statistics = $this->paymentService->getPaymentStatistics();
+            
+            return response()->json([
+                'success' => true,
+                'data' => $statistics
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve payment statistics',
                 'error' => $e->getMessage()
             ], 500);
         }

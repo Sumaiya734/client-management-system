@@ -406,7 +406,10 @@ class SubscriptionService extends BaseService
             'total_amount' => 'required|numeric|min:0',
             'products_subscription_status' => 'sometimes',
             'progress' => 'sometimes',
-            'po_details' => 'sometimes'
+            'po_details' => 'sometimes',
+            'unit_price' => 'sometimes|numeric|min:0',
+            'notes' => 'sometimes|string',
+            'purchase_id' => 'sometimes|exists:purchases,id'
         ]);
         
         if ($validator->fails()) {
@@ -498,7 +501,10 @@ class SubscriptionService extends BaseService
             'total_amount' => 'sometimes|numeric|min:0',
             'products_subscription_status' => 'sometimes',
             'progress' => 'sometimes',
-            'po_details' => 'sometimes'
+            'po_details' => 'sometimes',
+            'unit_price' => 'sometimes|numeric|min:0',
+            'notes' => 'sometimes|string',
+            'purchase_id' => 'sometimes|exists:purchases,id'
         ]);
         
         if ($validator->fails()) {

@@ -22,6 +22,7 @@ export default function Subscriptions() {
   const [selectedTotalAmount, setSelectedTotalAmount] = useState(null);
   const [originalSubscription, setOriginalSubscription] = useState(null);
   const [editingSubscription, setEditingSubscription] = useState(null);
+  const [selectedProductForEdit, setSelectedProductForEdit] = useState(null);
   const [loading, setLoading] = useState(true);
   const [subscriptions, setSubscriptions] = useState([]);
 
@@ -140,8 +141,13 @@ export default function Subscriptions() {
   const handleOpenModal = (product, quantity, subscription, isEdit = false) => {
     setSelectedProduct(product?.name || product);
     setSelectedQuantity(product?.quantity || quantity);
-    setSelectedTotalAmount(subscription?.totalAmount || null);
+    
+    // Calculate price for the specific product
+    const productPrice = product.price || (product.sub_total ? product.sub_total / product.quantity : null);
+    setSelectedTotalAmount(productPrice || subscription?.totalAmount || null);
+    
     setOriginalSubscription(subscription); // Store original subscription context
+    setSelectedProductForEdit(product); // Store the specific product being edited
 
     if (isEdit) {
       // Find the actual subscription record relative to this product if possible
@@ -149,9 +155,11 @@ export default function Subscriptions() {
       // Since the backend transforms data, we need to map back or use available fields
       setEditingSubscription({
         id: subscription.id,
-        start_date: product.dateRange && product.dateRange !== 'N/A' ? product.dateRange.split(' to ')[0] : '',
-        end_date: product.dateRange && product.dateRange !== 'N/A' ? product.dateRange.split(' to ')[1] : '',
+        start_date: product.subscription_start || subscription.start_date || (product.dateRange && product.dateRange !== 'N/A' ? product.dateRange.split(' to ')[0] : ''),
+        end_date: product.subscription_end || subscription.end_date || (product.dateRange && product.dateRange !== 'N/A' ? product.dateRange.split(' to ')[1] : ''),
         notes: subscription.notes || '', // Notes might be on main subscription
+        delivery_date: product.delivery_date || subscription.delivery_date || '',
+        total_amount: productPrice || subscription.total_amount || null,
         // Add other fields if available
       });
     } else {
@@ -170,19 +178,25 @@ export default function Subscriptions() {
       }
 
       // Prepare subscription data for API
+      // Extract numeric value from total amount (remove currency symbols)
+      // Use the total amount from the original subscription (sum of all products) rather than individual product
+      const totalAmountValue = originalSubscription?.total_amount ? parseFloat(originalSubscription?.total_amount.toString().replace(/[^\d.-]/g, '')) : 
+        (data.totalAmount ? parseFloat(data.totalAmount.toString().replace(/[^\d.-]/g, '')) : 0);
+
+      // Use original subscription data if available, fallback to data from form
       const subscriptionData = {
         po_number: data.poNumber || originalSubscription?.poNumber || 'PO-DEFAULT-001',
-        client_id: originalSubscription?.client_id || 1, // Use the original client_id from the purchase
-        product_id: originalSubscription?.product_id || 1, // Use the original product_id from the purchase
+        client_id: data.originalSubscription?.client_id || originalSubscription?.client_id || 1, // Use the original client_id from the purchase
+        product_id: data.selectedProductForEdit?.product_id || data.originalSubscription?.product_id || originalSubscription?.product_id || 1, // Use the product_id from selected product
         start_date: data.startDate,
         end_date: data.endDate,
         status: 'Active',
         notes: data.notes || '',
-        quantity: originalSubscription?.quantity || 1,
-        total_amount: originalSubscription?.total_amount || 0.00, // Use the original total_amount
-        purchase_id: originalSubscription?.id // Link to the original purchase if available
+        quantity: data.selectedProductForEdit?.quantity || data.originalSubscription?.quantity || originalSubscription?.quantity || 1,
+        total_amount: totalAmountValue, // Use the total amount from original subscription (sum of all products)
+        unit_price: data.unitPrice ? parseFloat(data.unitPrice.toString().replace(/[^\d.-]/g, '')) : null,
+        purchase_id: data.originalSubscription?.purchase_id || originalSubscription?.purchase_id // Link to the original purchase if available
       };
-
 
       let response;
       if (editingSubscription) {
@@ -217,10 +231,10 @@ export default function Subscriptions() {
       const response = await invoiceApi.generateFromSubscription({
         subscription_id: subscription.id
       });
-      
+
       if (response.data.success) {
         showSuccess('Invoice generated successfully');
-        
+
         // Refresh subscriptions to update UI
         fetchSubscriptions();
 
@@ -241,12 +255,12 @@ export default function Subscriptions() {
   const handleViewInvoiceSubscription = async (invoiceId) => {
     try {
       const response = await invoiceApi.downloadInvoice(invoiceId);
-      
+
       // Create a temporary URL and open in new tab
       const blob = new Blob([response.data], { type: 'text/html' });
       const url = window.URL.createObjectURL(blob);
       window.open(url, '_blank');
-      
+
       // Clean up after a short delay
       setTimeout(() => window.URL.revokeObjectURL(url), 500);
     } catch (error) {
@@ -331,7 +345,7 @@ export default function Subscriptions() {
                     <TableCell>
                       <div>
                         <div className="font-semibold text-gray-900">{subscription.poNumber}</div>
-                        <div className="text-sm text-gray-600">Created: {formatDate(subscription.createdDate)}</div>
+                        <div className="text-sm text-gray-600">Delivery Date: {formatDate(subscription.createdDate)}</div>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -366,7 +380,7 @@ export default function Subscriptions() {
                               </div>
                               {product.dateRange && product.dateRange !== 'N/A' && (
                                 <div className="text-sm text-gray-600">
-                                  {product.dateRange.includes(' to ') 
+                                  {product.dateRange.includes(' to ')
                                     ? formatDateRange(product.dateRange.split(' to ')[0], product.dateRange.split(' to ')[1])
                                     : formatDate(product.dateRange)
                                   }
@@ -443,6 +457,8 @@ export default function Subscriptions() {
         onSubmit={handleModalSubmit}
         poNumber={originalSubscription?.poNumber || 'PO-DEFAULT-001'}
         previousSubscription={editingSubscription}
+        originalSubscription={originalSubscription}
+        selectedProductForEdit={selectedProductForEdit}
       />
     </div>
   );

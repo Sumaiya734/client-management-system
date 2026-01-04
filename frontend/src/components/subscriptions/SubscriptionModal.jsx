@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Calendar, Upload, Lock, Unlock } from 'lucide-react';
+import { X, Upload, Lock, Unlock } from 'lucide-react';
 import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
 
 const SubscriptionModal = ({
@@ -12,6 +12,8 @@ const SubscriptionModal = ({
   poNumber,
   onSubmit,
   previousSubscription = null,
+  originalSubscription = null,
+  selectedProductForEdit = null,
 }) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -25,11 +27,21 @@ const SubscriptionModal = ({
 
   useEffect(() => {
     if (isOpen && previousSubscription) {
-      setStartDate(previousSubscription.start_date?.split('T')[0] || '');
-      setEndDate(previousSubscription.end_date?.split('T')[0] || '');
-      setDeliveryDate(previousSubscription.delivery_date?.split('T')[0] || '');
-      setNotes(previousSubscription.notes || '');
-      setCustomTotal(previousSubscription.total_amount ?? initialTotalAmount);
+      // Use dates from previousSubscription if available, otherwise try to get from selectedProductForEdit or originalSubscription
+      const productToUse = selectedProductForEdit || originalSubscription?.products?.[0];
+      
+      setStartDate(previousSubscription.start_date?.split('T')[0] || 
+                   (productToUse?.subscription_start || ''));
+      setEndDate(previousSubscription.end_date?.split('T')[0] || 
+                 (productToUse?.subscription_end || ''));
+      setDeliveryDate(previousSubscription.delivery_date?.split('T')[0] || 
+                      (productToUse?.delivery_date || ''));
+      setNotes(previousSubscription.notes || originalSubscription?.notes || '');
+      
+      // Calculate product-specific total amount if available
+      const productPrice = productToUse?.price || (productToUse?.sub_total ? productToUse.sub_total / productToUse?.quantity : null);
+      
+      setCustomTotal(previousSubscription.total_amount ?? productPrice ?? originalSubscription?.total_amount ?? initialTotalAmount);
       setCustomPrice(!!previousSubscription.custom_price);
       setAttachment(null);
     } else if (isOpen) {
@@ -41,9 +53,11 @@ const SubscriptionModal = ({
       setCustomPrice(false);
       setAttachment(null);
     }
-  }, [isOpen, previousSubscription, initialTotalAmount]);
+  }, [isOpen, previousSubscription, originalSubscription, selectedProductForEdit, initialTotalAmount]);
 
-  const currencyMatch = (initialTotalAmount?.toString() || customTotal?.toString() || '').match(/([৳$€£¥₽₹]|BDT|USD|EUR)/);
+  const currencyMatch = (initialTotalAmount?.toString() || customTotal?.toString() || '').match(
+    /([৳$€£¥₽₹]|BDT|USD|EUR)/
+  );
   const currency = currencyMatch ? currencyMatch[0] : '৳';
 
   const calculateUnitPrice = () => {
@@ -78,11 +92,12 @@ const SubscriptionModal = ({
       totalAmount: displayTotal,
       customPrice,
       unitPrice,
+      originalSubscription, // Include original subscription info
+      selectedProductForEdit, // Include selected product info
     });
+
     onRequestClose();
   };
-
-  const isFormValid = startDate && endDate;
 
   if (!isVisible) return null;
 
@@ -95,194 +110,159 @@ const SubscriptionModal = ({
     >
       <PopupAnimation animationType="zoomIn" duration="0.3s">
         <div
-          className="w-full max-w-4xl rounded-xl bg-white shadow-2xl max-h-[95vh] overflow-hidden"
+          className="w-full max-w-4xl bg-white rounded-lg shadow-2xl max-h-[95vh] overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 bg-gray-50">
+          <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-50">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">
+              <h2 className="text-lg font-semibold text-gray-900">
                 {previousSubscription ? 'Edit Subscription' : 'Create Subscription'}
               </h2>
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-xs text-gray-600">
                 {product} — {quantity} {quantity > 1 ? 'licenses' : 'license'}
               </p>
+              {originalSubscription && (
+                <p className="text-xs text-gray-500">
+                  PO: {originalSubscription.poNumber || 'N/A'} | 
+                  Client: {originalSubscription.client?.company || originalSubscription.client?.cli_name || 'N/A'}
+                </p>
+              )}
             </div>
-            <button
-              onClick={onRequestClose}
-              className="rounded-lg p-2 text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition"
-            >
-              <X size={22} />
+            <button className="p-1.5 rounded-md hover:bg-gray-200" onClick={onRequestClose}>
+              <X size={18} />
             </button>
           </div>
 
-          {/* Two Column Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-6">
-            {/* Left: Form Fields */}
-            <div className="space-y-6">
-              {/* Subscription Period */}
-              <div>
-                <h3 className="text-base font-medium text-gray-900 mb-4">Subscription Period</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Start Date <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
+          {/* Body */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-5">
+            {/* Left */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium text-gray-900">Subscription Period</h3>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      End Date <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        value={endDate}
-                        min={startDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                     
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Delivery Date */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Expected First Delivery (Optional)
-                </label>
-                <div className="relative">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Start Date *
+                  </label>
                   <input
                     type="date"
-                    value={deliveryDate}
-                    onChange={(e) => setDeliveryDate(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full rounded-md border px-3 py-2 text-xs focus:ring-1 focus:ring-blue-500"
                   />
-                 
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    End Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    min={startDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full rounded-md border px-3 py-2 text-xs focus:ring-1 focus:ring-blue-500"
+                  />
                 </div>
               </div>
 
-              {/* Notes */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Notes (Optional)
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Expected Delivery
                 </label>
-                <textarea
-                  rows={4}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Add any internal notes or special instructions..."
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                <input
+                  type="date"
+                  value={deliveryDate}
+                  onChange={(e) => setDeliveryDate(e.target.value)}
+                  className="w-full rounded-md border px-3 py-2 text-xs focus:ring-1 focus:ring-blue-500"
                 />
               </div>
 
-              {/* Attachment */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Attachment (Optional)
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Notes
                 </label>
-                <label className="block border-2 border-dashed border-gray-300 rounded-lg p-5 text-center cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition">
-                  <Upload className="mx-auto text-gray-400 mb-3" size={32} />
-                  <p className="text-sm text-gray-600">
-                    {attachment ? attachment.name : 'Click to upload file (PO, contract, etc.)'}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">PDF, DOC, JPG, PNG</p>
-                  <input type="file" className="hidden" onChange={handleFileChange} accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" />
+                <textarea
+                  rows={2}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="w-full rounded-md border px-3 py-1.5 text-xs resize-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Attachment
                 </label>
-                {attachment && (
-                  <p className="text-xs text-gray-500 text-right mt-2">
-                    {(attachment.size / 1024).toFixed(0)} KB
+                <label className="block border border-dashed rounded-md p-2.5 text-center cursor-pointer hover:bg-gray-50">
+                  <Upload size={18} className="mx-auto text-gray-400 mb-1" />
+                  <p className="text-xs text-gray-600 truncate">
+                    {attachment ? attachment.name : 'Upload file'}
                   </p>
-                )}
+                  <p className="text-[10px] text-gray-500">PDF, DOC, JPG, PNG</p>
+                  <input type="file" className="hidden" onChange={handleFileChange} />
+                </label>
               </div>
             </div>
 
-            {/* Right: Order Summary */}
-            <div className="space-y-6">
-              <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-                <div className="flex justify-between items-center mb-5">
-                  <h3 className="text-base font-semibold text-gray-900">Order Summary</h3>
-                  <button
-                    onClick={() => setCustomPrice(!customPrice)}
-                    className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1.5 font-medium"
-                  >
-                    {customPrice ? <Lock size={16} /> : <Unlock size={16} />}
-                    {customPrice ? 'Price Locked' : 'Edit Price'}
-                  </button>
-                </div>
+            {/* Right */}
+            <div className="border rounded-lg p-4 space-y-3 text-sm">
+              <div className="flex justify-between items-center">
+                <h3 className="font-semibold">Order Summary</h3>
+                <button
+                  onClick={() => setCustomPrice(!customPrice)}
+                  className="text-xs text-blue-600 flex items-center gap-1"
+                >
+                  {customPrice ? <Lock size={14} /> : <Unlock size={14} />}
+                  {customPrice ? 'Locked' : 'Edit'}
+                </button>
+              </div>
 
-                <div className="space-y-4 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Product</span>
-                    <span className="font-medium text-gray-900">{product}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">PO Number</span>
-                    <span className="font-medium text-gray-900">{poNumber || '—'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Quantity</span>
-                    <span className="font-medium text-gray-900">{quantity}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Unit Price</span>
-                    <span className="font-medium text-gray-900">{currency}{unitPrice}</span>
-                  </div>
+              <div className="flex justify-between text-xs">
+                <span>Product</span>
+                <span className="font-medium">{product}</span>
+              </div>
 
-                  <div className="pt-4 border-t border-gray-300">
-                    {customPrice && (
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Custom Total Amount
-                        </label>
-                        <input
-                          type="text"
-                          value={customTotal}
-                          onChange={(e) => setCustomTotal(e.target.value)}
-                          placeholder="e.g. ৳25,000"
-                          className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                    )}
+              <div className="flex justify-between text-xs">
+                <span>Quantity</span>
+                <span className="font-medium">{quantity}</span>
+              </div>
 
-                    <div className="flex justify-between items-end">
-                      <span className="text-base font-semibold text-gray-900">Total Amount</span>
-                      <span className="text-2xl font-bold text-blue-600">{displayTotal}</span>
-                    </div>
-                  </div>
-                </div>
+              <div className="flex justify-between text-xs">
+                <span>Unit Price</span>
+                <span className="font-medium">{currency}{unitPrice}</span>
+              </div>
+
+              {customPrice && (
+                <input
+                  type="text"
+                  value={customTotal}
+                  onChange={(e) => setCustomTotal(e.target.value)}
+                  className="w-full rounded-md border px-3 py-2 text-xs"
+                />
+              )}
+
+              <div className="flex justify-between pt-2 border-t">
+                <span className="font-semibold">Total</span>
+                <span className="text-lg font-bold text-blue-600">{displayTotal}</span>
               </div>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-4 px-6 py-4 border-t border-gray-200 bg-gray-50">
+          <div className="flex justify-end gap-3 px-5 py-3 border-t bg-gray-50">
             <button
               onClick={onRequestClose}
-              className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition"
+              className="px-4 py-2 text-xs border rounded-md"
             >
               Cancel
             </button>
             <button
               onClick={handleSubmit}
-              disabled={!isFormValid}
-              className={`px-8 py-2.5 text-sm font-medium text-white rounded-lg transition ${
-                isFormValid
-                  ? 'bg-blue-600 hover:bg-blue-700 shadow-md'
-                  : 'bg-gray-400 cursor-not-allowed'
-              }`}
+              className="px-6 py-2 text-xs text-white bg-blue-600 rounded-md hover:bg-blue-700"
             >
-              {previousSubscription ? 'Update Subscription' : 'Activate Subscription'}
+              {previousSubscription ? 'Update' : 'Activate'}
             </button>
           </div>
         </div>

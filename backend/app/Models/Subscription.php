@@ -17,6 +17,7 @@ class Subscription extends Model
         'status',
         'notes',
         'total_amount',
+        'unit_price',
         'quantity',
         'next_billing_date',
         'po_details',
@@ -29,6 +30,7 @@ class Subscription extends Model
         'end_date' => 'date',
         'next_billing_date' => 'date',
         'total_amount' => 'decimal:2',
+        'unit_price' => 'decimal:2',
         'po_details' => 'array',
         'products_subscription_status' => 'array',
         'progress' => 'array'

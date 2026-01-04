@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronDown, Globe, Tag, FileText, DollarSign, Percent, Eye } from 'lucide-react';
+import { X, ChevronDown, Eye } from 'lucide-react';
 import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
 import { vendorApi } from '../../api.js';
 
@@ -235,7 +235,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
     >
       <PopupAnimation animationType="zoomIn" duration="0.3s">
         <div
-          className="w-full max-w-2xl rounded-xl bg-white shadow-xl max-h-[95vh] overflow-hidden"
+          className="w-full max-w-lg rounded-xl bg-white shadow-xl max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -253,9 +253,9 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
           </div>
 
           {/* Form Body - Compact */}
-          <form onSubmit={handleSubmit} className="space-y-4 p-5">
+          <form onSubmit={handleSubmit} className="space-y-3 p-4">
             {/* Row 1: Name + Vendor */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
                 <input
@@ -264,7 +264,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
                   onChange={(e) => handleInputChange('name', e.target.value)}
                   className={`w-full rounded-md border ${
                     errors.name ? 'border-red-500' : 'border-gray-300'
-                  } px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  } px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   placeholder="e.g. Adobe Photoshop"
                 />
                 {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
@@ -279,7 +279,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
                     disabled={loadingVendors}
                     className={`w-full flex justify-between items-center rounded-md border ${
                       errors.vendor ? 'border-red-500' : 'border-gray-300'
-                    } px-3 py-2 text-sm bg-white`}
+                    } px-3 py-1.5 text-sm bg-white`}
                   >
                     <span className={formData.vendor ? '' : 'text-gray-500'}>
                       {loadingVendors ? 'Loading...' : formData.vendor || 'Select vendor'}
@@ -312,20 +312,20 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
                 type="url"
                 value={formData.vendorWebsite}
                 onChange={(e) => handleInputChange('vendorWebsite', e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="https://www.example.com"
               />
             </div>
 
             {/* Row 2: Category + Type */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => toggleDropdown('category')}
-                    className="w-full flex justify-between items-center rounded-md border border-gray-300 px-3 py-2 text-sm bg-white"
+                    className="w-full flex justify-between items-center rounded-md border border-gray-inción-300 px-3 py-1.5 text-sm bg-white"
                   >
                     <span className={formData.category ? '' : 'text-gray-500'}>
                       {formData.category || 'Select category'}
@@ -355,7 +355,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
                   <button
                     type="button"
                     onClick={() => toggleDropdown('subscriptionType')}
-                    className="w-full flex justify-between items-center rounded-md border border-gray-300 px-3 py-2 text-sm bg-white"
+                    className="w-full flex justify-between items-center rounded-md border border-gray-300 px-3 py-1.5 text-sm bg-white"
                   >
                     <span className={formData.subscriptionType ? '' : 'text-gray-500'}>
                       {formData.subscriptionType || 'Select type'}
@@ -384,19 +384,19 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
               <textarea
-                rows={3}
+                rows={2}
                 value={formData.description}
                 onChange={(e) => handleInputChange('description', e.target.value)}
                 className={`w-full rounded-md border ${
                   errors.description ? 'border-red-500' : 'border-gray-300'
-                } px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                } px-3 py-1.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 placeholder="Short description..."
               />
               {errors.description && <p className="mt-1 text-xs text-red-600">{errors.description}</p>}
             </div>
 
             {/* Pricing Row */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Base Price</label>
                 <input
@@ -406,7 +406,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
                   onChange={(e) => handleInputChange('basePrice', e.target.value)}
                   className={`w-full rounded-md border ${
                     errors.basePrice ? 'border-red-500' : 'border-gray-300'
-                  } px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  } px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 />
                 {errors.basePrice && <p className="mt-1 text-xs text-red-600">{errors.basePrice}</p>}
               </div>
@@ -417,7 +417,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
                   <button
                     type="button"
                     onClick={() => toggleDropdown('baseCurrency')}
-                    className="w-full flex justify-between items-center rounded-md border border-gray-300 px-3 py-2 text-sm bg-white"
+                    className="w-full flex justify-between items-center rounded-md border border-gray-300 px-3 py-1.5 text-sm bg-white"
                   >
                     {formData.baseCurrency}
                     <ChevronDown size={16} />
@@ -445,7 +445,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
                   type="number"
                   value={formData.profitMargin}
                   onChange={(e) => handleInputChange('profitMargin', e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="20"
                 />
               </div>
@@ -453,26 +453,26 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
 
             {/* BDT Preview - Compact */}
             {(formData.basePrice || formData.profitMargin) && (
-              <div className="rounded-lg bg-blue-50 p-4 border border-blue-200">
-                <div className="flex items-center gap-2 text-sm font-medium text-blue-800 mb-1">
-                  <Eye size={16} />
+              <div className="rounded-md bg-blue-50 p-3 border border-blue-200 text-sm">
+                <div className="flex items-center gap-2 font-medium text-blue-800 mb-1">
+                  <Eye size={14} />
                   Final Price (BDT)
                 </div>
-                <div className="text-2xl font-bold text-blue-900">৳{pricePreview.bdt}</div>
+                <div className="text-xl font-bold text-blue-900">৳{pricePreview.bdt}</div>
                 <p className="text-xs text-gray-600 mt-1">
-                  ${pricePreview.finalUSD} × 110.5 rate (+{pricePreview.profit}% profit)
+                  ${pricePreview.finalUSD} × 110.5 (+{pricePreview.profit}%)
                 </p>
               </div>
             )}
 
             {/* Status */}
-            <div className="max-w-xs">
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
               <div className="relative">
                 <button
                   type="button"
                   onClick={() => toggleDropdown('status')}
-                  className="w-full flex justify-between items-center rounded-md border border-gray-300 px-3 py-2 text-sm bg-white"
+                  className="w-full flex justify-between items-center rounded-md border border-gray-300 px-3 py-1.5 text-sm bg-white"
                 >
                   <span className={formData.status === 'Active' ? 'text-green-600' : 'text-red-600'}>
                     {formData.status}
@@ -497,7 +497,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
             </div>
 
             {/* Buttons */}
-            <div className="flex justify-end gap-3 pt-3 border-t border-gray-200">
+            <div className="flex justify-end gap-3 pt-2 border-t border-gray-200">
               <button
                 type="button"
                 onClick={onClose}
