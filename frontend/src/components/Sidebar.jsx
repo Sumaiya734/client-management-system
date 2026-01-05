@@ -82,31 +82,29 @@ export default function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-1">
         {navigation.map((item) => {
-          const isActive = location.pathname === item.href;
-
           return (
             <NavLink
               key={item.name}
               to={item.href}
-              className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg group relative transition-all
-                ${
-                  isActive
-                    ? 'bg-gray-800 text-white shadow'
-                    : 'text-gray-700 hover:bg-gray-100'
-                }
-              `}
+              end // 👈 THIS IS CRITICAL: exact match
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg group relative transition-all
+                ${isActive ? 'bg-gray-800 text-white shadow' : 'text-gray-700 hover:bg-gray-100'}`
+              }
             >
-              <item.icon
-                size={18}
-                className={isActive ? 'text-white' : 'text-gray-500'}
-              />
-
-              {!isCollapsed && <span>{item.name}</span>}
-
-              {isCollapsed && (
-                <span className="absolute left-16 ml-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 whitespace-nowrap">
-                  {item.name}
-                </span>
+              {({ isActive }) => (
+                <>
+                  <item.icon
+                    size={18}
+                    className={isActive ? 'text-white' : 'text-gray-500'}
+                  />
+                  {!isCollapsed && <span>{item.name}</span>}
+                  {isCollapsed && (
+                    <span className="absolute left-16 ml-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 whitespace-nowrap">
+                      {item.name}
+                    </span>
+                  )}
+                </>
               )}
             </NavLink>
           );
@@ -121,7 +119,6 @@ export default function Sidebar() {
         >
           <LogOut size={14} className="text-red-500" />
           {!isCollapsed && <span>Logout</span>}
-
           {isCollapsed && (
             <span className="absolute left-16 ml-2 px-2 py-1 bg-red-600 text-white text-xs rounded opacity-0 group-hover:opacity-100">
               Logout

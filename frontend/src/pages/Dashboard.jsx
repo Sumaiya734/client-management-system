@@ -14,18 +14,19 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        const response = await dashboardApi.getDashboardData();
-        setDashboardData(response.data);
-        setLoading(false);
-      } catch (err) {
-        setError(err.message || 'Failed to load dashboard data');
-        setLoading(false);
-      }
-    };
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      const response = await dashboardApi.getDashboardData();
+      setDashboardData(response.data);
+      setLoading(false);
+    } catch (err) {
+      setError(err.message || 'Failed to load dashboard data');
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchDashboardData();
   }, []);
 
@@ -140,7 +141,8 @@ export default function Dashboard() {
   const recentPayments = recent.recentPayments?.map(payment => ({
     name: payment.client?.cli_name || payment.client?.name || payment.client_name || payment.name || 'Unknown Client',
     amount: payment.amount ? `$${payment.amount}` : '$0',
-    daysOverdue: payment.days_overdue || 'N/A'
+    status: payment.status || payment.payment_status || 'Completed',
+    date: formatDate(payment.created_at || payment.date || payment.payment_date)
   })) || [];
 
   const recentBills = recent.recentBills?.map(bill => ({
@@ -188,13 +190,20 @@ export default function Dashboard() {
     );
   }
 
+  const refreshDashboard = () => {
+    fetchDashboardData();
+  };
+
   return (
     <div className="space-y-4">
       <PageHeader
         title="Dashboard"
         subtitle="Welcome back! Here's what's happening with your business."
         actions={
-          <Button size="sm" icon={<FileBarChart className="h-3 w-3" />}>Generate Report</Button>
+          <>
+            <Button size="sm" onClick={refreshDashboard} icon={<TrendingUp className="h-3 w-3" />}>Refresh</Button>
+            <Button size="sm" icon={<FileBarChart className="h-3 w-3" />}>Generate Report</Button>
+          </>
         }
       />
 
@@ -274,9 +283,12 @@ export default function Dashboard() {
                       <h3 className="text-sm font-medium text-gray-900">{payment.name}</h3>
                       <p className="text-sm text-gray-500">{payment.amount}</p>
                     </div>
-                    <Badge size="sm" variant="default">
-                      {payment.daysOverdue}
-                    </Badge>
+                    <div className="text-right">
+                      <Badge size="sm" variant={payment.status === 'Completed' || payment.status === 'Paid' ? 'active' : 'inactive'}>
+                        {payment.status}
+                      </Badge>
+                      <p className="text-xs text-gray-500 mt-1">{payment.date}</p>
+                    </div>
                   </div>
                 ))
               ) : (
