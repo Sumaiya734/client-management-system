@@ -141,11 +141,13 @@ export default function Subscriptions() {
   const handleOpenModal = (product, quantity, subscription, isEdit = false) => {
     setSelectedProduct(product?.name || product);
     setSelectedQuantity(product?.quantity || quantity);
-    
-    // Calculate price for the specific product
-    const productPrice = product.price || (product.sub_total ? product.sub_total / product.quantity : null);
-    setSelectedTotalAmount(productPrice || subscription?.totalAmount || null);
-    
+
+    // Calculate total price for the specific product (Unit Price * Quantity)
+    const unitPrice = product.price || (product.sub_total ? product.sub_total / product.quantity : 0);
+    const lineTotal = product.sub_total || (unitPrice * quantity);
+
+    setSelectedTotalAmount(lineTotal || subscription?.totalAmount || null);
+
     setOriginalSubscription(subscription); // Store original subscription context
     setSelectedProductForEdit(product); // Store the specific product being edited
 
@@ -159,7 +161,7 @@ export default function Subscriptions() {
         end_date: product.subscription_end || subscription.end_date || (product.dateRange && product.dateRange !== 'N/A' ? product.dateRange.split(' to ')[1] : ''),
         notes: subscription.notes || '', // Notes might be on main subscription
         delivery_date: product.delivery_date || subscription.delivery_date || '',
-        total_amount: productPrice || subscription.total_amount || null,
+        total_amount: lineTotal || subscription.total_amount || null,
         // Add other fields if available
       });
     } else {
@@ -177,35 +179,114 @@ export default function Subscriptions() {
         return;
       }
 
-      // Prepare subscription data for API
-      // Extract numeric value from total amount (remove currency symbols)
-      // Use the total amount from the original subscription (sum of all products) rather than individual product
-      const totalAmountValue = originalSubscription?.total_amount ? parseFloat(originalSubscription?.total_amount.toString().replace(/[^\d.-]/g, '')) : 
-        (data.totalAmount ? parseFloat(data.totalAmount.toString().replace(/[^\d.-]/g, '')) : 0);
+      // Validate that end date is after start date
+      if (new Date(data.endDate) <= new Date(data.startDate)) {
+        showError('End date must be after start date');
+        return;
+      }
 
-      // Use original subscription data if available, fallback to data from form
+      // Parse current products status
+      let currentProducts = [];
+      try {
+        if (originalSubscription?.raw_products_subscription_status) {
+          // use raw_products_subscription_status which we added in backend transformer
+          currentProducts = typeof originalSubscription.raw_products_subscription_status === 'string'
+            ? JSON.parse(originalSubscription.raw_products_subscription_status)
+            : originalSubscription.raw_products_subscription_status;
+        } else if (originalSubscription?.products_subscription_status) {
+          currentProducts = typeof originalSubscription.products_subscription_status === 'string'
+            ? JSON.parse(originalSubscription.products_subscription_status)
+            : originalSubscription.products_subscription_status;
+        }
+      } catch (e) {
+        console.warn("Failed to parse products status", e);
+      }
+
+      if (!Array.isArray(currentProducts)) {
+        currentProducts = [];
+      }
+
+      // Identify the product to update
+      const targetProductName = data.product; // Name from modal
+      const lineTotalAmount = parseFloat(data.totalAmount.toString().replace(/[^\d.-]/g, '')) || 0;
+      const quantity = parseInt(data.quantity) || 1;
+      const unitPrice = quantity > 0 ? lineTotalAmount / quantity : 0;
+
+      let productFound = false;
+      const updatedProducts = currentProducts.map(p => {
+        const pName = p.name || p.product_name;
+        // Match by name matching
+        if (pName === targetProductName) {
+          productFound = true;
+          return {
+            ...p,
+            start_date: data.startDate,
+            end_date: data.endDate,
+            delivery_date: data.deliveryDate,
+            notes: data.notes,
+            // Update price info
+            price: unitPrice,
+            unit_price: unitPrice,
+            sub_total: lineTotalAmount,
+            quantity: quantity,
+            custom_price: data.customPrice ? lineTotalAmount : null, // Persist custom price flag/value for this product
+            status: 'Active' // Mark as active when saving
+          };
+        }
+        return p;
+      });
+
+      // If product was not in the existing JSON list (e.g. legacy data), add it
+      if (!productFound) {
+        updatedProducts.push({
+          name: targetProductName,
+          product_name: targetProductName,
+          quantity: quantity,
+          start_date: data.startDate,
+          end_date: data.endDate,
+          delivery_date: data.deliveryDate,
+          price: unitPrice,
+          unit_price: unitPrice,
+          sub_total: lineTotalAmount,
+          custom_price: data.customPrice ? lineTotalAmount : null,
+          status: 'Active'
+        });
+      }
+
+      // Calculate the new total amount for the subscription
+      // Sum up sub_totals of all products
+      const newTotalAmount = updatedProducts.reduce((sum, p) => sum + (parseFloat(p.sub_total) || parseFloat(p.total_amount) || 0), 0);
+
+      // Check if ANY product has custom pricing active to set the subscription-level custom_price
+      const hasCustomPricing = updatedProducts.some(p => p.custom_price !== null && p.custom_price !== undefined);
+
+      // Prepare subscription data for API
+      // Use conditional logic to only include IDs if they are valid values (not null/undefined/0)
+      const clientId = data.originalSubscription?.client_id || originalSubscription?.client_id;
+      const productId = data.selectedProductForEdit?.product_id || data.originalSubscription?.product_id || originalSubscription?.product_id;
+      const purchaseId = data.originalSubscription?.purchase_id || originalSubscription?.purchase_id;
+
       const subscriptionData = {
         po_number: data.poNumber || originalSubscription?.poNumber || 'PO-DEFAULT-001',
-        client_id: data.originalSubscription?.client_id || originalSubscription?.client_id || 1, // Use the original client_id from the purchase
-        product_id: data.selectedProductForEdit?.product_id || data.originalSubscription?.product_id || originalSubscription?.product_id || 1, // Use the product_id from selected product
         start_date: data.startDate,
         end_date: data.endDate,
         status: 'Active',
         notes: data.notes || '',
-        quantity: data.selectedProductForEdit?.quantity || data.originalSubscription?.quantity || originalSubscription?.quantity || 1,
-        total_amount: totalAmountValue, // Use the total amount from original subscription (sum of all products)
-        unit_price: data.unitPrice ? parseFloat(data.unitPrice.toString().replace(/[^\d.-]/g, '')) : null,
-        purchase_id: data.originalSubscription?.purchase_id || originalSubscription?.purchase_id // Link to the original purchase if available
+        quantity: quantity,
+        total_amount: newTotalAmount,
+        custom_price: hasCustomPricing ? newTotalAmount : null,
+        unit_price: unitPrice,
+        products_subscription_status: updatedProducts
       };
+
+      if (clientId) subscriptionData.client_id = clientId;
+      if (productId) subscriptionData.product_id = productId;
+      if (purchaseId) subscriptionData.purchase_id = purchaseId;
 
       let response;
       if (editingSubscription) {
         // UPDATE existing subscription
-        const updateData = {
-          ...subscriptionData,
-          // Ensure we keep other fields or just update what's changed
-        };
-        response = await api.put(`/subscriptions/${editingSubscription.id}`, updateData);
+        response = await api.put(`/subscriptions/${editingSubscription.id}`, subscriptionData);
         console.log('Subscription updated:', response.data);
       } else {
         // CREATE new subscription
@@ -215,11 +296,19 @@ export default function Subscriptions() {
 
       // Refresh the subscriptions list
       fetchSubscriptions();
+
+      // Close modal
+      setIsModalOpen(false);
+      showSuccess('Subscription saved successfully');
+
     } catch (error) {
       console.error('Error saving subscription:', error);
       if (error.response) {
         console.error('Server response:', error.response.data);
         showError(`Failed to save subscription: ${error.response.data.message || 'Validation failed'}`);
+        if (error.response.data.errors) {
+          console.log('Validation Errors:', error.response.data.errors);
+        }
       } else {
         showError('Failed to save subscription');
       }

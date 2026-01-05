@@ -76,14 +76,39 @@ const GlobalSearch = ({ placeholder = "Search...", className = "" }) => {
         limit: 5 // Limit results for dropdown
       });
 
-      if (response.data.success) {
-        setSearchResults(response.data.data);
+      console.log('Search response:', response); // Debug log
+
+      // Handle different response structures
+      if (response.data) {
+        // If response has success property
+        if (response.data.success) {
+          setSearchResults(response.data.data || {});
+        } 
+        // If response data is directly the search results
+        else if (typeof response.data === 'object' && response.data !== null) {
+          setSearchResults(response.data);
+        }
+        // If no results
+        else {
+          setSearchResults({});
+        }
       } else {
-        setError(response.data.message || 'Search failed');
+        setSearchResults({});
       }
     } catch (err) {
       console.error('Search error:', err);
-      setError('An error occurred during search');
+      console.error('Error details:', err.response?.data);
+      
+      // More detailed error handling
+      if (err.response?.status === 404) {
+        setError('Search endpoint not found. Please check backend configuration.');
+      } else if (err.response?.status === 500) {
+        setError('Server error occurred during search.');
+      } else if (err.response?.data?.message) {
+        setError(err.response.data.message);
+      } else {
+        setError('An error occurred during search');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -125,117 +150,141 @@ const GlobalSearch = ({ placeholder = "Search...", className = "" }) => {
       );
     }
     
-    if (Object.keys(searchResults).length === 0) {
+    // Check if searchResults is empty or has no results
+    if (!searchResults || Object.keys(searchResults).length === 0) {
       return <p className="text-gray-500 px-4 py-2">No results found</p>;
     }
 
-    return Object.entries(searchResults).map(([model, data]) => (
-      <div key={model} className="mb-3 last:mb-0">
-        <h4 className="text-xs font-semibold text-gray-500 uppercase px-4 py-1 border-b border-gray-100">
-          {model} ({data.results.length})
-        </h4>
-        <div className="space-y-1">
-          {data.results.slice(0, 3).map((item, index) => (
-            <div 
-              key={index} 
-              className="px-4 py-2 hover:bg-gray-50 cursor-pointer flex items-start"
-              onClick={() => {
-                // Navigate to the appropriate page based on model
-                let path = '';
-                switch(model) {
-                  case 'clients':
-                    path = `/clients`;
-                    break;
-                  case 'products':
-                    path = `/products`;
-                    break;
-                  case 'purchases':
-                    path = `/orders`;
-                    break;
-                  case 'subscriptions':
-                    path = `/subscriptions`;
-                    break;
-                  case 'invoices':
-                    path = `/invoices`;
-                    break;
-                  case 'vendors':
-                    path = `/vendors`;
-                    break;
-                  default:
-                    path = `/search?q=${encodeURIComponent(searchQuery)}`;
-                }
-                
-                if (item.id) {
-                  navigate(`${path}#${item.id}`);
-                } else {
-                  navigate(path);
-                }
-                
-                setShowResults(false);
-              }}
-            >
-              {renderResultItem(model, item)}
-            </div>
-          ))}
-          {data.results.length > 3 && (
-            <div 
-              className="px-4 py-2 text-blue-600 hover:bg-gray-50 cursor-pointer text-sm"
-              onClick={() => navigateToSearchPage()}
-            >
-              View all {data.results.length} results for {model}
-            </div>
-          )}
+    return Object.entries(searchResults).map(([model, data]) => {
+      // Handle different data structures
+      const results = data?.results || data || [];
+      const resultsArray = Array.isArray(results) ? results : [];
+      
+      if (resultsArray.length === 0) {
+        return null; // Skip empty result sets
+      }
+
+      return (
+        <div key={model} className="mb-3 last:mb-0">
+          <h4 className="text-xs font-semibold text-gray-500 uppercase px-4 py-1 border-b border-gray-100">
+            {model} ({resultsArray.length})
+          </h4>
+          <div className="space-y-1">
+            {resultsArray.slice(0, 3).map((item, index) => (
+              <div 
+                key={index} 
+                className="px-4 py-2 hover:bg-gray-50 cursor-pointer flex items-start"
+                onClick={() => {
+                  // Navigate to the appropriate page based on model
+                  let path = '';
+                  switch(model) {
+                    case 'clients':
+                      path = `/clients`;
+                      break;
+                    case 'products':
+                      path = `/products`;
+                      break;
+                    case 'purchases':
+                      path = `/orders`;
+                      break;
+                    case 'subscriptions':
+                      path = `/subscriptions`;
+                      break;
+                    case 'invoices':
+                      path = `/invoices`;
+                      break;
+                    case 'vendors':
+                      path = `/vendors`;
+                      break;
+                    default:
+                      path = `/search?q=${encodeURIComponent(searchQuery)}`;
+                  }
+                  
+                  if (item.id) {
+                    navigate(`${path}#${item.id}`);
+                  } else {
+                    navigate(path);
+                  }
+                  
+                  setShowResults(false);
+                }}
+              >
+                {renderResultItem(model, item)}
+              </div>
+            ))}
+            {resultsArray.length > 3 && (
+              <div 
+                className="px-4 py-2 text-blue-600 hover:bg-gray-50 cursor-pointer text-sm"
+                onClick={() => navigateToSearchPage()}
+              >
+                View all {resultsArray.length} results for {model}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-    ));
+      );
+    }).filter(Boolean); // Remove null entries
   };
 
   const renderResultItem = (model, item) => {
+    if (!item) {
+      return <div className="text-gray-500">No data available</div>;
+    }
+
     switch (model) {
       case 'clients':
         return (
           <div>
-            <div className="font-medium text-gray-900">{item.cli_name || item.company}</div>
-            <div className="text-sm text-gray-500">{item.email || item.phone}</div>
+            <div className="font-medium text-gray-900">{item.cli_name || item.company || item.name || 'Unnamed Client'}</div>
+            <div className="text-sm text-gray-500">{item.email || item.phone || 'No contact info'}</div>
           </div>
         );
       case 'products':
         return (
           <div>
-            <div className="font-medium text-gray-900">{item.product_name}</div>
-            <div className="text-sm text-gray-500">{item.description}</div>
+            <div className="font-medium text-gray-900">{item.product_name || item.name || 'Unnamed Product'}</div>
+            <div className="text-sm text-gray-500">{item.description || 'No description'}</div>
           </div>
         );
       case 'purchases':
         return (
           <div>
-            <div className="font-medium text-gray-900">PO: {item.po_number}</div>
-            <div className="text-sm text-gray-500">Client: {item.cli_name}</div>
+            <div className="font-medium text-gray-900">PO: {item.po_number || 'No PO Number'}</div>
+            <div className="text-sm text-gray-500">Client: {item.cli_name || item.client_name || 'Unknown Client'}</div>
           </div>
         );
       case 'subscriptions':
         return (
           <div>
-            <div className="font-medium text-gray-900">PO: {item.po_number}</div>
-            <div className="text-sm text-gray-500">Status: {item.status}</div>
+            <div className="font-medium text-gray-900">PO: {item.po_number || 'No PO Number'}</div>
+            <div className="text-sm text-gray-500">Status: {item.status || 'Unknown Status'}</div>
           </div>
         );
       case 'invoices':
         return (
           <div>
-            <div className="font-medium text-gray-900">Invoice: {item.invoice_number}</div>
-            <div className="text-sm text-gray-500">PO: {item.po_number} | Status: {item.payment_status}</div>
+            <div className="font-medium text-gray-900">Invoice: {item.invoice_number || 'No Invoice Number'}</div>
+            <div className="text-sm text-gray-500">PO: {item.po_number || 'N/A'} | Status: {item.payment_status || 'Unknown'}</div>
           </div>
         );
       case 'vendors':
         return (
           <div>
-            <div className="font-medium text-gray-900">{item.name || item.company}</div>
-            <div className="text-sm text-gray-500">{item.email || item.contact_person}</div>
+            <div className="font-medium text-gray-900">{item.name || item.company || 'Unnamed Vendor'}</div>
+            <div className="text-sm text-gray-500">{item.email || item.contact_person || 'No contact info'}</div>
           </div>
         );
       default:
-        return <div>{JSON.stringify(item, null, 2)}</div>;
+        return (
+          <div>
+            <div className="font-medium text-gray-900">
+              {item.name || item.title || item.id || 'Unknown Item'}
+            </div>
+            <div className="text-sm text-gray-500">
+              {JSON.stringify(item).substring(0, 100)}...
+            </div>
+          </div>
+        );
     }
   };
 

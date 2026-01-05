@@ -53,4 +53,45 @@ class ProductController extends BaseAPIController
         ];
     }
 
+    /**
+     * Search products
+     */
+    public function search(Request $request)
+    {
+        try {
+            $searchTerm = $request->input('search', '');
+            $category = $request->input('category', '');
+            $status = $request->input('status', '');
+            $limit = $request->input('limit', 50);
+
+            $query = \App\Models\Product::query();
+
+            // Apply search filter
+            if (!empty($searchTerm)) {
+                $query->where(function ($q) use ($searchTerm) {
+                    $q->where('product_name', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('description', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('category', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('vendor', 'LIKE', "%{$searchTerm}%");
+                });
+            }
+
+            // Apply category filter
+            if (!empty($category) && $category !== 'All Categories') {
+                $query->where('category', $category);
+            }
+
+            // Apply status filter
+            if (!empty($status) && $status !== 'All Status') {
+                $query->where('status', $status);
+            }
+
+            $products = $query->limit($limit)->get();
+
+            return \App\Helpers\ResponseHelper::success($products, 'Products retrieved successfully');
+        } catch (\Exception $e) {
+            return \App\Helpers\ResponseHelper::error('Failed to search products', $e->getMessage());
+        }
+    }
+
 }

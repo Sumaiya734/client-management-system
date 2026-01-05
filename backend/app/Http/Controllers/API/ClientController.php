@@ -59,4 +59,74 @@ class ClientController extends BaseAPIController
             return ResponseHelper::error('Failed to update ' . strtolower($this->resourceName), $e->getMessage());
         }
     }
+
+    /**
+     * Search clients
+     */
+    public function search(Request $request)
+    {
+        try {
+            $searchTerm = $request->input('search', '');
+            $status = $request->input('status', '');
+            $limit = $request->input('limit', 50);
+
+            $query = Client::query();
+
+            // Apply search filter
+            if (!empty($searchTerm)) {
+                $query->where(function ($q) use ($searchTerm) {
+                    $q->where('cli_name', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('company', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('email', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('phone', 'LIKE', "%{$searchTerm}%");
+                });
+            }
+
+            // Apply status filter
+            if (!empty($status) && $status !== 'All Status') {
+                $query->where('status', $status);
+            }
+
+            $clients = $query->limit($limit)->get();
+
+            return ResponseHelper::success($clients, 'Clients retrieved successfully');
+        } catch (\Exception $e) {
+            return ResponseHelper::error('Failed to search clients', $e->getMessage());
+        }
+    }
+
+    /**
+     * Get paginated clients
+     */
+    public function paginate(Request $request)
+    {
+        try {
+            $perPage = $request->input('per_page', 15);
+            $searchTerm = $request->input('search', '');
+            $status = $request->input('status', '');
+
+            $query = Client::query();
+
+            // Apply search filter
+            if (!empty($searchTerm)) {
+                $query->where(function ($q) use ($searchTerm) {
+                    $q->where('cli_name', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('company', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('email', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('phone', 'LIKE', "%{$searchTerm}%");
+                });
+            }
+
+            // Apply status filter
+            if (!empty($status) && $status !== 'All Status') {
+                $query->where('status', $status);
+            }
+
+            $clients = $query->paginate($perPage);
+
+            return ResponseHelper::success($clients, 'Clients retrieved successfully');
+        } catch (\Exception $e) {
+            return ResponseHelper::error('Failed to get paginated clients', $e->getMessage());
+        }
+    }
 }

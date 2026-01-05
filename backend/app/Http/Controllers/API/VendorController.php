@@ -63,4 +63,39 @@ class VendorController extends BaseAPIController
             return ResponseHelper::error('Failed to update ' . strtolower($this->resourceName), $e->getMessage());
         }
     }
+
+    /**
+     * Search vendors
+     */
+    public function search(Request $request)
+    {
+        try {
+            $searchTerm = $request->input('search', '');
+            $status = $request->input('status', '');
+            $limit = $request->input('limit', 50);
+
+            $query = Vendor::query();
+
+            // Apply search filter
+            if (!empty($searchTerm)) {
+                $query->where(function ($q) use ($searchTerm) {
+                    $q->where('name', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('company', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('email', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('contact_person', 'LIKE', "%{$searchTerm}%");
+                });
+            }
+
+            // Apply status filter
+            if (!empty($status) && $status !== 'All Status') {
+                $query->where('status', $status);
+            }
+
+            $vendors = $query->limit($limit)->get();
+
+            return ResponseHelper::success($vendors, 'Vendors retrieved successfully');
+        } catch (\Exception $e) {
+            return ResponseHelper::error('Failed to search vendors', $e->getMessage());
+        }
+    }
 }

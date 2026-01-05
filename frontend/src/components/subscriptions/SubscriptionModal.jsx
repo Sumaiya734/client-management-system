@@ -62,7 +62,7 @@ const SubscriptionModal = ({
 
   const calculateUnitPrice = () => {
     const totalStr = customPrice ? customTotal : initialTotalAmount;
-    const numeric = parseFloat((totalStr || '').replace(/[^\d.]/g, '')) || 0;
+    const numeric = parseFloat((totalStr || '').toString().replace(/[^\d.]/g, '')) || 0;
     return quantity > 0 ? (numeric / quantity).toFixed(0) : '0';
   };
 

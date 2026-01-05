@@ -51,25 +51,20 @@ export default function VendorManagement() {
   const fetchVendors = async () => {
     try {
       setLoading(true);
-      let url = '/vendors';
       
-      // Build query parameters
-      const params = {};
-      if (statusFilter !== 'All Status') {
-        params.status = statusFilter;
+      // Use search endpoint if we have search term or status filter
+      if (searchTerm || (statusFilter && statusFilter !== 'All Status')) {
+        const searchData = {};
+        if (searchTerm) searchData.search = searchTerm;
+        if (statusFilter && statusFilter !== 'All Status') searchData.status = statusFilter;
+        
+        const response = await vendorApi.search(searchData);
+        setVendors(response.data);
+      } else {
+        // Use regular endpoint for all vendors
+        const response = await vendorApi.getAll();
+        setVendors(response.data);
       }
-      if (searchTerm) {
-        params.search = searchTerm;
-      }
-      
-      if (Object.keys(params).length > 0) {
-        const searchParams = new URLSearchParams(params);
-        url += `?${searchParams.toString()}`;
-      }
-      
-      const response = await vendorApi.getAll();
-      // After response interceptor normalization, response.data is the array of vendors
-      setVendors(response.data);
     } catch (error) {
       console.error('Error fetching vendors:', error);
       if (error.response) {

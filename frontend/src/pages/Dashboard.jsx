@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Package, FileText, DollarSign, TrendingUp, TrendingDown, AlertTriangle, FileBarChart } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
@@ -8,6 +9,7 @@ import { dashboardApi } from '../api';
 import { formatDate } from '../utils/dateUtils';
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -30,6 +32,37 @@ export default function Dashboard() {
   // Get stats from API data or fallback to empty values
   const summary = dashboardData?.summary || {};
   const recent = dashboardData?.recent || {};
+  
+  const handleCardClick = (cardName) => {
+    switch(cardName) {
+      case 'Total Clients':
+        navigate('/clients');
+        break;
+      case 'Total Vendors':
+        navigate('/vendors');
+        break;
+      case 'Total Products':
+        navigate('/products');
+        break;
+      case 'Total Purchases':
+        navigate('/purchases');
+        break;
+      case 'Active Subscriptions':
+        navigate('/subscriptions');
+        break;
+      case 'Pending Payments':
+        navigate('/payments');
+        break;
+      case 'Monthly Revenue':
+        navigate('/reports');
+        break;
+      case 'Total Bills':
+        navigate('/billing');
+        break;
+      default:
+        break;
+    }
+  };
   
   const stats = [
     { 
@@ -86,6 +119,14 @@ export default function Dashboard() {
       change: summary.monthlyRevenueChange || '+0%', 
       trend: summary.monthlyRevenueTrend || 'up',
       icon: DollarSign, 
+      description: 'from last month' 
+    },
+    { 
+      name: 'Total Bills', 
+      value: summary.totalBills || 0, 
+      change: summary.totalBillsChange || '+0%', 
+      trend: summary.totalBillsTrend || 'up',
+      icon: FileText, 
       description: 'from last month' 
     },
   ];
@@ -160,7 +201,11 @@ export default function Dashboard() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         {stats.map((stat) => (
-          <Card key={stat.name} className="p-2">
+          <Card 
+            key={stat.name} 
+            className="p-2 cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => handleCardClick(stat.name)}
+          >
             <CardContent className="p-1">
               <div className="flex items-center justify-between mb-1">
                 <div className="p-0.5 bg-gray-50 rounded-sm">

@@ -51,25 +51,20 @@ export default function Clients() {
   const fetchClients = async () => {
     try {
       setLoading(true);
-      let url = '/clients';
       
-      // Build query parameters
-      const params = {};
-      if (statusFilter !== 'All Status') {
-        params.status = statusFilter;
+      // Use search endpoint if we have search term or status filter
+      if (searchTerm || (statusFilter && statusFilter !== 'All Status')) {
+        const searchData = {};
+        if (searchTerm) searchData.search = searchTerm;
+        if (statusFilter && statusFilter !== 'All Status') searchData.status = statusFilter;
+        
+        const response = await api.post('/clients-search', searchData);
+        setClients(response.data);
+      } else {
+        // Use regular endpoint for all clients
+        const response = await api.get('/clients');
+        setClients(response.data);
       }
-      if (searchTerm) {
-        params.search = searchTerm;
-      }
-      
-      if (Object.keys(params).length > 0) {
-        const searchParams = new URLSearchParams(params);
-        url += `?${searchParams.toString()}`;
-      }
-      
-      const response = await api.get(url);
-      // After response interceptor normalization, response.data is the array of clients
-      setClients(response.data);
     } catch (error) {
       console.error('Error fetching clients:', error);
       if (error.response) {

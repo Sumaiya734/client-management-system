@@ -63,6 +63,7 @@ Route::apiResource('billing-managements', \App\Http\Controllers\Api\BillingManag
 
 // Additional billing management routes
 Route::get('billing-managements-search', [\App\Http\Controllers\Api\BillingManagementController::class, 'search']);
+Route::post('billing-managements-search', [\App\Http\Controllers\Api\BillingManagementController::class, 'search']);
 Route::get('billing-managements-summary', [\App\Http\Controllers\Api\BillingManagementController::class, 'summary']);
 Route::get('billing-managements/{id}/download', [\App\Http\Controllers\Api\BillingManagementController::class, 'download']);
 

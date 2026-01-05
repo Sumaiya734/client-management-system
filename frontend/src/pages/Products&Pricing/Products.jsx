@@ -70,42 +70,54 @@ export default function Products() {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      let url = '/products';
       
-      // Build query parameters
-      const params = {};
-      if (categoryFilter !== 'All Categories') {
-        params.category = categoryFilter;
+      // Use search endpoint if we have search term or category filter
+      if (searchTerm || (categoryFilter && categoryFilter !== 'All Categories')) {
+        const searchData = {};
+        if (searchTerm) searchData.search = searchTerm;
+        if (categoryFilter && categoryFilter !== 'All Categories') searchData.category = categoryFilter;
+        
+        const response = await api.post('/products-search', searchData);
+        // Transform the API response to match the expected format
+        const transformedProducts = response.data.map(product => ({
+          id: product.id,
+          name: product.product_name || product.name,
+          description: product.description,
+          category: product.category,
+          vendor: product.vendor,
+          vendorWebsite: product.vendor_website,
+          type: product.subscription_type || product.type,
+          basePrice: product.base_price || 0,
+          baseCurrency: product.base_currency || 'USD',
+          profit: product.profit || product.profit_margin || 0,
+          bdtPrice: `৳${product.bdt_price || 0}`,
+          bdtLabel: 'BDT (final price)',
+          currencies: product.multi_currency ? (typeof product.multi_currency === 'string' ? JSON.parse(product.multi_currency) : product.multi_currency) : [],
+          status: product.status
+        }));
+        setProducts(transformedProducts);
+      } else {
+        // Use regular endpoint for all products
+        const response = await api.get('/products');
+        // Transform the API response to match the expected format
+        const transformedProducts = response.data.map(product => ({
+          id: product.id,
+          name: product.product_name || product.name,
+          description: product.description,
+          category: product.category,
+          vendor: product.vendor,
+          vendorWebsite: product.vendor_website,
+          type: product.subscription_type || product.type,
+          basePrice: product.base_price || 0,
+          baseCurrency: product.base_currency || 'USD',
+          profit: product.profit || product.profit_margin || 0,
+          bdtPrice: `৳${product.bdt_price || 0}`,
+          bdtLabel: 'BDT (final price)',
+          currencies: product.multi_currency ? (typeof product.multi_currency === 'string' ? JSON.parse(product.multi_currency) : product.multi_currency) : [],
+          status: product.status
+        }));
+        setProducts(transformedProducts);
       }
-      if (searchTerm) {
-        params.search = searchTerm;
-      }
-      
-      if (Object.keys(params).length > 0) {
-        const searchParams = new URLSearchParams(params);
-        url += `?${searchParams.toString()}`;
-      }
-      
-      const response = await api.get(url);
-      // After response interceptor normalization, response.data is the array of products
-      // Transform the API response to match the expected format
-      const transformedProducts = response.data.map(product => ({
-        id: product.id,
-        name: product.product_name || product.name,
-        description: product.description,
-        category: product.category,
-        vendor: product.vendor,
-        vendorWebsite: product.vendor_website,
-        type: product.subscription_type || product.type,
-        basePrice: product.base_price || 0,
-        baseCurrency: product.base_currency || 'USD',
-        profit: product.profit || product.profit_margin || 0,
-        bdtPrice: `৳${product.bdt_price || 0}`,
-        bdtLabel: 'BDT (final price)',
-        currencies: product.multi_currency ? (typeof product.multi_currency === 'string' ? JSON.parse(product.multi_currency) : product.multi_currency) : [],
-        status: product.status
-      }));
-      setProducts(transformedProducts);
     } catch (error) {
       console.error('Error fetching products:', error);
       if (error.response) {

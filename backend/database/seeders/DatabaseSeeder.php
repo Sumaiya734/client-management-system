@@ -23,6 +23,9 @@ class DatabaseSeeder extends Seeder
         ]);
         
         $this->call([
+            ClientSeeder::class,
+            ProductSeeder::class,
+            VendorSeeder::class,
             PurchaseSeeder::class,
             SubscriptionSeeder::class,
             PaymentManagementSeeder::class,

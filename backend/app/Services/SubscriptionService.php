@@ -64,7 +64,9 @@ class SubscriptionService extends BaseService
                                 'status' => $storedProduct['status'] ?? 'Pending',
                                 'dateRange' => $subscription->start_date && $subscription->end_date ?
                                     $subscription->start_date . ' to ' . $subscription->end_date : 'N/A',
-                                'action' => ($storedProduct['status'] ?? 'Pending') === 'Pending' ? 'Subscribe' : 'Edit'
+                                'action' => ($storedProduct['status'] ?? 'Pending') === 'Pending' ? 'Subscribe' : 'Edit',
+                                'price' => $storedProduct['price'] ?? $storedProduct['unit_price'] ?? 0,
+                                'sub_total' => $storedProduct['sub_total'] ?? 0,
                             ];
                         }
                     } else {
@@ -87,7 +89,9 @@ class SubscriptionService extends BaseService
                         'status' => $subscription->status ?? 'Pending',
                         'dateRange' => $subscription->start_date && $subscription->end_date ?
                             $subscription->start_date . ' to ' . $subscription->end_date : 'N/A',
-                        'action' => $subscription->status === 'Pending' ? 'Subscribe' : 'Edit'
+                        'action' => $subscription->status === 'Pending' ? 'Subscribe' : 'Edit',
+                        'price' => $subscription->unit_price ?? $subscription->product->price ?? 0,
+                        'sub_total' => $subscription->total_amount ?? 0,
                     ];
                 }
                 // Fallback: create a basic product entry from subscription data if no product or purchase data available
@@ -195,7 +199,11 @@ class SubscriptionService extends BaseService
                     'raw_progress' => $subscription->progress,
                     'raw_progress' => $subscription->progress,
                     'raw_products_subscription_status' => $subscription->products_subscription_status,
-                    'invoice' => $subscription->invoice
+                    'invoice' => $subscription->invoice,
+                    // Add date fields for frontend modal
+                    'start_date' => $subscription->start_date,
+                    'end_date' => $subscription->end_date,
+                    'delivery_date' => $subscription->delivery_date ?? $purchase->delivery_date ?? null,
                 ];
 
                 logger()->info('Transformed subscription:', [
@@ -254,7 +262,9 @@ class SubscriptionService extends BaseService
                             'status' => $storedProduct['status'] ?? 'Pending',
                             'dateRange' => $subscription->start_date && $subscription->end_date ?
                                 $subscription->start_date . ' to ' . $subscription->end_date : 'N/A',
-                            'action' => ($storedProduct['status'] ?? 'Pending') === 'Pending' ? 'Subscribe' : 'Edit'
+                            'action' => ($storedProduct['status'] ?? 'Pending') === 'Pending' ? 'Subscribe' : 'Edit',
+                            'price' => $storedProduct['price'] ?? $storedProduct['unit_price'] ?? 0,
+                            'sub_total' => $storedProduct['sub_total'] ?? 0,
                         ];
                     }
                 } else {
@@ -277,7 +287,9 @@ class SubscriptionService extends BaseService
                     'status' => $subscription->status ?? 'Pending',
                     'dateRange' => $subscription->start_date && $subscription->end_date ?
                         $subscription->start_date . ' to ' . $subscription->end_date : 'N/A',
-                    'action' => $subscription->status === 'Pending' ? 'Subscribe' : 'Edit'
+                    'action' => $subscription->status === 'Pending' ? 'Subscribe' : 'Edit',
+                    'price' => $subscription->unit_price ?? $subscription->product->price ?? 0,
+                    'sub_total' => $subscription->total_amount ?? 0,
                 ];
             }
             // Fallback: create a basic product entry from subscription data if no product or purchase data available
@@ -288,7 +300,9 @@ class SubscriptionService extends BaseService
                     'status' => $subscription->status ?? 'Pending',
                     'dateRange' => $subscription->start_date && $subscription->end_date ?
                         $subscription->start_date . ' to ' . $subscription->end_date : 'N/A',
-                    'action' => $subscription->status === 'Pending' ? 'Subscribe' : 'Edit'
+                    'action' => $subscription->status === 'Pending' ? 'Subscribe' : 'Edit',
+                    'price' => $subscription->unit_price ?? $subscription->product->price ?? 0,
+                    'sub_total' => $subscription->total_amount ?? 0,
                 ];
             }
     
@@ -377,7 +391,10 @@ class SubscriptionService extends BaseService
                 'total_amount' => $subscription->total_amount ?? $purchase->total_amount,
                 // Include the raw database fields
                 'raw_progress' => $subscription->progress,
-                'raw_products_subscription_status' => $subscription->products_subscription_status
+                'raw_products_subscription_status' => $subscription->products_subscription_status,
+                'start_date' => $subscription->start_date,
+                'end_date' => $subscription->end_date,
+                'delivery_date' => $subscription->delivery_date ?? $purchase->delivery_date ?? null,
             ];
     
             return $transformedSubscription;
@@ -398,18 +415,19 @@ class SubscriptionService extends BaseService
         $validator = Validator::make($data, [
             'po_number' => 'required|string',
             'client_id' => 'required|exists:clients,id',
-            'product_id' => 'sometimes|exists:products,id',
+            'product_id' => 'nullable|exists:products,id',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'status' => 'required|string',
             'quantity' => 'required|integer|min:1',
             'total_amount' => 'required|numeric|min:0',
+            'custom_price' => 'nullable|numeric|min:0',
             'products_subscription_status' => 'sometimes',
             'progress' => 'sometimes',
             'po_details' => 'sometimes',
             'unit_price' => 'sometimes|numeric|min:0',
-            'notes' => 'sometimes|string',
-            'purchase_id' => 'sometimes|exists:purchases,id'
+            'notes' => 'nullable|string',
+            'purchase_id' => 'nullable|exists:purchases,id'
         ]);
         
         if ($validator->fails()) {
@@ -493,18 +511,19 @@ class SubscriptionService extends BaseService
         $validator = Validator::make($data, [
             'po_number' => 'sometimes|string',
             'client_id' => 'sometimes|exists:clients,id',
-            'product_id' => 'sometimes|exists:products,id',
+            'product_id' => 'nullable|exists:products,id',
             'start_date' => 'sometimes|date',
             'end_date' => 'sometimes|date|after:start_date',
             'status' => 'sometimes|string',
             'quantity' => 'sometimes|integer|min:1',
             'total_amount' => 'sometimes|numeric|min:0',
+            'custom_price' => 'nullable|numeric|min:0',
             'products_subscription_status' => 'sometimes',
             'progress' => 'sometimes',
             'po_details' => 'sometimes',
             'unit_price' => 'sometimes|numeric|min:0',
-            'notes' => 'sometimes|string',
-            'purchase_id' => 'sometimes|exists:purchases,id'
+            'notes' => 'nullable|string',
+            'purchase_id' => 'nullable|exists:purchases,id'
         ]);
         
         if ($validator->fails()) {
@@ -594,7 +613,9 @@ class SubscriptionService extends BaseService
                         'quantity' => $productData['quantity'] ?? 1,
                         'status' => $productData['status'] ?? 'Pending',
                         'dateRange' => $productData['dateRange'] ?? ($purchase->delivery_date ?? 'N/A'),
-                        'action' => $productData['status'] === 'Pending' ? 'Subscribe' : 'Edit'
+                        'action' => $productData['status'] === 'Pending' ? 'Subscribe' : 'Edit',
+                        'price' => $productData['price'] ?? $productData['unit_price'] ?? 0,
+                        'sub_total' => $productData['sub_total'] ?? 0,
                     ];
                 }
             } else {
