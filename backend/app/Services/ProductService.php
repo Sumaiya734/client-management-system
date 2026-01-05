@@ -56,6 +56,12 @@ class ProductService extends BaseService
             $basePrice = (float) $data['base_price'];
             $profitMargin = (float) $data['profit_margin'];
             $data['profit'] = $basePrice * ($profitMargin / 100);
+            
+            // Calculate BDT price based on base_price with profit margin applied and converted to BDT
+            // Using exchange rate of 110.5 (this should ideally come from settings or be configurable)
+            $finalUSD = $basePrice * (1 + $profitMargin / 100);
+            $bdtRate = 110.5; // This should be configurable
+            $data['bdt_price'] = round($finalUSD * $bdtRate);
         }
 
         return $this->repository->create($data);
@@ -105,6 +111,12 @@ class ProductService extends BaseService
             $basePrice = (float) $data['base_price'];
             $profitMargin = (float) $data['profit_margin'];
             $data['profit'] = $basePrice * ($profitMargin / 100);
+            
+            // Calculate BDT price based on base_price with profit margin applied and converted to BDT
+            // Using exchange rate of 110.5 (this should ideally come from settings or be configurable)
+            $finalUSD = $basePrice * (1 + $profitMargin / 100);
+            $bdtRate = 110.5; // This should be configurable
+            $data['bdt_price'] = round($finalUSD * $bdtRate);
         }
 
         return $this->repository->update($id, $data);

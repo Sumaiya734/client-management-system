@@ -90,7 +90,7 @@ export default function Products() {
           basePrice: product.base_price || 0,
           baseCurrency: product.base_currency || 'USD',
           profit: product.profit || product.profit_margin || 0,
-          bdtPrice: `৳${product.bdt_price || 0}`,
+          bdtPrice: product.bdt_price ? `৳${product.bdt_price}` : `৳0`,
           bdtLabel: 'BDT (final price)',
           currencies: product.multi_currency ? (typeof product.multi_currency === 'string' ? JSON.parse(product.multi_currency) : product.multi_currency) : [],
           status: product.status
@@ -111,7 +111,7 @@ export default function Products() {
           basePrice: product.base_price || 0,
           baseCurrency: product.base_currency || 'USD',
           profit: product.profit || product.profit_margin || 0,
-          bdtPrice: `৳${product.bdt_price || 0}`,
+          bdtPrice: product.bdt_price ? `৳${product.bdt_price}` : `৳0`,
           bdtLabel: 'BDT (final price)',
           currencies: product.multi_currency ? (typeof product.multi_currency === 'string' ? JSON.parse(product.multi_currency) : product.multi_currency) : [],
           status: product.status
@@ -152,7 +152,7 @@ export default function Products() {
     basePrice: 0,
     baseCurrency: 'USD',
     profit: 0,
-    bdtPrice: 0,
+    bdtPrice: '৳0',
     bdtLabel: 'BDT (final price)',
     currencies: [],
     status: 'Active'
@@ -233,7 +233,7 @@ export default function Products() {
           subscription_type: productData.type,
           base_price: parseFloat(productData.basePrice),
           base_currency: productData.baseCurrency || 'USD',
-          bdt_price: parseFloat(productData.bdtPrice.replace('৳', '')),
+          bdt_price: typeof productData.bdtPrice === 'string' ? parseFloat(productData.bdtPrice.replace('৳', '')) : productData.bdtPrice,
           multi_currency: JSON.stringify(productData.currencies),
           status: productData.status,
           category: productData.category,
@@ -260,7 +260,7 @@ export default function Products() {
               basePrice: response.data.base_price || 0,
               baseCurrency: response.data.base_currency || 'USD',
               profit: response.data.profit_margin || 0,
-              bdtPrice: `৳${response.data.bdt_price || 0}`,
+              bdtPrice: response.data.bdt_price ? `৳${response.data.bdt_price}` : `৳0`,
               bdtLabel: 'BDT (final price)',
               currencies: response.data.multi_currency ? (typeof response.data.multi_currency === 'string' ? JSON.parse(response.data.multi_currency) : response.data.multi_currency) : [],
               status: response.data.status
@@ -275,7 +275,7 @@ export default function Products() {
           subscription_type: productData.type,
           base_price: parseFloat(productData.basePrice),
           base_currency: productData.baseCurrency || 'USD',
-          bdt_price: parseFloat(productData.bdtPrice.replace('৳', '')),
+          bdt_price: typeof productData.bdtPrice === 'string' ? parseFloat(productData.bdtPrice.replace('৳', '')) : productData.bdtPrice,
           multi_currency: JSON.stringify(productData.currencies),
           status: productData.status,
           category: productData.category,
@@ -298,7 +298,7 @@ export default function Products() {
           basePrice: response.data.base_price || 0,
           baseCurrency: response.data.base_currency || 'USD',
           profit: response.data.profit_margin || 0,
-          bdtPrice: `৳${response.data.bdt_price || 0}`,
+          bdtPrice: response.data.bdt_price ? `৳${response.data.bdt_price}` : `৳0`,
           bdtLabel: 'BDT (final price)',
           currencies: response.data.multi_currency ? (typeof response.data.multi_currency === 'string' ? JSON.parse(response.data.multi_currency) : response.data.multi_currency) : [],
           status: response.data.status

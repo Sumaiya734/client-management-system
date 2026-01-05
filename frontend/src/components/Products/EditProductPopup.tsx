@@ -15,7 +15,7 @@ interface Product {
   basePrice: string | number;
   baseCurrency: string;
   profit: string | number;
-  bdtPrice: string;
+  bdtPrice: string | number;
   bdtLabel: string;
   currencies: Array<{ code: string; price: string }>;
   status: string;
@@ -179,7 +179,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
     const finalUSD = base * (1 + profit / 100);
     const bdt = finalUSD * rate;
     return {
-      bdt: Math.round(bdt).toLocaleString(),
+      bdt: Math.round(bdt),
       finalUSD: finalUSD.toFixed(2),
       profit,
     };
@@ -214,7 +214,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
       basePrice: parseFloat(formData.basePrice),
       baseCurrency: formData.baseCurrency,
       profit: parseFloat(formData.profitMargin),
-      bdtPrice: `৳${pricePreview.bdt}`,
+      bdtPrice: pricePreview.bdt,
       bdtLabel: 'Final Price (BDT)',
       currencies: product?.currencies || [],
       status: formData.status,

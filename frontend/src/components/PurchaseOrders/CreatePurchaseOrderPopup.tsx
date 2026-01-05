@@ -135,7 +135,7 @@ const CreatePurchaseOrderPopup: React.FC<CreatePurchaseOrderPopupProps> = ({
   const selectClient = (client: Client) => {
     setFormData(prev => ({
       ...prev,
-      client: `${client.company} - ${client.contact}`,
+      client: `${client.company}`,
       clientId: client.id
     }));
     toggleDropdown('client');
