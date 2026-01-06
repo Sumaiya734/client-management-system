@@ -201,16 +201,45 @@ class InvoiceService extends BaseService
 
         // Prepare invoice items from subscription/product
         $items = [];
-        if ($subscription->product) {
+        $subscriptionTotalAmount = $subscription->total_amount ?? $purchase->total_amount ?? 0;
+        
+        // Check for subscription specific products (from products_subscription_status)
+        if ($subscription->products_subscription_status) {
+             $products = is_string($subscription->products_subscription_status) ? 
+                json_decode($subscription->products_subscription_status, true) : 
+                $subscription->products_subscription_status;
+                
+             if (is_array($products)) {
+                $items = [];
+                // Recalculate total amount from active products to be safe
+                $subscriptionTotalAmount = 0;
+                
+                foreach ($products as $product) {
+                    $itemTotal = $product['sub_total'] ?? ($product['quantity'] ?? 1) * ($product['price'] ?? $product['unit_price'] ?? 0);
+                    $subscriptionTotalAmount += $itemTotal;
+                    
+                    $items[] = [
+                        'name' => $product['name'] ?? $product['product_name'] ?? 'Service',
+                        'description' => 'Service for ' . ($product['name'] ?? $product['product_name'] ?? 'Service'),
+                        'quantity' => $product['quantity'] ?? 1,
+                        'unit_price' => $product['price'] ?? $product['unit_price'] ?? 0,
+                        'total' => $itemTotal
+                    ];
+                }
+             }
+        }
+        // Check next for direct product relationship
+        elseif ($subscription->product) {
             $items[] = [
                 'name' => $subscription->product->product_name ?? $subscription->product->name ?? 'Service',
                 'description' => 'Subscription for ' . ($subscription->product->product_name ?? $subscription->product->name ?? 'Service'),
                 'quantity' => $subscription->quantity ?? 1,
-                'unit_price' => ($subscription->total_amount ?? $purchase->total_amount ?? 0) / ($subscription->quantity ?? 1),
-                'total' => $subscription->total_amount ?? $purchase->total_amount ?? 0
+                'unit_price' => ($subscriptionTotalAmount) / ($subscription->quantity ?? 1),
+                'total' => $subscriptionTotalAmount
             ];
-        } else {
-            // Fallback to using purchase products if subscription doesn't have direct product
+        } 
+        // Fallback to purchase products
+        else {
             if ($purchase && $purchase->products_subscriptions) {
                 $products = is_string($purchase->products_subscriptions) ? 
                     json_decode($purchase->products_subscriptions, true) : 
@@ -230,6 +259,64 @@ class InvoiceService extends BaseService
             }
         }
 
+        // --- Generate or Retrieve Billing Record ---
+        // Check if a billing record already exists for this subscription
+        $billing = Billing_management::where('subscription_id', $subscription->id)->first();
+        
+        if (!$billing) {
+            // Create a new Billing Record
+            $billPrefix = 'BILL';
+            $billDate = date('Ym');
+            $lastBill = Billing_management::where('bill_number', 'LIKE', $billPrefix . '-' . $billDate . '-%')
+                ->orderBy('bill_number', 'desc')
+                ->first();
+            
+            if ($lastBill) {
+                $billNum = intval(substr($lastBill->bill_number, -4));
+                $newBillNum = $billNum + 1;
+            } else {
+                $newBillNum = 1;
+            }
+            $billNumber = $billPrefix . '-' . $billDate . '-' . str_pad($newBillNum, 4, '0', STR_PAD_LEFT);
+
+            $billingData = [
+                'bill_number' => $billNumber,
+                'client' => $client->company ?? $client->cli_name ?? $client->name,
+                'client_id' => $client->id,
+                'subscription_id' => $subscription->id,
+                'purchase_id' => $purchase->id ?? null,
+                'po_number' => $subscription->po_number ?? $purchase->po_number ?? null,
+                'bill_date' => now()->format('Y-m-d'),
+                'due_date' => $subscription->end_date ?? now()->addDays(30)->format('Y-m-d'),
+                'total_amount' => $subscriptionTotalAmount,
+                'paid_amount' => 0,
+                'status' => 'Pending',
+                'payment_status' => 'Unpaid'
+            ];
+            
+            $billing = Billing_management::create($billingData);
+            
+            // Clear payment statistics cache
+            \Illuminate\Support\Facades\Cache::forget('payment_statistics');
+        } else {
+            // Update existing billing amount to ensure it matches subscription
+            if ($billing->total_amount != $subscriptionTotalAmount) {
+                $billing->total_amount = $subscriptionTotalAmount;
+                // Adjust status if needed
+                 if ($billing->paid_amount >= $billing->total_amount) {
+                     $billing->payment_status = 'Paid';
+                     $billing->status = 'Completed';
+                 } elseif ($billing->paid_amount > 0) {
+                     $billing->payment_status = 'Partially Paid';
+                     $billing->status = 'Partially Paid';
+                 } else {
+                     $billing->payment_status = 'Unpaid';
+                     $billing->status = 'Pending';
+                 }
+                $billing->save();
+            }
+        }
+
         // Create invoice data
         $invoiceData = [
             'client_id' => $client->id,
@@ -240,14 +327,18 @@ class InvoiceService extends BaseService
             'po_number' => $subscription->po_number ?? $purchase->po_number ?? null,
             'subscription_id' => $subscription->id,
             'purchase_id' => $purchase->id ?? null,
-            'billing_id' => null, // Will be linked later if needed
+            'billing_id' => $billing->id, // Link to the billing record
             'issue_date' => now()->format('Y-m-d'),
             'due_date' => $subscription->end_date ?? now()->addDays(30)->format('Y-m-d'),
             'items' => $items,
+            'sub_total' => $subscriptionTotalAmount,
+            'total_amount' => $subscriptionTotalAmount, // Assuming no tax/discount initially for generated invoices
+            'balance_amount' => $subscriptionTotalAmount - ($billing->paid_amount ?? 0), 
+            'paid_amount' => $billing->paid_amount ?? 0,
             'notes' => 'Invoice generated from subscription',
             'terms' => 'Payment is due within 30 days.',
-            'status' => 'Draft',
-            'payment_status' => 'Unpaid'
+            'status' => ($billing->payment_status == 'Paid') ? 'Paid' : 'Draft',
+            'payment_status' => $billing->payment_status ?? 'Unpaid'
         ];
 
         return $this->create($invoiceData);

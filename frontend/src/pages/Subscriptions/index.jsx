@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, AlertTriangle, Clock, CheckCircle, FileText } from 'lucide-react';
+import { Package, AlertTriangle, Clock, CheckCircle, FileText, Paperclip, Eye } from 'lucide-react';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { SearchFilter } from '../../components/ui/SearchFilter';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../../components/ui/Card';
@@ -7,6 +7,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '.
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import SubscriptionModal from '../../components/subscriptions/SubscriptionModal';
+import ViewSubscriptionModal from '../../components/subscriptions/ViewSubscriptionModal';
 import api from '../../api';
 import { invoiceApi } from '../../api';
 import { useNotification } from '../../components/Notifications';
@@ -26,6 +27,10 @@ export default function Subscriptions() {
   const [loading, setLoading] = useState(true);
   const [subscriptions, setSubscriptions] = useState([]);
 
+  // View subscription modal state
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [selectedSubscription, setSelectedSubscription] = useState(null);
+
   // Fetch subscriptions from API
   useEffect(() => {
     fetchSubscriptions();
@@ -37,13 +42,32 @@ export default function Subscriptions() {
       const response = await api.get('/subscriptions');
       console.log('Raw API response:', response.data);
 
-      // Transform the API response to ensure client data has proper structure
+      // Transform the API response to ensure client data has proper structure and products are accessible
       const transformedSubscriptions = response.data.map(subscription => {
         console.log('Processing subscription:', subscription);
         console.log('Subscription products:', subscription.products);
 
+        // Ensure products are properly structured
+        let products = [];
+        if (subscription.products_subscription_status) {
+          if (typeof subscription.products_subscription_status === 'string') {
+            try {
+              products = JSON.parse(subscription.products_subscription_status);
+            } catch (e) {
+              console.error('Error parsing products_subscription_status:', e);
+              products = [];
+            }
+          } else {
+            products = subscription.products_subscription_status;
+          }
+        } else if (Array.isArray(subscription.products)) {
+          products = subscription.products;
+        }
+
         return {
           ...subscription,
+          products: products, // Ensure products are accessible
+          raw_products_subscription_status: subscription.products_subscription_status, // Keep original for reference
           client: {
             ...subscription.client,
             company: subscription.client?.company || subscription.client || 'N/A',
@@ -358,6 +382,34 @@ export default function Subscriptions() {
     }
   };
 
+  // Handle opening view subscription modal
+  const handleViewSubscription = (subscription) => {
+    // Ensure the subscription data has properly formatted products for the modal
+    let products = [];
+    if (subscription.products_subscription_status) {
+      if (typeof subscription.products_subscription_status === 'string') {
+        try {
+          products = JSON.parse(subscription.products_subscription_status);
+        } catch (e) {
+          console.error('Error parsing products_subscription_status:', e);
+          products = [];
+        }
+      } else {
+        products = subscription.products_subscription_status;
+      }
+    } else if (Array.isArray(subscription.products)) {
+      products = subscription.products;
+    }
+
+    const formattedSubscription = {
+      ...subscription,
+      products: products
+    };
+
+    setSelectedSubscription(formattedSubscription);
+    setIsViewModalOpen(true);
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -405,19 +457,20 @@ export default function Subscriptions() {
                 <TableHead>Products & Subscription Status</TableHead>
                 <TableHead>Progress</TableHead>
                 <TableHead>Total Amount</TableHead>
+                <TableHead>Attachment</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan="6" className="text-center py-8 text-gray-500">
+                  <TableCell colSpan="7" className="text-center py-8 text-gray-500">
                     Loading subscriptions...
                   </TableCell>
                 </TableRow>
               ) : subscriptions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan="6" className="text-center py-8 text-gray-500">
+                  <TableCell colSpan="7" className="text-center py-8 text-gray-500">
                     No subscriptions found
                   </TableCell>
                 </TableRow>
@@ -443,42 +496,53 @@ export default function Subscriptions() {
                         <div className="text-sm text-gray-600">{subscription.client?.cli_name || subscription.client.contact || 'N/A'}</div>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <div className="space-y-3">
+                    <TableCell> 
+                      {/* Products & Subscription Status */}
+                      <div className="space-y-2"> 
                         {subscription.products && subscription.products.length > 0 ? (
                           subscription.products.map((product, index) => (
-                            <div key={index} className="border-b border-gray-100 last:border-b-0 pb-3 last:pb-0">
-                              <div className="flex items-center justify-between mb-2">
+                            <div
+                              key={index}
+                              className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm hover:shadow transition"
+                            >
+                              {/* Left: Product + Qty */}
+                              <div className="flex flex-col">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-medium text-gray-900">{product.name}</span>
-                                  <span className="text-xs bg-gray-900 text-white px-2 py-1 rounded">
+                                  <span className="font-medium text-gray-900 text-sm">
+                                    {product.name}
+                                  </span>
+                                  <span className="text-xs bg-gray-800 text-white px-2 py-0.5 rounded">
                                     x{product.quantity}
                                   </span>
-                                  <Badge className={`text-xs ${getStatusBadgeColor(product.status)}`}>
-                                    {product.status}
-                                  </Badge>
                                 </div>
-                                <Button
-                                  variant={product.action === 'Subscribe' ? 'primary' : 'outline'}
-                                  size="xs"
-                                  className="text-xs"
-                                  onClick={() => handleOpenModal(product, product.quantity, subscription, product.action === 'Edit')}
-                                >
-                                  {product.action}
-                                </Button>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {product.start_date && product.end_date
+                                    ? formatDateRange(product.start_date, product.end_date)
+                                    : product.delivery_date
+                                    ? `Delivery: ${formatDate(product.delivery_date)}`
+                                    : 'N/A'}
+                                </div>
                               </div>
-                              {product.dateRange && product.dateRange !== 'N/A' && (
-                                <div className="text-sm text-gray-600">
-                                  {product.dateRange.includes(' to ')
-                                    ? formatDateRange(product.dateRange.split(' to ')[0], product.dateRange.split(' to ')[1])
-                                    : formatDate(product.dateRange)
-                                  }
-                                </div>
-                              )}
+
+                              {/* Middle: Status */}
+                              <Badge className={`text-xs ${getStatusBadgeColor(product.status)}`}>
+                                {product.status}
+                              </Badge>
+
+                              {/* Right: Action Button */}
+                              <Button
+                                variant={product.action === 'Subscribe' ? 'primary' : 'outline'}
+                                size="xs"
+                                className="text-xs"
+                                onClick={() => handleOpenModal(product, product.quantity, subscription, product.action === 'Edit')}
+                              > Edit
+                                {product.action}
+                              </Button>
+   
                             </div>
                           ))
                         ) : (
-                          <div className="text-gray-500 text-sm">No products found</div>
+                          <span className="text-gray-400 text-sm">No products</span>
                         )}
                       </div>
                     </TableCell>
@@ -505,28 +569,54 @@ export default function Subscriptions() {
                       <div className="font-semibold text-gray-900">{subscription.totalAmount}</div>
                     </TableCell>
                     <TableCell>
-                      {subscription.invoice && subscription.invoice.length > 0 ? (
+                      {subscription.attachment ? (
                         <Button
                           variant="outline"
                           size="sm"
                           className="text-xs"
-                          icon={<FileText className="h-3 w-3" />}
-                          onClick={() => handleViewInvoiceSubscription(subscription.invoice[0].id)}
+                          icon={<Paperclip className="h-3 w-3" />}
+                          onClick={() => window.open(subscription.attachment, '_blank')}
                         >
-                          View Bill
+                          View
                         </Button>
                       ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-xs"
-                          icon={<FileText className="h-3 w-3" />}
-                          disabled={!subscription.canGenerateBill}
-                          onClick={() => handleGenerateInvoiceFromSubscription(subscription)}
-                        >
-                          Generate Bill
-                        </Button>
+                        <span className="text-gray-400 text-xs">No attachment</span>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {/* View Icon */}
+                        <button
+                          type="button"
+                          className="p-1.5 rounded-md border border-gray-300 hover:bg-gray-100 transition"
+                          title="View"
+                          onClick={() => handleViewSubscription(subscription)}
+                        >
+                          <Eye className="h-4 w-4 text-gray-700" />
+                        </button>
+
+                        {/* Invoice Icon */}
+                        {subscription.invoice && subscription.invoice.length > 0 ? (
+                          <button
+                            type="button"
+                            className="p-1.5 rounded-md border border-gray-300 hover:bg-gray-100 transition"
+                            title="View Bill"
+                            onClick={() => handleViewInvoiceSubscription(subscription.invoice[0].id)}
+                          >
+                            <FileText className="h-4 w-4 text-green-600" />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="p-1.5 rounded-md border border-gray-300 hover:bg-gray-100 transition disabled:opacity-50"
+                            title="Generate Bill"
+                            disabled={!subscription.canGenerateBill}
+                            onClick={() => handleGenerateInvoiceFromSubscription(subscription)}
+                          >
+                            <FileText className="h-4 w-4 text-blue-600" />
+                          </button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -548,6 +638,16 @@ export default function Subscriptions() {
         previousSubscription={editingSubscription}
         originalSubscription={originalSubscription}
         selectedProductForEdit={selectedProductForEdit}
+      />
+
+      {/* View Subscription Modal */}
+      <ViewSubscriptionModal
+        subscription={selectedSubscription}
+        isOpen={isViewModalOpen}
+        onClose={() => {
+          setIsViewModalOpen(false);
+          setSelectedSubscription(null);
+        }}
       />
     </div>
   );

@@ -47,6 +47,9 @@ class PurchaseService
      */
     public function create(array $requestData)
     {
+        // Sanitize input to handle "null" strings from FormData
+        $requestData = $this->sanitizeRequestData($requestData);
+
         // Auto-correct subscription_active if required fields missing
         if (isset($requestData['subscription_active']) && $this->getBooleanValue($requestData['subscription_active'])) {
             if (empty($requestData['subscription_type']) || empty($requestData['recurring_count']) || empty($requestData['delivery_date'])) {
@@ -128,6 +131,9 @@ class PurchaseService
      */
     public function update($id, array $data)
     {
+        // Sanitize input
+        $data = $this->sanitizeRequestData($data);
+
         $this->validatePurchaseData($data, true);
 
         return DB::transaction(function () use ($id, $data) {
@@ -563,5 +569,17 @@ class PurchaseService
         $purchaseArray['payment'] = $purchase->payment;
         
         return $purchaseArray;
+    }
+    /**
+     * Sanitize request data to handle "null" strings
+     */
+    private function sanitizeRequestData(array $data)
+    {
+        foreach ($data as $key => $value) {
+            if ($value === 'null') {
+                $data[$key] = null;
+            }
+        }
+        return $data;
     }
 }

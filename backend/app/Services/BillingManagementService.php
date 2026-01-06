@@ -24,10 +24,33 @@ class BillingManagementService extends BaseService
         $billings = $this->model->with('client', 'subscription', 'purchase')->get();
         
         // Process each billing record to include products from the associated purchase
+        // Process each billing record to include products from the associated purchase or subscription
         foreach ($billings as $billing) {
-            if ($billing->purchase) {
+            $products = [];
+            
+            // Priority 1: Check subscription for products
+            if ($billing->subscription && $billing->subscription->products_subscription_status) {
+                $productsSubscriptions = $billing->subscription->products_subscription_status;
+                
+                // If it's a JSON string, decode it
+                if (is_string($productsSubscriptions)) {
+                    $productsSubscriptions = json_decode($productsSubscriptions, true);
+                }
+                
+                if (is_array($productsSubscriptions)) {
+                    foreach ($productsSubscriptions as $productData) {
+                        $products[] = [
+                            'description' => $productData['name'] ?? $productData['product_name'] ?? 'Product',
+                            'quantity' => $productData['quantity'] ?? 1,
+                            'unit_price' => $productData['price'] ?? $productData['unit_price'] ?? 0,
+                            'total' => $productData['sub_total'] ?? ($productData['quantity'] ?? 1) * ($productData['price'] ?? $productData['unit_price'] ?? 0)
+                        ];
+                    }
+                }
+            } 
+            // Priority 2: Check purchase for products
+            elseif ($billing->purchase) {
                 // Extract products from the purchase
-                $products = [];
                 $purchaseData = $billing->purchase->toArray();
                 
                 if (isset($purchaseData['products_subscriptions'])) {
@@ -49,10 +72,10 @@ class BillingManagementService extends BaseService
                         }
                     }
                 }
-                
-                // Add products to the billing record
-                $billing->setAttribute('products', $products);
             }
+            
+            // Add products to the billing record
+            $billing->setAttribute('products', $products);
         }
         
         return $billings;
@@ -65,13 +88,12 @@ class BillingManagementService extends BaseService
     {
         $billing = $this->model->with('client', 'subscription', 'purchase')->find($id);
         
-        if ($billing && $billing->purchase) {
-            // Extract products from the purchase
+        if ($billing) {
             $products = [];
-            $purchaseData = $billing->purchase->toArray();
             
-            if (isset($purchaseData['products_subscriptions'])) {
-                $productsSubscriptions = $purchaseData['products_subscriptions'];
+            // Priority 1: Check subscription for products
+            if ($billing->subscription && $billing->subscription->products_subscription_status) {
+                $productsSubscriptions = $billing->subscription->products_subscription_status;
                 
                 // If it's a JSON string, decode it
                 if (is_string($productsSubscriptions)) {
@@ -83,9 +105,34 @@ class BillingManagementService extends BaseService
                         $products[] = [
                             'description' => $productData['name'] ?? $productData['product_name'] ?? 'Product',
                             'quantity' => $productData['quantity'] ?? 1,
-                            'unit_price' => $productData['price'] ?? 0,
-                            'total' => $productData['sub_total'] ?? ($productData['quantity'] ?? 1) * ($productData['price'] ?? 0)
+                            'unit_price' => $productData['price'] ?? $productData['unit_price'] ?? 0,
+                            'total' => $productData['sub_total'] ?? ($productData['quantity'] ?? 1) * ($productData['price'] ?? $productData['unit_price'] ?? 0)
                         ];
+                    }
+                }
+            }
+            // Priority 2: Check purchase for products
+            elseif ($billing->purchase) {
+                // Extract products from the purchase
+                $purchaseData = $billing->purchase->toArray();
+                
+                if (isset($purchaseData['products_subscriptions'])) {
+                    $productsSubscriptions = $purchaseData['products_subscriptions'];
+                    
+                    // If it's a JSON string, decode it
+                    if (is_string($productsSubscriptions)) {
+                        $productsSubscriptions = json_decode($productsSubscriptions, true);
+                    }
+                    
+                    if (is_array($productsSubscriptions)) {
+                        foreach ($productsSubscriptions as $productData) {
+                            $products[] = [
+                                'description' => $productData['name'] ?? $productData['product_name'] ?? 'Product',
+                                'quantity' => $productData['quantity'] ?? 1,
+                                'unit_price' => $productData['price'] ?? 0,
+                                'total' => $productData['sub_total'] ?? ($productData['quantity'] ?? 1) * ($productData['price'] ?? 0)
+                            ];
+                        }
                     }
                 }
             }
@@ -218,10 +265,33 @@ class BillingManagementService extends BaseService
         $billings = $query->with('client', 'subscription', 'purchase')->get();
         
         // Process each billing record to include products from the associated purchase
+        // Process each billing record to include products from the associated purchase or subscription
         foreach ($billings as $billing) {
-            if ($billing->purchase) {
+            $products = [];
+            
+            // Priority 1: Check subscription for products
+            if ($billing->subscription && $billing->subscription->products_subscription_status) {
+                $productsSubscriptions = $billing->subscription->products_subscription_status;
+                
+                // If it's a JSON string, decode it
+                if (is_string($productsSubscriptions)) {
+                    $productsSubscriptions = json_decode($productsSubscriptions, true);
+                }
+                
+                if (is_array($productsSubscriptions)) {
+                    foreach ($productsSubscriptions as $productData) {
+                        $products[] = [
+                            'description' => $productData['name'] ?? $productData['product_name'] ?? 'Product',
+                            'quantity' => $productData['quantity'] ?? 1,
+                            'unit_price' => $productData['price'] ?? $productData['unit_price'] ?? 0,
+                            'total' => $productData['sub_total'] ?? ($productData['quantity'] ?? 1) * ($productData['price'] ?? $productData['unit_price'] ?? 0)
+                        ];
+                    }
+                }
+            }
+            // Priority 2: Check purchase for products
+            elseif ($billing->purchase) {
                 // Extract products from the purchase
-                $products = [];
                 $purchaseData = $billing->purchase->toArray();
                 
                 if (isset($purchaseData['products_subscriptions'])) {
@@ -243,10 +313,10 @@ class BillingManagementService extends BaseService
                         }
                     }
                 }
-                
-                // Add products to the billing record
-                $billing->setAttribute('products', $products);
             }
+            
+            // Add products to the billing record
+            $billing->setAttribute('products', $products);
         }
         
         return $billings;

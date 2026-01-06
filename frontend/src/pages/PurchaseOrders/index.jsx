@@ -1,40 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, FileText, Trash2, Eye } from 'lucide-react';
+import { Plus, FileText, Trash2, Eye, Paperclip } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { SearchFilter } from '../../components/ui/SearchFilter';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../../components/ui/Card';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/Table';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import CreatePurchaseOrderPopup from '../../components/PurchaseOrders/CreatePurchaseOrderPopup';
 import ViewPurchaseOrderPopup from '../../components/PurchaseOrders/ViewPurchaseOrderPopup';
-import api, { purchaseApi, invoiceApi } from '../../api';
+import api, { invoiceApi } from '../../api';
 import { formatDate, formatDateRange } from '../../utils/dateUtils';
 import { useNotification } from '../../components/Notifications';
 
 export default function PurchaseOrders() {
   const { showError, showSuccess } = useNotification();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [loading, setLoading] = useState(true);
-  
-  // Confirmation dialog state
-  const [confirmDialog, setConfirmDialog] = useState({
-    isOpen: false,
-    item: null,
-    action: null
-  });
-  
-  // Create PO popup state
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, item: null, action: null });
   const [isCreatePopupOpen, setIsCreatePopupOpen] = useState(false);
-
-  // View PO popup state
   const [isViewPopupOpen, setIsViewPopupOpen] = useState(false);
   const [selectedPurchaseOrder, setSelectedPurchaseOrder] = useState(null);
-
   const [purchaseOrders, setPurchaseOrders] = useState([]);
 
-  // Fetch purchase orders from API
   useEffect(() => {
     fetchPurchaseOrders();
   }, []);
@@ -43,7 +32,7 @@ export default function PurchaseOrders() {
     try {
       setLoading(true);
       const response = await api.get('/purchases');
-      setPurchaseOrders(response.data); // response.data is the array after interceptor
+      setPurchaseOrders(response.data);
     } catch (error) {
       console.error('Error fetching purchase orders:', error);
       showError('Error loading purchase orders: ' + (error.response?.data?.message || error.message));
@@ -85,183 +74,91 @@ export default function PurchaseOrders() {
     return isNaN(num) ? '0.00' : num.toFixed(2);
   };
 
-  // Handle opening create popup
-  const handleCreatePO = () => {
-    setIsCreatePopupOpen(true);
-  };
+  const handleCreatePO = () => setIsCreatePopupOpen(true);
+  const handleCloseCreatePopup = () => setIsCreatePopupOpen(false);
+  const handleCloseViewPopup = () => setIsViewPopupOpen(false);
 
-  // Handle closing create popup
-  const handleCloseCreatePopup = () => {
-    setIsCreatePopupOpen(false);
-  };
-
-  // Handle creating new purchase order - FIXED VERSION
   const handleCreatePurchaseOrder = async (orderData) => {
     try {
       let response;
-      
-      // Determine if we need FormData (attachment present)
       const hasAttachment = orderData.attachment && orderData.attachment instanceof File;
 
       if (hasAttachment) {
-        // Use FormData when there's an attachment
         const formData = new FormData();
-        formData.append('status', orderData.status);
-        formData.append('client_id', orderData.client_id.toString());
-        formData.append('po_number', orderData.po_number);
-        
-        // Handle products array
-        if (orderData.products && Array.isArray(orderData.products)) {
-          orderData.products.forEach((product, index) => {
-            formData.append(`products[${index}][productId]`, product.productId);
-            formData.append(`products[${index}][quantity]`, product.quantity);
-          });
-        }
-        
-        // Handle subscription fields
-        formData.append('subscription_active', orderData.subscription_active ? '1' : '0');
-        
-        if (orderData.subscription_type) {
-          formData.append('subscription_type', orderData.subscription_type);
-        }
-        if (orderData.recurring_count) {
-          formData.append('recurring_count', orderData.recurring_count.toString());
-        }
-        if (orderData.delivery_date) {
-          formData.append('delivery_date', orderData.delivery_date);
-        }
-        if (orderData.po_details) {
-          formData.append('po_details', orderData.po_details);
-        }
-        
-        formData.append('attachment', orderData.attachment, orderData.attachment.name);
-        
-        // Use axios with proper headers for file upload
+        Object.keys(orderData).forEach(key => {
+          if (key === 'products') {
+            orderData.products.forEach((p, i) => {
+              formData.append(`products[${i}][productId]`, p.productId);
+              formData.append(`products[${i}][quantity]`, p.quantity);
+            });
+          } else if (key === 'attachment') {
+            if (orderData.attachment) {
+              formData.append('attachment', orderData.attachment);
+            }
+          } else {
+            // Only append non-null and non-undefined values
+            if (orderData[key] !== null && orderData[key] !== undefined) {
+              formData.append(key, orderData[key]);
+            }
+          }
+        });
+
         response = await api.post('/purchases', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
+          headers: { 'Content-Type': 'multipart/form-data' },
         });
       } else {
-        // Use JSON for no attachment
-        const purchaseData = {
-          po_number: orderData.po_number,
-          status: orderData.status,
-          client_id: orderData.client_id,
-          products: orderData.products, // Send array directly
-          subscription_active: Boolean(orderData.subscription_active),
-          subscription_type: orderData.subscription_type,
-          recurring_count: orderData.recurring_count,
-          delivery_date: orderData.delivery_date,
-          po_details: orderData.po_details
-        };
-        
-        console.log('Sending purchase data:', purchaseData);
-        
-        response = await api.post('/purchases', purchaseData);
+        response = await api.post('/purchases', orderData);
       }
-      
-      // Success → refresh list
+
       fetchPurchaseOrders();
       setIsCreatePopupOpen(false);
       showSuccess('Purchase order created successfully!');
-      console.log('Created purchase:', response.data);
     } catch (error) {
-      console.error('Error creating purchase order:', error);
-
-      // Validation error details
-      if (error.response?.status === 422 && error.response?.data?.errors) {
-        const errors = error.response.data.errors;
-        console.log('Validation errors:', errors);
-        const errorMessages = Object.values(errors).flat().join(', ');
-        showError('Validation failed: ' + errorMessages);
-      } else {
-        showError('Failed to create purchase order: ' + (error.response?.data?.message || error.message));
-      }
+      const msg = error.response?.data?.errors
+        ? Object.values(error.response.data.errors).flat().join(', ')
+        : error.response?.data?.message || error.message;
+      showError('Validation failed: ' + msg);
     }
   };
 
-  // Handle deleting purchase order
-  const handleDeletePO = (po) => {
-    setConfirmDialog({
-      isOpen: true,
-      item: po,
-      action: 'deletePO'
-    });
-  };
+  const handleDeletePO = (po) => setConfirmDialog({ isOpen: true, item: po, action: 'deletePO' });
 
-  // Confirm purchase order deletion
   const confirmDeletePO = async () => {
     const po = confirmDialog.item;
     try {
       await api.delete(`/purchases/${po.id}`);
       fetchPurchaseOrders();
       showSuccess('Purchase order deleted successfully');
-      setConfirmDialog({ isOpen: false, item: null, action: null });
     } catch (error) {
-      console.error('Error deleting:', error);
       showError('Failed to delete: ' + (error.response?.data?.message || error.message));
+    } finally {
       setConfirmDialog({ isOpen: false, item: null, action: null });
     }
   };
 
-  // Close confirmation dialog
-  const closeConfirmDialog = () => {
-    setConfirmDialog({ isOpen: false, item: null, action: null });
-  };
-
-  // Handle opening view popup
   const handleViewPO = (po) => {
-    setSelectedPurchaseOrder(po);
-    setIsViewPopupOpen(true);
+    navigate('/subscriptions', {
+      state: {
+        openViewModal: true,
+        purchaseOrderData: po
+      }
+    });
   };
 
-  // Handle closing view popup
-  const handleCloseViewPopup = () => {
-    setIsViewPopupOpen(false);
-    setSelectedPurchaseOrder(null);
-  };
-
-  const handleGenerateInvoiceFromPO = async (purchaseOrder) => {
+  const handleGenerateInvoiceFromPO = async (po) => {
     try {
-      const response = await invoiceApi.generateFromPurchase({
-        purchase_id: purchaseOrder.id
-      });
-      
+      const response = await invoiceApi.generateFromPurchase({ purchase_id: po.id });
       if (response.data.success) {
         showSuccess('Invoice generated successfully');
-        
-        // Refresh list to update UI state
         fetchPurchaseOrders();
-
-        // View the invoice
         const invoiceId = response.data.data.id;
-        handleViewInvoicePO(invoiceId);
+        const blob = new Blob([await invoiceApi.downloadInvoice(invoiceId)], { type: 'text/html' });
+        const url = window.URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => window.URL.revokeObjectURL(url), 500);
       }
     } catch (error) {
-      console.error('Error generating invoice:', error);
-      if (error.response) {
-        showError(error.response.data.message || 'Failed to generate invoice');
-      } else {
-        showError('Failed to generate invoice');
-      }
-    }
-  };
-
-  const handleViewInvoicePO = async (invoiceId) => {
-    try {
-      const response = await invoiceApi.downloadInvoice(invoiceId);
-      
-      // Create a temporary URL and open in new tab
-      const blob = new Blob([response.data], { type: 'text/html' });
-      const url = window.URL.createObjectURL(blob);
-      window.open(url, '_blank');
-      
-      // Clean up after a short delay to ensure browser has opened it
-      setTimeout(() => window.URL.revokeObjectURL(url), 500);
-    } catch (error) {
-      console.error('Error viewing invoice:', error);
-      showError('Failed to view invoice');
+      showError(error.response?.data?.message || 'Failed to generate invoice');
     }
   };
 
@@ -271,10 +168,7 @@ export default function PurchaseOrders() {
         title="Purchase Orders"
         subtitle="Create and manage purchase orders from clients"
         actions={
-          <Button 
-            icon={<Plus className="h-4 w-4" />}
-            onClick={handleCreatePO}
-          >
+          <Button icon={<Plus className="h-4 w-4" />} onClick={handleCreatePO}>
             Create PO
           </Button>
         }
@@ -293,159 +187,137 @@ export default function PurchaseOrders() {
           <CardDescription>Manage purchase orders from clients. Use Subscriptions module to manage software subscriptions.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>PO Details</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead>Products & Subscriptions</TableHead>
-                <TableHead>Total Amount</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan="6" className="text-center py-8 text-gray-500">
-                    Loading purchase orders...
-                  </TableCell>
-                </TableRow>
-              ) : purchaseOrders.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan="6" className="text-center py-8 text-gray-500">
-                    No purchase orders found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                purchaseOrders.map((po) => (
-                  <TableRow key={po.id}>
-                    <TableCell>
-                      <div> 
-                        <div className="font-semibold text-gray-900">{po.po_number}</div>
-                        <div className="text-sm text-gray-600">
-                          Delivery Date: {formatDate(po.delivery_date)}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium text-gray-900">{po.client?.company || 'N/A'}</div>
-                        <div className="text-sm text-gray-600">{po.client?.cli_name || 'N/A'}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-2">
-                        {po.products && po.products.length > 0 ? (
-                          po.products.map((product, index) => (
-                            <div key={index} className="border-b border-gray-100 last:border-b-0 pb-2 last:pb-0">
-                              <div className="flex flex-col gap-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-gray-900">
-                                    {product.product_name || 'N/A'}
-                                  </span>
-                                  <span className="text-xs bg-gray-900 text-white px-2 py-1 rounded">
-                                    x{product.quantity || 1}
-                                  </span>
+          {/* ✅ Responsive Table Wrapper */}
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-3 py-3 text-left font-medium text-gray-700">PO Details</th>
+                  <th className="px-3 py-3 text-left font-medium text-gray-700">Client</th>
+                  <th className="px-3 py-3 text-left font-medium text-gray-700">Products & Subscriptions</th>
+                  <th className="px-3 py-3 text-left font-medium text-gray-700">Total Amount</th>
+                  <th className="px-3 py-3 text-left font-medium text-gray-700">Status</th>
+                  <th className="px-3 py-3 text-left font-medium text-gray-700">Attachment</th>
+                  <th className="px-3 py-3 text-left font-medium text-gray-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {loading ? (
+                  <tr>
+                    <td colSpan="7" className="text-center py-6 text-gray-500">Loading purchase orders...</td>
+                  </tr>
+                ) : purchaseOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="text-center py-6 text-gray-500">No purchase orders found</td>
+                  </tr>
+                ) : (
+                  purchaseOrders.map((po) => (
+                    <tr key={po.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <div className="text-sm font-semibold text-gray-900">{po.po_number}</div>
+                        <div className="text-xs text-gray-500">Delivery: {formatDate(po.delivery_date)}</div>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{po.client?.company || 'N/A'}</div>
+                        <div className="text-xs text-gray-500">{po.client?.cli_name || 'N/A'}</div>
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="space-y-2">
+                          {po.products?.length > 0 ? (
+                            po.products.map((p, i) => (
+                              <div key={i} className="border rounded-md p-2 bg-gray-50 shadow-sm">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium text-gray-900 text-sm">{p.product_name}</span>
+                                  <Badge className="bg-gray-800 text-white text-xs">x{p.quantity}</Badge>
                                 </div>
-                                <div className="text-sm">
-                                  <span className="font-medium text-gray-900">
-                                    {'৳' + (product.sub_total || product.price * product.quantity || 0).toFixed(2)}
-                                  </span>
-                                  {/* <span className="text-gray-500 mx-2">•</span> */}
-                                  {/* <span className="text-gray-600">
-                                    {product.subscription_start && product.subscription_end 
-                                      ? formatDateRange(product.subscription_start, product.subscription_end)
-                                      : product.delivery_date 
-                                        ? `Delivery: ${formatDate(product.delivery_date)}`
-                                        : 'N/A'
-                                    }
-                                  </span> */}
-                                </div>
+                                <div className="text-xs text-gray-600 mt-1">৳{formatCurrency(p.sub_total || p.price * p.quantity)}</div>
+                                {/* <div className="text-xs text-gray-500 mt-1"> // subscription start and end date
+                                  {p.subscription_start && p.subscription_end
+                                    ? formatDateRange(p.subscription_start, p.subscription_end)
+                                    : p.delivery_date
+                                    ? `Delivery: ${formatDate(p.delivery_date)}`
+                                    : 'N/A'}
+                                </div> */}
                               </div>
-                            </div>
-                          ))
-                        ) : (
-                          <div>N/A</div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-semibold text-gray-900">
-                        ৳{formatCurrency(po.total_amount)} BDT
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={`text-xs ${getStatusColor(po.status)}`}>
-                        {po.status || 'Draft'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          title="View"
-                          onClick={() => handleViewPO(po)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-
-                        {po.invoice && po.invoice.length > 0 ? (
+                            ))
+                          ) : (
+                            <span className="text-gray-400 text-xs">No products</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">৳{formatCurrency(po.total_amount)} BDT</td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <Badge className={`text-xs ${getStatusColor(po.status)}`}>{po.status || 'Draft'}</Badge>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        {po.attachment ? (
                           <Button
                             variant="outline"
                             size="sm"
                             className="text-xs"
-                            icon={<Eye className="h-3 w-3" />}
-                            onClick={() => handleViewInvoicePO(po.invoice[0].id)}
+                            icon={<Paperclip className="h-3 w-3" />}
+                            onClick={() => window.open(po.attachment, '_blank')}
                           >
-                            View Bill
+                            View
                           </Button>
                         ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-xs"
-                            icon={<FileText className="h-3 w-3" />}
-                            onClick={() => handleGenerateInvoiceFromPO(po)}
-                          >
-                            Generate Bill
-                          </Button>
+                          <span className="text-gray-400 text-xs">No attachment</span>
                         )}
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <div className="flex items-center gap-1">
+                          <Button variant="outline" size="icon" title="View" onClick={() => handleViewPO(po)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
 
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          title="Delete"
-                          onClick={() => handleDeletePO(po)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                          {po.invoice?.length > 0 ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs"
+                              icon={<FileText className="h-3 w-3" />}
+                              onClick={() => handleViewInvoicePO(po.invoice[0].id)}
+                            >
+                              View Bill
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs"
+                              icon={<FileText className="h-3 w-3" />}
+                              onClick={() => handleGenerateInvoiceFromPO(po)}
+                            >
+                              Generate
+                            </Button>
+                          )}
+
+                          <Button variant="outline" size="icon" title="Delete" onClick={() => handleDeletePO(po)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Create Purchase Order Popup */}
       <CreatePurchaseOrderPopup
         isOpen={isCreatePopupOpen}
         onClose={handleCloseCreatePopup}
         onCreate={handleCreatePurchaseOrder}
       />
 
-      {/* View Purchase Order Popup */}
       <ViewPurchaseOrderPopup
         isOpen={isViewPopupOpen}
         onClose={handleCloseViewPopup}
         purchaseOrder={selectedPurchaseOrder}
       />
-      
-      {/* Confirmation Dialog */}
+
       {confirmDialog.isOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
@@ -455,15 +327,13 @@ export default function PurchaseOrders() {
             </p>
             <div className="flex justify-end space-x-3">
               <button
-                type="button"
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-                onClick={closeConfirmDialog}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
+                onClick={() => setConfirmDialog({ isOpen: false, item: null, action: null })}
               >
                 Cancel
               </button>
               <button
-                type="button"
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
                 onClick={confirmDeletePO}
               >
                 Delete

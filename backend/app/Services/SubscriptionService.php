@@ -6,10 +6,13 @@ use App\Models\Subscription;
 use App\Models\Purchase;
 use App\Models\Product;
 use App\Models\Client;
+use App\Models\Billing_management;
+use App\Models\Invoice;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Cache;
 
 class SubscriptionService extends BaseService
 {
@@ -67,6 +70,9 @@ class SubscriptionService extends BaseService
                                 'action' => ($storedProduct['status'] ?? 'Pending') === 'Pending' ? 'Subscribe' : 'Edit',
                                 'price' => $storedProduct['price'] ?? $storedProduct['unit_price'] ?? 0,
                                 'sub_total' => $storedProduct['sub_total'] ?? 0,
+                                'start_date' => $storedProduct['start_date'] ?? $subscription->start_date,
+                                'end_date' => $storedProduct['end_date'] ?? $subscription->end_date,
+                                'delivery_date' => $storedProduct['delivery_date'] ?? $subscription->delivery_date ?? $purchase->delivery_date ?? null,
                             ];
                         }
                     } else {
@@ -92,6 +98,9 @@ class SubscriptionService extends BaseService
                         'action' => $subscription->status === 'Pending' ? 'Subscribe' : 'Edit',
                         'price' => $subscription->unit_price ?? $subscription->product->price ?? 0,
                         'sub_total' => $subscription->total_amount ?? 0,
+                        'start_date' => $subscription->start_date,
+                        'end_date' => $subscription->end_date,
+                        'delivery_date' => $subscription->delivery_date ?? $purchase->delivery_date ?? null,
                     ];
                 }
                 // Fallback: create a basic product entry from subscription data if no product or purchase data available
@@ -200,6 +209,8 @@ class SubscriptionService extends BaseService
                     'raw_progress' => $subscription->progress,
                     'raw_products_subscription_status' => $subscription->products_subscription_status,
                     'invoice' => $subscription->invoice,
+                    // Add attachment from purchase
+                    'attachment' => $purchase->attachment ?? null,
                     // Add date fields for frontend modal
                     'start_date' => $subscription->start_date,
                     'end_date' => $subscription->end_date,
@@ -265,6 +276,9 @@ class SubscriptionService extends BaseService
                             'action' => ($storedProduct['status'] ?? 'Pending') === 'Pending' ? 'Subscribe' : 'Edit',
                             'price' => $storedProduct['price'] ?? $storedProduct['unit_price'] ?? 0,
                             'sub_total' => $storedProduct['sub_total'] ?? 0,
+                            'start_date' => $storedProduct['start_date'] ?? $subscription->start_date,
+                            'end_date' => $storedProduct['end_date'] ?? $subscription->end_date,
+                            'delivery_date' => $storedProduct['delivery_date'] ?? $subscription->delivery_date ?? $purchase->delivery_date ?? null,
                         ];
                     }
                 } else {
@@ -290,6 +304,9 @@ class SubscriptionService extends BaseService
                     'action' => $subscription->status === 'Pending' ? 'Subscribe' : 'Edit',
                     'price' => $subscription->unit_price ?? $subscription->product->price ?? 0,
                     'sub_total' => $subscription->total_amount ?? 0,
+                    'start_date' => $subscription->start_date,
+                    'end_date' => $subscription->end_date,
+                    'delivery_date' => $subscription->delivery_date ?? $purchase->delivery_date ?? null,
                 ];
             }
             // Fallback: create a basic product entry from subscription data if no product or purchase data available
@@ -303,6 +320,9 @@ class SubscriptionService extends BaseService
                     'action' => $subscription->status === 'Pending' ? 'Subscribe' : 'Edit',
                     'price' => $subscription->unit_price ?? $subscription->product->price ?? 0,
                     'sub_total' => $subscription->total_amount ?? 0,
+                    'start_date' => $subscription->start_date,
+                    'end_date' => $subscription->end_date,
+                    'delivery_date' => $subscription->delivery_date ?? $purchase->delivery_date ?? null,
                 ];
             }
     
@@ -392,6 +412,8 @@ class SubscriptionService extends BaseService
                 // Include the raw database fields
                 'raw_progress' => $subscription->progress,
                 'raw_products_subscription_status' => $subscription->products_subscription_status,
+                // Add attachment from purchase
+                'attachment' => $purchase->attachment ?? null,
                 'start_date' => $subscription->start_date,
                 'end_date' => $subscription->end_date,
                 'delivery_date' => $subscription->delivery_date ?? $purchase->delivery_date ?? null,
@@ -567,6 +589,82 @@ class SubscriptionService extends BaseService
         }
         
         $subscription->update($data);
+        
+        // Cascade updates to related Billing Management records
+        if (isset($data['total_amount']) || isset($data['products_subscription_status'])) {
+            $billing = Billing_management::where('subscription_id', $id)->first();
+            
+            if ($billing) {
+                // Update total amount
+                if (isset($data['total_amount'])) {
+                    $billing->total_amount = $data['total_amount'];
+                    
+                    // Recalculate status based on paid amount
+                    if ($billing->paid_amount >= $billing->total_amount) {
+                         $billing->payment_status = 'Paid';
+                         $billing->status = 'Completed';
+                    } elseif ($billing->paid_amount > 0) {
+                         $billing->payment_status = 'Partially Paid';
+                         $billing->status = 'Partially Paid';
+                    } else {
+                         $billing->payment_status = 'Unpaid';
+                         $billing->status = 'Pending'; // or keep existing status if not Completed/Paid
+                    }
+                }
+                
+                $billing->save();
+                
+                // Clear payment statistics cache
+                Cache::forget('payment_statistics');
+            }
+            
+            // Cascade updates to related Invoice records
+            $invoices = Invoice::where('subscription_id', $id)->get();
+            
+            foreach ($invoices as $invoice) {
+                $invoiceUpdates = [];
+                $shouldUpdate = false;
+                
+                // Update total amount and balance
+                if (isset($data['total_amount'])) {
+                    $invoiceUpdates['sub_total'] = $data['total_amount']; // Assuming sub_total = total for subscription (tax/discount separate?)
+                    // If invoice has tax/discount, we should respect them. 
+                    // Simple approach: Recalculate total based on new subtotal
+                    $invoiceUpdates['total_amount'] = $data['total_amount'] + $invoice->tax_amount - $invoice->discount_amount;
+                    $invoiceUpdates['balance_amount'] = $invoiceUpdates['total_amount'] - $invoice->paid_amount;
+                    $shouldUpdate = true;
+                }
+                
+                // Update items if products changed
+                if (isset($data['products_subscription_status'])) {
+                    $products = is_string($data['products_subscription_status']) ? 
+                        json_decode($data['products_subscription_status'], true) : 
+                        $data['products_subscription_status'];
+                        
+                    if (is_array($products)) {
+                        $items = [];
+                        foreach ($products as $product) {
+                            $items[] = [
+                                'name' => $product['name'] ?? $product['product_name'] ?? 'Service',
+                                'description' => 'Service for ' . ($product['name'] ?? $product['product_name'] ?? 'Service'),
+                                'quantity' => $product['quantity'] ?? 1,
+                                'unit_price' => $product['price'] ?? $product['unit_price'] ?? 0,
+                                'total' => $product['sub_total'] ?? ($product['quantity'] ?? 1) * ($product['price'] ?? $product['unit_price'] ?? 0)
+                            ];
+                        }
+                        $invoiceUpdates['items'] = $items; // Invoice model casts items to array/json automatically? Check Model.
+                        // InvoiceService creates it as array, Model probably casts it.
+                        // Let's assume Invoice model has 'items' => 'array' cast or handles it.
+                         $shouldUpdate = true;
+                    }
+                }
+                
+                if ($shouldUpdate) {
+                    $invoice->update($invoiceUpdates);
+                }
+            }
+        }
+        
         return $subscription;
     }
 
@@ -616,6 +714,9 @@ class SubscriptionService extends BaseService
                         'action' => $productData['status'] === 'Pending' ? 'Subscribe' : 'Edit',
                         'price' => $productData['price'] ?? $productData['unit_price'] ?? 0,
                         'sub_total' => $productData['sub_total'] ?? 0,
+                        'start_date' => $productData['start_date'] ?? $purchase->delivery_date ?? null,
+                        'end_date' => $productData['end_date'] ?? null,
+                        'delivery_date' => $productData['delivery_date'] ?? $purchase->delivery_date ?? null,
                     ];
                 }
             } else {
