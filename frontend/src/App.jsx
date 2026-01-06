@@ -10,6 +10,7 @@ import Clients from './pages/ClientManagement/Clients';
 import Products from './pages/Products&Pricing/Products';
 import PurchaseOrders from './pages/PurchaseOrders/index';
 import Subscriptions from './pages/Subscriptions/index';
+
 import BillingManagement from './pages/BillingManagement/index';
 import PaymentManagement from './pages/PaymentManagement/index';
 import CurrencyRates from './pages/Currency&Rates/index';
@@ -106,6 +107,7 @@ function App() {
               </div>
             </ProtectedRoute>
           } />
+
           <Route path="/billing" element={
             <ProtectedRoute>
               <div className="flex h-screen bg-[var(--soft-purple)]">

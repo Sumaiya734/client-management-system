@@ -104,6 +104,7 @@ Route::prefix('purchases')->group(function () {
 });
 
 // Subscription Management Routes
+Route::get('subscriptions/renewals', [\App\Http\Controllers\Api\SubscriptionController::class, 'getRenewals'])->middleware('auth:sanctum');
 Route::apiResource('subscriptions', \App\Http\Controllers\Api\SubscriptionController::class)->middleware('auth:sanctum');
 
 // Payment Management Routes

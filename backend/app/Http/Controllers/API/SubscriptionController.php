@@ -165,4 +165,25 @@ class SubscriptionController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get subscription renewals
+     */
+    public function getRenewals(): JsonResponse
+    {
+        try {
+            $renewals = $this->subscriptionService->getRenewals();
+            
+            return response()->json([
+                'success' => true,
+                'data' => $renewals
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve subscription renewals',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

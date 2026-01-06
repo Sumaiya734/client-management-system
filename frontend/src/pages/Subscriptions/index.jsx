@@ -12,6 +12,7 @@ import api from '../../api';
 import { invoiceApi } from '../../api';
 import { useNotification } from '../../components/Notifications';
 import { formatDate, formatDateRange } from '../../utils/dateUtils';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 export default function Subscriptions() {
   const { showError, showSuccess } = useNotification();
@@ -26,15 +27,26 @@ export default function Subscriptions() {
   const [selectedProductForEdit, setSelectedProductForEdit] = useState(null);
   const [loading, setLoading] = useState(true);
   const [subscriptions, setSubscriptions] = useState([]);
-
+  
+  // Renewal state
+  const [renewalLoading, setRenewalLoading] = useState(false);
+  const [renewals, setRenewals] = useState([]);
+    
+  // Tab state
+  const [activeTab, setActiveTab] = useState('subscriptions');
+    
   // View subscription modal state
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState(null);
 
-  // Fetch subscriptions from API
+  // Fetch subscriptions or renewal data based on active tab
   useEffect(() => {
-    fetchSubscriptions();
-  }, []);
+    if (activeTab === 'renewals') {
+      fetchRenewalData();
+    } else {
+      fetchSubscriptions();
+    }
+  }, [activeTab]);
 
   const fetchSubscriptions = async () => {
     try {
@@ -85,6 +97,20 @@ export default function Subscriptions() {
     }
   };
 
+  const fetchRenewalData = async () => {
+    try {
+      setRenewalLoading(true);
+      const response = await api.get('/subscriptions/renewals');
+      setRenewals(response.data || []);
+    } catch (error) {
+      console.error('Error fetching renewal list:', error);
+      showError('Failed to load renewal data');
+      setRenewals([]);
+    } finally {
+      setRenewalLoading(false);
+    }
+  };
+
   const summaryStats = [
     {
       title: 'Total Subscriptions',
@@ -129,7 +155,9 @@ export default function Subscriptions() {
       options: statusOptions,
     }
   ];
-
+  const navigate = useNavigate();
+  const location = useLocation();
+  
   const getIconColor = (color) => {
     const colors = {
       blue: 'text-blue-600',
@@ -417,6 +445,30 @@ export default function Subscriptions() {
         subtitle="Manage software subscriptions for approved purchase orders"
       />
 
+      {/* === Pill Tabs Navigation === */}
+      <div className="flex space-x-1 bg-gray-100 p-1 rounded-full w-fit">
+        <button
+          onClick={() => setActiveTab('subscriptions')}
+          className={`px-4 py-2 text-sm font-medium rounded-full transition ${
+            activeTab === 'subscriptions'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Subscription Management
+        </button>
+        <button
+          onClick={() => setActiveTab('renewals')}
+          className={`px-4 py-2 text-sm font-medium rounded-full transition ${
+            activeTab === 'renewals'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Subscription Renewal
+        </button>
+      </div>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {summaryStats.map((stat) => (
@@ -440,191 +492,271 @@ export default function Subscriptions() {
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
         searchPlaceholder="Search by PO number, client, or product..."
-        filters={filters}
+        filters={activeTab === 'renewals' ? [] : filters}
       />
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Purchase Orders & Subscriptions ({subscriptions.length})</CardTitle>
-          <CardDescription>Manage subscriptions for approved purchase orders</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>PO Details</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead>Products & Subscription Status</TableHead>
-                <TableHead>Progress</TableHead>
-                <TableHead>Total Amount</TableHead>
-                <TableHead>Attachment</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
+      
+      {/* Conditional rendering for Subscription vs Renewal content */}
+      {activeTab === 'renewals' ? (
+        /* Renewal Content */
+        <Card>
+          <CardHeader>
+            <CardTitle>Renewal Requests ({renewals.length})</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan="7" className="text-center py-8 text-gray-500">
-                    Loading subscriptions...
-                  </TableCell>
+                  <TableHead>Products</TableHead>
+                  <TableHead>Renewal Date</TableHead>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
-              ) : subscriptions.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan="7" className="text-center py-8 text-gray-500">
-                    No subscriptions found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                subscriptions.filter(subscription => {
-                  // Apply status filter
-                  if (statusFilter !== 'All Status') {
-                    // Check if any product in the subscription matches the status filter
-                    return subscription.products.some(product => product.status === statusFilter);
-                  }
-                  return true; // No filter applied
-                }).map((subscription) => (
-                  <TableRow key={subscription.id}>
-                    <TableCell>
-                      <div>
-                        <div className="font-semibold text-gray-900">{subscription.poNumber}</div>
-                        <div className="text-sm text-gray-600">Delivery Date: {formatDate(subscription.createdDate)}</div>
-                      </div>
+              </TableHeader>
+              <TableBody>
+                {renewalLoading ? (
+                  <TableRow>
+                    <TableCell colSpan="5" className="text-center py-8 text-gray-500">
+                      Loading renewal list...
                     </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium text-gray-900">{subscription.client?.company || 'N/A'}</div>
-                        <div className="text-sm text-gray-600">{subscription.client?.cli_name || subscription.client.contact || 'N/A'}</div>
-                      </div>
+                  </TableRow>
+                ) : renewals.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan="5" className="text-center py-8 text-gray-500">
+                      No upcoming renewals
                     </TableCell>
-                    <TableCell> 
-                      {/* Products & Subscription Status */}
-                      <div className="space-y-2"> 
-                        {subscription.products && subscription.products.length > 0 ? (
-                          subscription.products.map((product, index) => (
-                            <div
-                              key={index}
-                              className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm hover:shadow transition"
-                            >
-                              {/* Left: Product + Qty */}
-                              <div className="flex flex-col">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-gray-900 text-sm">
-                                    {product.name}
-                                  </span>
-                                  <span className="text-xs bg-gray-800 text-white px-2 py-0.5 rounded">
-                                    x{product.quantity}
-                                  </span>
-                                </div>
-                                <div className="text-xs text-gray-500 mt-1">
-                                  {product.start_date && product.end_date
-                                    ? formatDateRange(product.start_date, product.end_date)
-                                    : product.delivery_date
-                                    ? `Delivery: ${formatDate(product.delivery_date)}`
-                                    : 'N/A'}
-                                </div>
-                              </div>
-
-                              {/* Middle: Status */}
-                              <Badge className={`text-xs ${getStatusBadgeColor(product.status)}`}>
-                                {product.status}
-                              </Badge>
-
-                              {/* Right: Action Button */}
-                              <Button
-                                variant={product.action === 'Subscribe' ? 'primary' : 'outline'}
-                                size="xs"
-                                className="text-xs"
-                                onClick={() => handleOpenModal(product, product.quantity, subscription, product.action === 'Edit')}
-                              > Edit
-                                {product.action}
-                              </Button>
-   
-                            </div>
-                          ))
-                        ) : (
-                          <span className="text-gray-400 text-sm">No products</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {(subscription.progress.status === 'Active' || subscription.progress.status === 'Complete') ? (
-                          <CheckCircle className={`h-4 w-4 ${getProgressColor(subscription.progress.status)}`} />
-                        ) : (subscription.progress.status === 'Pending' || subscription.progress.status === 'Partial') ? (
-                          <AlertTriangle className={`h-4 w-4 ${getProgressColor(subscription.progress.status)}`} />
-                        ) : (
-                          <Clock className={`h-4 w-4 ${getProgressColor(subscription.progress.status)}`} />
-                        )}
+                  </TableRow>
+                ) : (
+                  renewals.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Package className="h-4 w-4 text-gray-500" />
+                          <span className="font-medium text-gray-900">{item.product_name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-gray-500" />
+                          <span>{formatDate(item.renewal_date)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         <div>
-                          <div className={`font-medium ${getProgressColor(subscription.progress.status)}`}>
-                            {subscription.progress.status}
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            {subscription.progress.completed}/{subscription.progress.total} products ({subscription.progress.percentage}%)
+                          <div className="font-medium text-gray-900">{item.client?.company || 'N/A'}</div>
+                          <div className="text-sm text-gray-600">{item.client?.cli_name || 'N/A'}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={
+                          item.status === 'Expiring Soon' ? 'warning' :
+                          item.status === 'Active' ? 'success' :
+                          item.status === 'Expired' ? 'destructive' : 'secondary'
+                        }>
+                          {item.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleOpenModal(item.product_name, item.quantity, item, true)}
+                        >
+                          Renew
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : (
+        /* Original Subscription Content */
+        <Card>
+          <CardHeader>
+            <CardTitle>Purchase Orders & Subscriptions ({subscriptions.length})</CardTitle>
+            <CardDescription>Manage subscriptions for approved purchase orders</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>PO Details</TableHead>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Products & Subscription Status</TableHead>
+                  <TableHead>Progress</TableHead>
+                  <TableHead>Total Amount</TableHead>
+                  <TableHead>Attachment</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan="7" className="text-center py-8 text-gray-500">
+                      Loading subscriptions...
+                    </TableCell>
+                  </TableRow>
+                ) : subscriptions.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan="7" className="text-center py-8 text-gray-500">
+                      No subscriptions found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  subscriptions.filter(subscription => {
+                    // Apply status filter
+                    if (statusFilter !== 'All Status') {
+                      // Check if any product in the subscription matches the status filter
+                      return subscription.products.some(product => product.status === statusFilter);
+                    }
+                    return true; // No filter applied
+                  }).map((subscription) => (
+                    <TableRow key={subscription.id}>
+                      <TableCell>
+                        <div>
+                          <div className="font-semibold text-gray-900">{subscription.poNumber}</div>
+                          <div className="text-sm text-gray-600">Delivery Date: {formatDate(subscription.createdDate)}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium text-gray-900">{subscription.client?.company || 'N/A'}</div>
+                          <div className="text-sm text-gray-600">{subscription.client?.cli_name || subscription.client.contact || 'N/A'}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell> 
+                        {/* Products & Subscription Status */}
+                        <div className="space-y-2"> 
+                          {subscription.products && subscription.products.length > 0 ? (
+                            subscription.products.map((product, index) => (
+                              <div
+                                key={index}
+                                className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm hover:shadow transition"
+                              >
+                                {/* Left: Product + Qty */}
+                                <div className="flex flex-col">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-gray-900 text-sm">
+                                      {product.name}
+                                    </span>
+                                    <span className="text-xs bg-gray-800 text-white px-2 py-0.5 rounded">
+                                      x{product.quantity}
+                                    </span>
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {product.start_date && product.end_date
+                                      ? formatDateRange(product.start_date, product.end_date)
+                                      : product.delivery_date
+                                      ? `Delivery: ${formatDate(product.delivery_date)}`
+                                      : 'N/A'}
+                                  </div>
+                                </div>
+      
+                                {/* Middle: Status */}
+                                <Badge className={`text-xs ${getStatusBadgeColor(product.status)}`}>
+                                  {product.status}
+                                </Badge>
+      
+                                {/* Right: Action Button */}
+                                <Button
+                                  variant={product.action === 'Subscribe' ? 'primary' : 'outline'}
+                                  size="xs"
+                                  className="text-xs"
+                                  onClick={() => handleOpenModal(product, product.quantity, subscription, product.action === 'Edit')}
+                                > Edit
+                                  {product.action}
+                                </Button>
+                                     
+                              </div>
+                            ))
+                          ) : (
+                            <span className="text-gray-400 text-sm">No products</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {(subscription.progress.status === 'Active' || subscription.progress.status === 'Complete') ? (
+                            <CheckCircle className={`h-4 w-4 ${getProgressColor(subscription.progress.status)}`} />
+                          ) : (subscription.progress.status === 'Pending' || subscription.progress.status === 'Partial') ? (
+                            <AlertTriangle className={`h-4 w-4 ${getProgressColor(subscription.progress.status)}`} />
+                          ) : (
+                            <Clock className={`h-4 w-4 ${getProgressColor(subscription.progress.status)}`} />
+                          )}
+                          <div>
+                            <div className={`font-medium ${getProgressColor(subscription.progress.status)}`}>
+                              {subscription.progress.status}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {subscription.progress.completed}/{subscription.progress.total} products ({subscription.progress.percentage}%)
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-semibold text-gray-900">{subscription.totalAmount}</div>
-                    </TableCell>
-                    <TableCell>
-                      {subscription.attachment ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-xs"
-                          icon={<Paperclip className="h-3 w-3" />}
-                          onClick={() => window.open(subscription.attachment, '_blank')}
-                        >
-                          View
-                        </Button>
-                      ) : (
-                        <span className="text-gray-400 text-xs">No attachment</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {/* View Icon */}
-                        <button
-                          type="button"
-                          className="p-1.5 rounded-md border border-gray-300 hover:bg-gray-100 transition"
-                          title="View"
-                          onClick={() => handleViewSubscription(subscription)}
-                        >
-                          <Eye className="h-4 w-4 text-gray-700" />
-                        </button>
-
-                        {/* Invoice Icon */}
-                        {subscription.invoice && subscription.invoice.length > 0 ? (
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-semibold text-gray-900">{subscription.totalAmount}</div>
+                      </TableCell>
+                      <TableCell>
+                        {subscription.attachment ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs"
+                            icon={<Paperclip className="h-3 w-3" />}
+                            onClick={() => window.open(subscription.attachment, '_blank')}
+                          >
+                            View
+                          </Button>
+                        ) : (
+                          <span className="text-gray-400 text-xs">No attachment</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {/* View Icon */}
                           <button
                             type="button"
                             className="p-1.5 rounded-md border border-gray-300 hover:bg-gray-100 transition"
-                            title="View Bill"
-                            onClick={() => handleViewInvoiceSubscription(subscription.invoice[0].id)}
+                            title="View"
+                            onClick={() => handleViewSubscription(subscription)}
                           >
-                            <FileText className="h-4 w-4 text-green-600" />
+                            <Eye className="h-4 w-4 text-gray-700" />
                           </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="p-1.5 rounded-md border border-gray-300 hover:bg-gray-100 transition disabled:opacity-50"
-                            title="Generate Bill"
-                            disabled={!subscription.canGenerateBill}
-                            onClick={() => handleGenerateInvoiceFromSubscription(subscription)}
-                          >
-                            <FileText className="h-4 w-4 text-blue-600" />
-                          </button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      
+                          {/* Invoice Icon */}
+                          {subscription.invoice && subscription.invoice.length > 0 ? (
+                            <button
+                              type="button"
+                              className="p-1.5 rounded-md border border-gray-300 hover:bg-gray-100 transition"
+                              title="View Bill"
+                              onClick={() => handleViewInvoiceSubscription(subscription.invoice[0].id)}
+                            >
+                              <FileText className="h-4 w-4 text-green-600" />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="p-1.5 rounded-md border border-gray-300 hover:bg-gray-100 transition disabled:opacity-50"
+                              title="Generate Bill"
+                              disabled={!subscription.canGenerateBill}
+                              onClick={() => handleGenerateInvoiceFromSubscription(subscription)}
+                            >
+                              <FileText className="h-4 w-4 text-blue-600" />
+                            </button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Subscription Modal */}
       <SubscriptionModal

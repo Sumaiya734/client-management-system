@@ -734,4 +734,82 @@ class SubscriptionService extends BaseService
         
         return $products;
     }
+
+    /**
+     * Get subscription renewals (expiring soon subscriptions)
+     */
+    public function getRenewals()
+    {
+        try {
+            // Get subscriptions that are expiring soon (within 7 days) or have expired
+            $now = Carbon::now();
+            $sevenDaysFromNow = Carbon::now()->addDays(7);
+            
+            // Get all subscriptions that have an end_date
+            $allSubscriptions = $this->model->whereNotNull('end_date')
+                ->where('end_date', '<=', $sevenDaysFromNow) // Only get subscriptions expiring within 7 days or already expired
+                ->with(['client', 'product', 'purchase', 'invoice'])
+                ->get();
+            
+            logger()->info('SubscriptionService::getRenewals() - Found expiring/expired subscriptions:', [
+                'total_count' => $allSubscriptions->count(),
+            ]);
+
+            // Transform the subscriptions to match the renewal frontend expectations
+            $transformedRenewals = $allSubscriptions->map(function ($subscription) {
+                $purchase = $subscription->purchase;
+                
+                // Determine status based on end date
+                $status = 'Active';
+                if ($subscription->end_date) {
+                    $endDate = Carbon::parse($subscription->end_date);
+                    $now = Carbon::now();
+                    $daysToExpiry = $now->diffInDays($endDate, false);
+                    
+                    if ($now->gt($endDate)) {
+                        $status = 'Expired';
+                    } elseif ($daysToExpiry <= 7) {
+                        $status = 'Expiring Soon';
+                    } else {
+                        $status = 'Active';
+                    }
+                }
+                
+                return [
+                    'id' => $subscription->id,
+                    'product_name' => $subscription->product->product_name ?? $subscription->product->name ?? $subscription->product_name ?? 'N/A',
+                    'renewal_date' => $subscription->end_date, // This is when renewal is needed
+                    'start_date' => $subscription->start_date,
+                    'end_date' => $subscription->end_date,
+                    'quantity' => $subscription->quantity ?? 1,
+                    'client' => [
+                        'company' => $subscription->client->company ?? $subscription->client->name ?? $purchase->cli_name ?? 'N/A',
+                        'cli_name' => $subscription->client->cli_name ?? $purchase->cli_name ?? 'N/A',
+                        'client_id' => $subscription->client_id
+                    ],
+                    'status' => $status,
+                    'poNumber' => $subscription->po_number ?? $purchase->po_number ?? 'N/A',
+                    'total_amount' => $subscription->total_amount ?? $purchase->total_amount ?? 0,
+                    'products_subscription_status' => $subscription->products_subscription_status,
+                    'raw_products_subscription_status' => $subscription->products_subscription_status,
+                    'client_id' => $subscription->client_id,
+                    'product_id' => $subscription->product_id,
+                    'purchase_id' => $subscription->purchase_id,
+                ];
+            });
+
+            logger()->info('SubscriptionService::getRenewals() - Transformed renewals:', [
+                'count' => $transformedRenewals->count(),
+                'data' => $transformedRenewals->toArray()
+            ]);
+
+            return $transformedRenewals;
+        } catch (\Exception $e) {
+            logger()->error('Error in SubscriptionService::getRenewals()', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
+    }
 }
