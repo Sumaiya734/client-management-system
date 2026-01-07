@@ -26,34 +26,50 @@ const SubscriptionModal = ({
   const { isVisible, isAnimating } = useAnimationState(isOpen);
 
   useEffect(() => {
-    if (isOpen && previousSubscription) {
-      // Use dates from previousSubscription if available, otherwise try to get from selectedProductForEdit or originalSubscription
+    if (isOpen) {
+      // Determine the source of truth for product data
+      // selectedProductForEdit takes precedence (comes from the specific product row clicked)
+      // originalSubscription?.products?.[0] is a fallback
       const productToUse = selectedProductForEdit || originalSubscription?.products?.[0];
 
-      setStartDate(previousSubscription.start_date?.split('T')[0] ||
-        (productToUse?.subscription_start || ''));
-      setEndDate(previousSubscription.end_date?.split('T')[0] ||
-        (productToUse?.subscription_end || ''));
-      setDeliveryDate(previousSubscription.delivery_date?.split('T')[0] ||
-        (productToUse?.delivery_date || ''));
-      setNotes(previousSubscription.notes || originalSubscription?.notes || '');
+      // Helper to safely extract YYYY-MM-DD
+      const formatDateStr = (dateStr) => dateStr ? dateStr.split('T')[0] : '';
 
-      // Calculate product-specific total amount if available
+      // logical precedence: 
+      // 1. Existing subscription being edited (previousSubscription)
+      // 2. Product data from the PO (productToUse)
+      const initialStartDate = formatDateStr(previousSubscription?.start_date) ||
+        formatDateStr(productToUse?.subscription_start) ||
+        formatDateStr(productToUse?.start_date) || '';
+
+      const initialEndDate = formatDateStr(previousSubscription?.end_date) ||
+        formatDateStr(productToUse?.subscription_end) ||
+        formatDateStr(productToUse?.end_date) || '';
+
+      const initialDeliveryDate = formatDateStr(previousSubscription?.delivery_date) ||
+        formatDateStr(productToUse?.delivery_date) || '';
+
+      const initialNotes = previousSubscription?.notes || originalSubscription?.notes || '';
+
+      setStartDate(initialStartDate);
+      setEndDate(initialEndDate);
+      setDeliveryDate(initialDeliveryDate);
+      setNotes(initialNotes);
+
+      // Price handling
       const productPrice = productToUse?.price || (productToUse?.sub_total ? productToUse.sub_total / productToUse?.quantity : null);
 
-      setCustomTotal(previousSubscription.total_amount ?? productPrice ?? originalSubscription?.total_amount ?? initialTotalAmount);
-      setCustomPrice(!!previousSubscription.custom_price);
-      setAttachment(null);
-    } else if (isOpen) {
-      setStartDate('');
-      setEndDate('');
-      setDeliveryDate('');
-      setNotes('');
-      setCustomTotal(initialTotalAmount || '');
-      setCustomPrice(false);
+      const priceToSet = previousSubscription?.total_amount ??
+        productToUse?.sub_total ?? // Prefer sub_total for the total calculation
+        (productPrice ? productPrice * (quantity || 1) : null) ??
+        originalSubscription?.total_amount ??
+        initialTotalAmount;
+
+      setCustomTotal(priceToSet);
+      setCustomPrice(!!previousSubscription?.custom_price || !!productToUse?.custom_price);
       setAttachment(null);
     }
-  }, [isOpen, previousSubscription, originalSubscription, selectedProductForEdit, initialTotalAmount]);
+  }, [isOpen, previousSubscription, originalSubscription, selectedProductForEdit, initialTotalAmount, quantity]);
 
   const currencyMatch = (initialTotalAmount?.toString() || customTotal?.toString() || '').match(
     /([৳$€£¥₽₹]|BDT|USD|EUR)/

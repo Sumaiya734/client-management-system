@@ -194,11 +194,11 @@ const CreatePurchaseOrderPopup: React.FC<CreatePurchaseOrderPopupProps> = ({
       status: formData.status,
       client_id: formData.clientId,
       products: selectedProducts.map(p => ({ productId: p.productId, quantity: p.quantity })),
-      subscription_type: formData.subscriptionType || null,
+      subscription_type: formData.subscriptionType ? formData.subscriptionType : null,
       recurring_count: formData.subscriptionType ? formData.recurringCount : null,
-      delivery_date: formData.deliveryDate || null,
+      delivery_date: formData.deliveryDate ? formData.deliveryDate : null,
       subscription_active: formData.subscriptionActive,
-      po_details: formData.poDetails || null,
+      po_details: formData.poDetails ? formData.poDetails : null,
       attachment: attachments[0] || null,
     };
 

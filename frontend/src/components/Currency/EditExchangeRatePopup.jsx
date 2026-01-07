@@ -23,7 +23,7 @@ const EditExchangeRatePopup = ({
     currency: false
   });
 
-  const currencyOptions = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'CNY', 'INR'];
+  const currencyOptions = ['BDT', 'USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'CNY', 'INR'];
 
   // Update form data when rate changes
   React.useEffect(() => {
@@ -72,14 +72,20 @@ const EditExchangeRatePopup = ({
     try {
       const updatedRate = {
         id: rate?.id || Date.now(),
-        currencyPair: `${formData.currency} / USD`,
+        currencyPair: `${formData.currency} / BDT`, // Format as currency per BDT for new system
         rate: formData.rateValue,
         lastUpdated: formData.date,
         change: rate?.change || '+0.0000 (0.0%)',
         trend: rate?.trend || 'up'
       };
       
-      onUpdate(updatedRate);
+      // Prepare data for backend API - send the actual selected currency
+      const rateData = {
+        ...updatedRate,
+        currency: formData.currency
+      };
+      
+      onUpdate(rateData);
       onClose();
     } catch (err) {
       console.error('Error saving exchange rate:', err);
@@ -167,10 +173,10 @@ const EditExchangeRatePopup = ({
                 </div>
               </div>
 
-              {/* Rate (to USD) */}
+              {/* Rate (to BDT) */}
               <div>
                 <label htmlFor="rateValue" className="block text-sm font-medium text-gray-700 mb-2">
-                  Rate (to USD)
+                  Rate (per BDT)
                 </label>
                 <input
                   type="number"
@@ -179,7 +185,7 @@ const EditExchangeRatePopup = ({
                   onChange={(e) => handleInputChange('rateValue', e.target.value)}
                   step="0.0001"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="0.8500"
+                  placeholder="BDT"
                   required
                 />
               </div>
@@ -199,7 +205,7 @@ const EditExchangeRatePopup = ({
                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   required
                 />
-                <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
+               
               </div>
             </div>
           </div>

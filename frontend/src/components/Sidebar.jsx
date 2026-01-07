@@ -104,7 +104,7 @@ export default function Sidebar() {
               to={item.href}
               className={`flex items-center px-2 py-2 text-sm font-medium rounded-3xl transition-colors ${isActive
                 ? 'bg-gray-900 text-white font-semibold shadow-xl'
-                : 'text-gray-700 hover:bg-gray-400 hover:text-gray-900 hover:shadow-xl'
+                : 'text-gray-700 hover:bg-gray-400 hover:text-gray-900 hover:shadow-2xl'
                 }`}
             >
               <item.icon className="h-4 w-4" />

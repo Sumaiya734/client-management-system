@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ChevronDown, Eye } from 'lucide-react';
 import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
-import { vendorApi } from '../../api.js';
+import { vendorApi, currencyRatesApi } from '../../api.js';
 
 interface Product {
   id: number | null;
@@ -66,7 +66,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
 
   const categoryOptions = ['Communication', 'Productivity', 'Design', 'AI Tools', 'Media'];
   const subscriptionTypeOptions = ['Per User', 'Per License', 'Per Editor', 'Per Account'];
-  const currencyOptions = ['USD', 'EUR', 'GBP', 'CAD', 'AUD'];
+  const currencyOptions = ['BDT', 'USD', 'EUR', 'GBP', 'CAD', 'AUD'];
   const statusOptions = ['Active', 'Inactive'];
 
   useEffect(() => {
@@ -172,12 +172,49 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
     }
   };
 
+  const [bdtRate, setBdtRate] = useState(110.5); // Default rate
+
+  useEffect(() => {
+    // Fetch the current USD to BDT exchange rate
+    const fetchExchangeRate = async () => {
+      try {
+        const response = await currencyRatesApi.getAll();
+        const usdRateData = response.data.find(rate => rate.currency === 'USD');
+        if (usdRateData && usdRateData.rate) {
+          // In BDT-based system: if 1 BDT = x USD, we store x as the rate
+          setBdtRate(parseFloat(usdRateData.rate));
+        } else {
+          setBdtRate(0.0089); // fallback to approximate rate (1/112.36)
+        }
+      } catch (error) {
+        console.error('Failed to fetch exchange rate:', error);
+        setBdtRate(110.5); // fallback to default
+      }
+    };
+
+    fetchExchangeRate();
+    
+    // Listen for BDT rate update events
+    const handleBdtRateUpdate = (e) => {
+      if (e.detail && e.detail.rate !== undefined) {
+        setBdtRate(parseFloat(e.detail.rate) || 110.5);
+      }
+    };
+    
+    window.addEventListener('bdtRateUpdated', handleBdtRateUpdate);
+    
+    return () => {
+      window.removeEventListener('bdtRateUpdated', handleBdtRateUpdate);
+    };
+  }, []);
+
   const calculateBDTPrice = () => {
     const base = parseFloat(formData.basePrice) || 0;
     const profit = parseFloat(formData.profitMargin) || 0;
-    const rate = 110.5;
+    const rate = bdtRate; // Use dynamic rate (BDT-based system)
     const finalUSD = base * (1 + profit / 100);
-    const bdt = finalUSD * rate;
+    // In BDT-based system: if 1 BDT = x USD, then to convert USD to BDT we divide by x
+    const bdt = finalUSD / rate;
     return {
       bdt: Math.round(bdt),
       finalUSD: finalUSD.toFixed(2),
@@ -199,9 +236,28 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
     return Object.keys(err).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
+
+    // Fetch current exchange rate to calculate BDT price
+    let currentBdtRate = 110.5; // default fallback
+    try {
+      const response = await currencyRatesApi.getAll();
+      const bdtRateData = response.data.find(rate => rate.currency === 'BDT');
+      if (bdtRateData && bdtRateData.rate) {
+        currentBdtRate = parseFloat(bdtRateData.rate);
+      }
+    } catch (error) {
+      console.error('Failed to fetch exchange rate, using default:', error);
+    }
+
+    // Calculate BDT price with current exchange rate (BDT-based system)
+    const base = parseFloat(formData.basePrice) || 0;
+    const profit = parseFloat(formData.profitMargin) || 0;
+    const finalUSD = base * (1 + profit / 100);
+    // In BDT-based system: if 1 BDT = x USD, then to convert USD to BDT we divide by x
+    const calculatedBdtPrice = Math.round(finalUSD / currentBdtRate);
 
     const updatedProduct = {
       id: product?.id || null,
@@ -214,7 +270,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
       basePrice: parseFloat(formData.basePrice),
       baseCurrency: formData.baseCurrency,
       profit: parseFloat(formData.profitMargin),
-      bdtPrice: pricePreview.bdt,
+      bdtPrice: calculatedBdtPrice,
       bdtLabel: 'Final Price (BDT)',
       currencies: product?.currencies || [],
       status: formData.status,
@@ -460,7 +516,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
                 </div>
                 <div className="text-xl font-bold text-blue-900">৳{pricePreview.bdt}</div>
                 <p className="text-xs text-gray-600 mt-1">
-                  ${pricePreview.finalUSD} × 110.5 (+{pricePreview.profit}%)
+                  ${pricePreview.finalUSD} × {bdtRate} (+{pricePreview.profit}%)
                 </p>
               </div>
             )}

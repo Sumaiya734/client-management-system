@@ -8,7 +8,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import MultiCurrencyPricingPopup from '../../components/Products/MultiCurrencyPricingPopup';
 import EditProductPopup from '../../components/Products/EditProductPopup';
-import api from '../../api';
+import api, { currencyRatesApi } from '../../api';
 import { useNotification } from '../../components/Notifications';
 
 export default function Products() {
@@ -140,6 +140,19 @@ export default function Products() {
       setLoading(false);
     }
   };
+  
+  // Listen for BDT rate update events to refresh BDT prices
+  useEffect(() => {
+    const handleBdtRateUpdate = () => {
+      refreshExchangeRates();
+    };
+    
+    window.addEventListener('bdtRateUpdated', handleBdtRateUpdate);
+    
+    return () => {
+      window.removeEventListener('bdtRateUpdated', handleBdtRateUpdate);
+    };
+  }, []);
 
   // Create empty product template for adding new products
   const createEmptyProduct = () => ({
@@ -170,6 +183,35 @@ export default function Products() {
     setSelectedProduct(null);
   };
 
+  // Function to refresh exchange rates and update BDT prices for all products
+  const refreshExchangeRates = async () => {
+    try {
+      const response = await currencyRatesApi.getAll();
+      const usdRateData = response.data.find(rate => rate.currency === 'USD');
+      const usdRate = usdRateData ? parseFloat(usdRateData.rate) : 0.0089; // 1 BDT = 0.0089 USD
+      
+      // Update BDT prices for all products based on the new exchange rate (BDT-based system)
+      setProducts(prevProducts => 
+        prevProducts.map(product => {
+          // Calculate new BDT price based on base price and profit
+          const basePrice = parseFloat(product.basePrice) || 0;
+          const profitMargin = parseFloat(product.profit) || 0;
+          const finalUSD = basePrice * (1 + profitMargin / 100);
+          // In BDT-based system: if 1 BDT = x USD, then to convert USD to BDT we divide by x
+          const newBdtPrice = Math.round(finalUSD / usdRate);
+          
+          return {
+            ...product,
+            bdtPrice: `৳${newBdtPrice}`,
+            bdtLabel: 'BDT (final price)'
+          };
+        })
+      );
+    } catch (error) {
+      console.error('Failed to refresh exchange rates:', error);
+    }
+  };
+  
   // Handle updating currency prices
   const handleUpdateCurrencyPrices = (productId, prices) => {
     setProducts(prevProducts => 
@@ -194,6 +236,9 @@ export default function Products() {
     );
     
     console.log('Updated currency prices for product:', productId, prices);
+    
+    // Refresh exchange rates to update BDT prices if needed
+    refreshExchangeRates();
   };
 
   // Handle opening popup for adding new product

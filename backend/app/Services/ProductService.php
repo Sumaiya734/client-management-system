@@ -3,13 +3,17 @@
 namespace App\Services;
 
 use App\Repositories\ProductRepository;
+use App\Services\CurrencyRateService;
 use Illuminate\Http\Request;
 
 class ProductService extends BaseService
 {
-    public function __construct(ProductRepository $productRepository)
+    protected $currencyRateService;
+
+    public function __construct(ProductRepository $productRepository, CurrencyRateService $currencyRateService)
     {
         parent::__construct($productRepository);
+        $this->currencyRateService = $currencyRateService;
     }
 
     /**
@@ -58,10 +62,17 @@ class ProductService extends BaseService
             $data['profit'] = $basePrice * ($profitMargin / 100);
             
             // Calculate BDT price based on base_price with profit margin applied and converted to BDT
-            // Using exchange rate of 110.5 (this should ideally come from settings or be configurable)
+            // Using dynamic exchange rate from currency rates (BDT-based system)
             $finalUSD = $basePrice * (1 + $profitMargin / 100);
-            $bdtRate = 110.5; // This should be configurable
-            $data['bdt_price'] = round($finalUSD * $bdtRate);
+            $bdtRate = $this->currencyRateService->getByCurrency('BDT');
+            if ($bdtRate) {
+                // In BDT-based system: the stored rate represents how much foreign currency equals 1 BDT
+                // So if the stored rate is 0.0089, it means 1 BDT = 0.0089 USD
+                $bdtConversionRate = $bdtRate->rate;
+            } else {
+                $bdtConversionRate = 0.0089; // Fallback to 0.0089 if BDT rate not found
+            }
+            $data['bdt_price'] = round($finalUSD / $bdtConversionRate);
         }
 
         return $this->repository->create($data);
@@ -113,10 +124,17 @@ class ProductService extends BaseService
             $data['profit'] = $basePrice * ($profitMargin / 100);
             
             // Calculate BDT price based on base_price with profit margin applied and converted to BDT
-            // Using exchange rate of 110.5 (this should ideally come from settings or be configurable)
+            // Using dynamic exchange rate from currency rates (BDT-based system)
             $finalUSD = $basePrice * (1 + $profitMargin / 100);
-            $bdtRate = 110.5; // This should be configurable
-            $data['bdt_price'] = round($finalUSD * $bdtRate);
+            $bdtRate = $this->currencyRateService->getByCurrency('BDT');
+            if ($bdtRate) {
+                // In BDT-based system: the stored rate represents how much foreign currency equals 1 BDT
+                // So if the stored rate is 0.0089, it means 1 BDT = 0.0089 USD
+                $bdtConversionRate = $bdtRate->rate;
+            } else {
+                $bdtConversionRate = 0.0089; // Fallback to 0.0089 if BDT rate not found
+            }
+            $data['bdt_price'] = round($finalUSD / $bdtConversionRate);
         }
 
         return $this->repository->update($id, $data);

@@ -125,22 +125,41 @@ class SubscriptionService extends BaseService
                 $products = array_map(function($product) use ($subscription) {
                     $status = $product['status'];
                     
-                    // Check if product has date range
-                    if (isset($subscription->end_date) && $subscription->end_date) {
-                        $endDate = Carbon::parse($subscription->end_date);
+                    // Only override status if it's NOT explicitly 'Active' or if we need to check for expiry
+                    // But if it is Active, we trust the database unless it is ACTUALLY expired now.
+                    // Actually, if we just RENEWED it, the product date might be updated in the JSON but not the main subscription end_date yet?
+                    // Or more likely: The main subscription end_date IS updated, so we should trust that.
+                    
+                    // Use product-specific end_date if available, otherwise subscription end_date
+                    $productEndDate = $product['end_date'] ?? $subscription->end_date;
+                    
+                    if ($productEndDate) {
+                        $endDate = Carbon::parse($productEndDate);
                         $now = Carbon::now();
                         $daysToExpiry = $now->diffInDays($endDate, false);
                         
                         if ($now->gt($endDate)) {
-                            // Subscription is expired
                             $status = 'Expired';
-                        } elseif ($daysToExpiry <= 7) {
-                            // Subscription expires within 7 days
-                            $status = 'Expiring Soon';
+                        } elseif ($daysToExpiry <= 7 && $status !== 'Active') { 
+                             // Only mark as expiring soon if not already Active (avoid flickering if just renewed)
+                             // Actually, if it IS expiring soon, it should say so.
+                             // But the user says "change holo na" (didn't change).
+                             // If they renewed it, the date should be future.
+                             $status = 'Expiring Soon';
                         } else {
-                            // Subscription is active
-                            $status = 'Active';
+                            // If date is far in future, it is active.
+                            // But we should respect the 'status' field if it says 'Active' from the DB
+                            if ($daysToExpiry > 7) {
+                                $status = 'Active';
+                            }
                         }
+                    }
+                    
+                    // Specific fix for user request: If status was saved as 'Active' in the DB (during renewal update), allow it to stay Active
+                    // The update() method updates the products_subscription_status JSON.
+                    // So we should prefer the status from $product['status'] if the dates match.
+                    if ($product['status'] === 'Active' && isset($productEndDate) && Carbon::now()->lte(Carbon::parse($productEndDate))) {
+                         $status = 'Active';
                     }
                     
                     $product['status'] = $status;
@@ -330,22 +349,31 @@ class SubscriptionService extends BaseService
             $products = array_map(function($product) use ($subscription) {
                 $status = $product['status'];
                 
-                // Check if product has date range
-                if (isset($subscription->end_date) && $subscription->end_date) {
-                    $endDate = Carbon::parse($subscription->end_date);
+                // Only override status if it's NOT explicitly 'Active' or if we need to check for expiry
+                // Use product-specific end_date if available, otherwise subscription end_date
+                $productEndDate = $product['end_date'] ?? $subscription->end_date;
+                
+                if ($productEndDate) {
+                    $endDate = Carbon::parse($productEndDate);
                     $now = Carbon::now();
                     $daysToExpiry = $now->diffInDays($endDate, false);
                     
                     if ($now->gt($endDate)) {
-                        // Subscription is expired
                         $status = 'Expired';
-                    } elseif ($daysToExpiry <= 7) {
-                        // Subscription expires within 7 days
-                        $status = 'Expiring Soon';
+                    } elseif ($daysToExpiry <= 7 && $status !== 'Active') { 
+                         // Only mark as expiring soon if not already Active
+                         $status = 'Expiring Soon';
                     } else {
-                        // Subscription is active
-                        $status = 'Active';
+                        // If date is far in future, it is active.
+                        if ($daysToExpiry > 7) {
+                            $status = 'Active';
+                        }
                     }
+                }
+                
+                // Keep 'Active' if persisted as such and not actually expired
+                if ($product['status'] === 'Active' && isset($productEndDate) && Carbon::now()->lte(Carbon::parse($productEndDate))) {
+                     $status = 'Active';
                 }
                 
                 $product['status'] = $status;

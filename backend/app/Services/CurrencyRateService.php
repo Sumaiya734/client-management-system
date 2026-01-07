@@ -32,6 +32,14 @@ class CurrencyRateService extends BaseService
     }
 
     /**
+     * Get currency rate by currency code
+     */
+    public function getByCurrency($currency)
+    {
+        return $this->model->where('currency', $currency)->first();
+    }
+
+    /**
      * Create a new currency rate
      */
     public function create(array $data)

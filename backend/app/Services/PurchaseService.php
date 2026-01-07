@@ -576,8 +576,14 @@ class PurchaseService
     private function sanitizeRequestData(array $data)
     {
         foreach ($data as $key => $value) {
-            if ($value === 'null') {
-                $data[$key] = null;
+            if (is_string($value)) {
+                if ($value === 'null') {
+                    $data[$key] = null;
+                } elseif ($value === 'true') {
+                    $data[$key] = true;
+                } elseif ($value === 'false') {
+                    $data[$key] = false;
+                }
             }
         }
         return $data;

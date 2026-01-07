@@ -27,14 +27,14 @@ export default function Subscriptions() {
   const [selectedProductForEdit, setSelectedProductForEdit] = useState(null);
   const [loading, setLoading] = useState(true);
   const [subscriptions, setSubscriptions] = useState([]);
-  
+
   // Renewal state
   const [renewalLoading, setRenewalLoading] = useState(false);
   const [renewals, setRenewals] = useState([]);
-    
+
   // Tab state
   const [activeTab, setActiveTab] = useState('subscriptions');
-    
+
   // View subscription modal state
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState(null);
@@ -157,7 +157,7 @@ export default function Subscriptions() {
   ];
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   const getIconColor = (color) => {
     const colors = {
       blue: 'text-blue-600',
@@ -203,22 +203,17 @@ export default function Subscriptions() {
     setOriginalSubscription(subscription); // Store original subscription context
     setSelectedProductForEdit(product); // Store the specific product being edited
 
-    if (isEdit) {
-      // Find the actual subscription record relative to this product if possible
-      // For now, we use the main subscription object, but in a real scenario we might need checks
-      // Since the backend transforms data, we need to map back or use available fields
-      setEditingSubscription({
-        id: subscription.id,
-        start_date: product.subscription_start || subscription.start_date || (product.dateRange && product.dateRange !== 'N/A' ? product.dateRange.split(' to ')[0] : ''),
-        end_date: product.subscription_end || subscription.end_date || (product.dateRange && product.dateRange !== 'N/A' ? product.dateRange.split(' to ')[1] : ''),
-        notes: subscription.notes || '', // Notes might be on main subscription
-        delivery_date: product.delivery_date || subscription.delivery_date || '',
-        total_amount: lineTotal || subscription.total_amount || null,
-        // Add other fields if available
-      });
-    } else {
-      setEditingSubscription(null);
-    }
+    // Always treat as an edit/update to the existing subscription record to prevent creating duplicates (new rows)
+    // Even if we are "Activating" a pending product, we are updating the existing Subscription/PO record.
+    setEditingSubscription({
+      id: subscription.id,
+      start_date: product.subscription_start || subscription.start_date || (product.dateRange && product.dateRange !== 'N/A' ? product.dateRange.split(' to ')[0] : ''),
+      end_date: product.subscription_end || subscription.end_date || (product.dateRange && product.dateRange !== 'N/A' ? product.dateRange.split(' to ')[1] : ''),
+      notes: subscription.notes || '', // Notes might be on main subscription
+      delivery_date: product.delivery_date || subscription.delivery_date || '',
+      total_amount: lineTotal || subscription.total_amount || null,
+      custom_price: product.custom_price || null
+    });
 
     setIsModalOpen(true);
   };
@@ -335,10 +330,14 @@ export default function Subscriptions() {
       if (productId) subscriptionData.product_id = productId;
       if (purchaseId) subscriptionData.purchase_id = purchaseId;
 
+      // Determine if we should UPDATE or CREATE
+      // We check for an existing ID in multiple places to be robust
+      const existingId = editingSubscription?.id || data.previousSubscription?.id || data.originalSubscription?.id;
+
       let response;
-      if (editingSubscription) {
+      if (existingId) {
         // UPDATE existing subscription
-        response = await api.put(`/subscriptions/${editingSubscription.id}`, subscriptionData);
+        response = await api.put(`/subscriptions/${existingId}`, subscriptionData);
         console.log('Subscription updated:', response.data);
       } else {
         // CREATE new subscription
@@ -348,6 +347,9 @@ export default function Subscriptions() {
 
       // Refresh the subscriptions list
       fetchSubscriptions();
+
+      // Also refresh renewal data if we are on that tab or to keep counts updated
+      fetchRenewalData();
 
       // Close modal
       setIsModalOpen(false);
@@ -449,21 +451,19 @@ export default function Subscriptions() {
       <div className="flex space-x-1 bg-gray-100 p-1 rounded-full w-fit">
         <button
           onClick={() => setActiveTab('subscriptions')}
-          className={`px-4 py-2 text-sm font-medium rounded-full transition ${
-            activeTab === 'subscriptions'
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
+          className={`px-4 py-2 text-sm font-medium rounded-full transition ${activeTab === 'subscriptions'
+            ? 'bg-white text-gray-900 shadow-xl'
+            : 'text-gray-600 hover:text-gray-900'
+            }`}
         >
           Subscription Management
         </button>
         <button
           onClick={() => setActiveTab('renewals')}
-          className={`px-4 py-2 text-sm font-medium rounded-full transition ${
-            activeTab === 'renewals'
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
+          className={`px-4 py-2 text-sm font-medium rounded-full transition ${activeTab === 'renewals'
+            ? 'bg-white text-gray-900 shadow-xl'
+            : 'text-gray-600 hover:text-gray-900'
+            }`}
         >
           Subscription Renewal
         </button>
@@ -494,7 +494,7 @@ export default function Subscriptions() {
         searchPlaceholder="Search by PO number, client, or product..."
         filters={activeTab === 'renewals' ? [] : filters}
       />
-      
+
       {/* Conditional rendering for Subscription vs Renewal content */}
       {activeTab === 'renewals' ? (
         /* Renewal Content */
@@ -550,8 +550,8 @@ export default function Subscriptions() {
                       <TableCell>
                         <Badge variant={
                           item.status === 'Expiring Soon' ? 'warning' :
-                          item.status === 'Active' ? 'success' :
-                          item.status === 'Expired' ? 'destructive' : 'secondary'
+                            item.status === 'Active' ? 'success' :
+                              item.status === 'Expired' ? 'destructive' : 'secondary'
                         }>
                           {item.status}
                         </Badge>
@@ -627,14 +627,14 @@ export default function Subscriptions() {
                           <div className="text-sm text-gray-600">{subscription.client?.cli_name || subscription.client.contact || 'N/A'}</div>
                         </div>
                       </TableCell>
-                      <TableCell> 
+                      <TableCell>
                         {/* Products & Subscription Status */}
-                        <div className="space-y-2"> 
+                        <div className="space-y-2">
                           {subscription.products && subscription.products.length > 0 ? (
                             subscription.products.map((product, index) => (
                               <div
                                 key={index}
-                                className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm hover:shadow transition"
+                                className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-xl hover:shadow transition"
                               >
                                 {/* Left: Product + Qty */}
                                 <div className="flex flex-col">
@@ -647,19 +647,19 @@ export default function Subscriptions() {
                                     </span>
                                   </div>
                                   <div className="text-xs text-gray-500 mt-1">
-                                    {product.start_date && product.end_date
-                                      ? formatDateRange(product.start_date, product.end_date)
+                                    {(product.start_date || product.subscription_start) && (product.end_date || product.subscription_end)
+                                      ? formatDateRange(product.start_date || product.subscription_start, product.end_date || product.subscription_end)
                                       : product.delivery_date
-                                      ? `Delivery: ${formatDate(product.delivery_date)}`
-                                      : 'N/A'}
+                                        ? `Delivery: ${formatDate(product.delivery_date)}`
+                                        : 'N/A'}
                                   </div>
                                 </div>
-      
+
                                 {/* Middle: Status */}
                                 <Badge className={`text-xs ${getStatusBadgeColor(product.status)}`}>
                                   {product.status}
                                 </Badge>
-      
+
                                 {/* Right: Action Button */}
                                 <Button
                                   variant={product.action === 'Subscribe' ? 'primary' : 'outline'}
@@ -669,7 +669,7 @@ export default function Subscriptions() {
                                 > Edit
                                   {product.action}
                                 </Button>
-                                     
+
                               </div>
                             ))
                           ) : (
@@ -725,7 +725,7 @@ export default function Subscriptions() {
                           >
                             <Eye className="h-4 w-4 text-gray-700" />
                           </button>
-      
+
                           {/* Invoice Icon */}
                           {subscription.invoice && subscription.invoice.length > 0 ? (
                             <button

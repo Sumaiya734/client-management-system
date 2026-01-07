@@ -2,6 +2,8 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { X, Package, Calendar, FileText, DollarSign } from 'lucide-react';
 import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
+import { formatDate, formatDateRange } from '../../utils/dateUtils';
+
 
 const ViewSubscriptionModal = ({ subscription, isOpen, onClose }) => {
   const { isVisible, isAnimating } = useAnimationState(isOpen);
@@ -77,13 +79,19 @@ const ViewSubscriptionModal = ({ subscription, isOpen, onClose }) => {
                 <div>
                   <h3 className="text-sm font-medium text-gray-500">Start Date</h3>
                   <p className="text-lg font-medium text-gray-900">
-                    {subscription.start_date || subscription.startDate || 'N/A'}
+                    {formatDate(subscription.start_date || subscription.startDate)}
                   </p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-gray-500">End Date</h3>
                   <p className="text-lg font-medium text-gray-900">
-                    {subscription.end_date || subscription.endDate || 'N/A'}
+                    {formatDate(subscription.end_date || subscription.endDate)}
+                  </p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500">Duration</h3>
+                  <p className="text-lg font-medium text-gray-900">
+                    {formatDateRange(subscription.start_date || subscription.startDate, subscription.end_date || subscription.endDate)}
                   </p>
                 </div>
                 <div>
@@ -155,10 +163,10 @@ const ViewSubscriptionModal = ({ subscription, isOpen, onClose }) => {
                               : parseFloat(product.sub_total || product.total || product.SubTotal || 0).toFixed(2)}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-900">
-                            {product.start_date || product.subscription_start || product.StartDate || 'N/A'}
+                            {formatDate(product.start_date || product.subscription_start || product.StartDate)}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-900">
-                            {product.end_date || product.subscription_end || product.EndDate || 'N/A'}
+                            {formatDate(product.end_date || product.subscription_end || product.EndDate)}
                           </td>
                           <td className="px-4 py-3 text-sm">
                             <span

@@ -1,9 +1,9 @@
 /* Global color variables */
 :root {
-  --soft-purple: #ddf2fc;
-  --light-soft-purple: #d4dbe0;
+  --soft-purple: #ebecec;
+  --light-soft-purple: #ebe8e8;
   --dark-soft-purple: #d9e2ff;
-  --shadow-color: rgba(0, 0, 0, 0.1);
+  --shadow-color: rgba(0, 0, 0, 0.253);
 }
 
 /* Apply soft purple background to all pages */

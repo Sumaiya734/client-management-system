@@ -8,6 +8,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import CreatePurchaseOrderPopup from '../../components/PurchaseOrders/CreatePurchaseOrderPopup';
 import ViewPurchaseOrderPopup from '../../components/PurchaseOrders/ViewPurchaseOrderPopup';
+import ViewSubscriptionModal from '../../components/subscriptions/ViewSubscriptionModal';
 import api, { invoiceApi } from '../../api';
 import { formatDate, formatDateRange } from '../../utils/dateUtils';
 import { useNotification } from '../../components/Notifications';
@@ -21,7 +22,9 @@ export default function PurchaseOrders() {
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, item: null, action: null });
   const [isCreatePopupOpen, setIsCreatePopupOpen] = useState(false);
   const [isViewPopupOpen, setIsViewPopupOpen] = useState(false);
+  const [isViewSubscriptionOpen, setIsViewSubscriptionOpen] = useState(false);
   const [selectedPurchaseOrder, setSelectedPurchaseOrder] = useState(null);
+  const [selectedSubscription, setSelectedSubscription] = useState(null);
   const [purchaseOrders, setPurchaseOrders] = useState([]);
 
   useEffect(() => {
@@ -98,7 +101,9 @@ export default function PurchaseOrders() {
           } else {
             // Only append non-null and non-undefined values
             if (orderData[key] !== null && orderData[key] !== undefined) {
-              formData.append(key, orderData[key]);
+              // Convert boolean to 1/0 for Laravel validation compatibility
+              const value = typeof orderData[key] === 'boolean' ? (orderData[key] ? '1' : '0') : orderData[key];
+              formData.append(key, value);
             }
           }
         });
@@ -137,12 +142,23 @@ export default function PurchaseOrders() {
   };
 
   const handleViewPO = (po) => {
-    navigate('/subscriptions', {
-      state: {
-        openViewModal: true,
-        purchaseOrderData: po
-      }
-    });
+    setSelectedPurchaseOrder(po);
+    setIsViewPopupOpen(true);
+  };
+
+  // Handle viewing subscription details
+  const handleViewSubscription = (po) => {
+    // Format the purchase order data to match subscription format
+    const formattedSubscription = {
+      ...po,
+      products: po.products || [],
+      poNumber: po.po_number,
+      startDate: po.delivery_date,
+      totalAmount: po.total_amount
+    };
+    
+    setSelectedSubscription(formattedSubscription);
+    setIsViewSubscriptionOpen(true);
   };
 
   const handleGenerateInvoiceFromPO = async (po) => {
@@ -162,13 +178,28 @@ export default function PurchaseOrders() {
     }
   };
 
+  const handleViewInvoicePO = async (invoiceId) => {
+    try {
+      const response = await invoiceApi.downloadInvoice(invoiceId);
+      const blob = new Blob([response.data], { type: 'text/html' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => window.URL.revokeObjectURL(url), 500);
+    } catch (error) {
+      console.error('Error viewing invoice:', error);
+      showError('Failed to view invoice');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Purchase Orders"
         subtitle="Create and manage purchase orders from clients"
         actions={
-          <Button icon={<Plus className="h-4 w-4" />} onClick={handleCreatePO}>
+          <Button icon={<Plus className="h-4 w-4" />} onClick={handleCreatePO}
+            className="rounded-full shadow-xl"   // pill-shape + shadow
+          >
             Create PO
           </Button>
         }
@@ -225,7 +256,7 @@ export default function PurchaseOrders() {
                         <div className="space-y-2">
                           {po.products?.length > 0 ? (
                             po.products.map((p, i) => (
-                              <div key={i} className="border rounded-md p-2 bg-gray-50 shadow-sm">
+                              <div key={i} className="border rounded-md p-2 bg-gray-50 shadow-xl hover:shadow transition">
                                 <div className="flex items-center justify-between">
                                   <span className="font-medium text-gray-900 text-sm">{p.product_name}</span>
                                   <Badge className="bg-gray-800 text-white text-xs">x{p.quantity}</Badge>
@@ -256,7 +287,12 @@ export default function PurchaseOrders() {
                             size="sm"
                             className="text-xs"
                             icon={<Paperclip className="h-3 w-3" />}
-                            onClick={() => window.open(po.attachment, '_blank')}
+                            onClick={() => {
+                              const attachmentUrl = po.attachment.startsWith('http')
+                                ? po.attachment
+                                : `http://localhost:8000${po.attachment}`;
+                              window.open(attachmentUrl, '_blank');
+                            }}
                           >
                             View
                           </Button>
@@ -266,7 +302,7 @@ export default function PurchaseOrders() {
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap">
                         <div className="flex items-center gap-1">
-                          <Button variant="outline" size="icon" title="View" onClick={() => handleViewPO(po)}>
+                          <Button variant="outline" size="icon" title="View" onClick={() => handleViewSubscription(po)}>
                             <Eye className="h-4 w-4" />
                           </Button>
 
@@ -316,6 +352,16 @@ export default function PurchaseOrders() {
         isOpen={isViewPopupOpen}
         onClose={handleCloseViewPopup}
         purchaseOrder={selectedPurchaseOrder}
+      />
+
+      {/* View Subscription Modal */}
+      <ViewSubscriptionModal
+        subscription={selectedSubscription}
+        isOpen={isViewSubscriptionOpen}
+        onClose={() => {
+          setIsViewSubscriptionOpen(false);
+          setSelectedSubscription(null);
+        }}
       />
 
       {confirmDialog.isOpen && (
