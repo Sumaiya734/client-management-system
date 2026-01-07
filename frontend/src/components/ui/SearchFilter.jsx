@@ -11,7 +11,7 @@ export const SearchFilter = ({
   ...props
 }) => {
   return (
-    <div className={`bg-white p-6 rounded-lg border border-gray-200 ${className}`} {...props}>
+    <div className={`bg-white p-6 rounded-lg border border-gray-200 shadow-md ${className}`} {...props}>
       <h3 className="text-lg font-medium text-gray-900 mb-4">{title}</h3>
       <div className="flex gap-4">
         <div className="relative flex-1">

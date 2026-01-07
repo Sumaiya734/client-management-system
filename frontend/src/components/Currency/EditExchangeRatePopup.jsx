@@ -69,6 +69,22 @@ const EditExchangeRatePopup = ({
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Validate form data
+    if (!formData.currency) {
+      showError('Please select a currency');
+      return;
+    }
+    
+    if (!formData.rateValue || parseFloat(formData.rateValue) < 0) {
+      showError('Please enter a valid rate (must be >= 0)');
+      return;
+    }
+    
+    if (!formData.date) {
+      showError('Please select a date');
+      return;
+    }
+    
     try {
       const updatedRate = {
         id: rate?.id || Date.now(),
@@ -85,7 +101,8 @@ const EditExchangeRatePopup = ({
         currency: formData.currency
       };
       
-      onUpdate(rateData);
+      // Call onUpdate and wait for it to complete
+      await onUpdate(rateData);
       onClose();
     } catch (err) {
       console.error('Error saving exchange rate:', err);
@@ -101,6 +118,8 @@ const EditExchangeRatePopup = ({
         }
       } else if (err.response?.data?.message) {
         errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
       }
       
       showError(errorMessage);

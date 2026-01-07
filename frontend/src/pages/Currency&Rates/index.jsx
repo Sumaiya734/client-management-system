@@ -225,56 +225,73 @@ export default function CurrencyRates() {
   // Handle rate submit (both create and update)
   const handleRateSubmit = async (rateData) => {
     try {
+      let response = null;
+      let updatedCurrency = null;
+      let updatedRateValue = null;
+
       if (isEditMode) {
         // Update existing rate
         const rateToUpdate = exchangeRates.find(r => r.id === rateData.id);
-        if (rateToUpdate) {
-          // Transform the frontend format to backend format
-          const rateValue = parseFloat(rateData.rate);
-          if (isNaN(rateValue) || rateValue < 0) {
-            showError('Rate must be a valid number greater than or equal to 0');
-            return;
-          }
-
-          const backendData = {
-            currency: rateData.currency || rateData.currencyPair.split(' / ')[0], // Use currency field if available (for BDT rate)
-            rate: rateValue,
-            last_updated: rateData.lastUpdated,
-            change: extractNumericValue(rateData.change) || 0,
-            trend: rateData.trend
-          };
-
-          const response = await currencyRatesApi.update(rateData.id, backendData);
-
-          // Update the local state with the response data to ensure consistency
-          const updatedRate = {
-            id: response.data.id,
-            currencyPair: `${response.data.currency} / BDT`,
-            rate: response.data.rate.toString(),
-            lastUpdated: response.data.last_updated,
-            change: formatChangeDisplay(response.data.change) || '+0.0000 (0.0%)',
-            trend: response.data.trend || 'stable'
-          };
-          
-          setExchangeRates(prevRates =>
-            prevRates.map(rate =>
-              rate.id === rateData.id ? updatedRate : rate
-            )
-          );
-          console.log('Updated exchange rate:', updatedRate);
+        if (!rateToUpdate) {
+          showError('Exchange rate not found');
+          return;
         }
-      } else {
-        // Add new rate
+
         // Transform the frontend format to backend format
+        const rateValue = parseFloat(rateData.rate);
+        if (isNaN(rateValue) || rateValue < 0) {
+          showError('Rate must be a valid number greater than or equal to 0');
+          return;
+        }
+
         const backendData = {
           currency: rateData.currency || rateData.currencyPair.split(' / ')[0], // Use currency field if available (for BDT rate)
-          rate: parseFloat(rateData.rate),
+          rate: rateValue,
           last_updated: rateData.lastUpdated,
           change: extractNumericValue(rateData.change) || 0,
           trend: rateData.trend
         };
 
-        const response = await currencyRatesApi.create(backendData);
+        response = await currencyRatesApi.update(rateData.id, backendData);
+
+        // Update the local state with the response data to ensure consistency
+        const updatedRate = {
+          id: response.data.id,
+          currencyPair: `${response.data.currency} / BDT`,
+          rate: response.data.rate.toString(),
+          lastUpdated: response.data.last_updated,
+          change: formatChangeDisplay(response.data.change) || '+0.0000 (0.0%)',
+          trend: response.data.trend || 'stable'
+        };
+        
+        setExchangeRates(prevRates =>
+          prevRates.map(rate =>
+            rate.id === rateData.id ? updatedRate : rate
+          )
+        );
+        
+        updatedCurrency = response.data.currency;
+        updatedRateValue = response.data.rate;
+        console.log('Updated exchange rate:', updatedRate);
+        showSuccess('Exchange rate updated successfully');
+      } else {
+        // Add new rate
+        // Transform the frontend format to backend format
+        const rateValue = parseFloat(rateData.rate);
+        if (isNaN(rateValue) || rateValue < 0) {
+          showError('Rate must be a valid number greater than or equal to 0');
+          return;
+        }
+
+        const backendData = {
+          currency: rateData.currency || rateData.currencyPair.split(' / ')[0], // Use currency field if available (for BDT rate)
+          rate: rateValue,
+          last_updated: rateData.lastUpdated,
+          change: extractNumericValue(rateData.change) || 0,
+          trend: rateData.trend
+        };
+
+        response = await currencyRatesApi.create(backendData);
 
         // Transform the response to match frontend format
         const newRate = {
@@ -287,19 +304,31 @@ export default function CurrencyRates() {
         };
 
         setExchangeRates(prevRates => [...prevRates, newRate]);
+        
+        updatedCurrency = response.data.currency;
+        updatedRateValue = response.data.rate;
         console.log('Set new exchange rate:', newRate);
+        showSuccess('Exchange rate created successfully');
       }
 
       handleCloseRatePopup();
       
-      // Notify other components to refresh BDT prices when USD rate changes (as products are priced in USD)
-      {
-        // Determine the effective currency and the latest rate (prefer backend response if available)
-        const updatedCurrency = (response && response.data && response.data.currency) || rateData.currency || (rateData.currencyPair && rateData.currencyPair.split(' / ')[0]);
-        const updatedRateValue = (response && response.data && response.data.rate !== undefined) ? response.data.rate : (parseFloat(rateData.rate) || null);
+      // Notify other components to refresh BDT prices when any currency rate changes
+      // This allows products to update their prices dynamically
+      if (updatedCurrency && updatedRateValue !== null) {
+        // Dispatch a custom event to notify other components about the exchange rate change
+        window.dispatchEvent(new CustomEvent('currencyRateUpdated', { 
+          detail: { 
+            currency: updatedCurrency,
+            rate: updatedRateValue 
+          } 
+        }));
+        
+        // Also dispatch the specific USD event for backward compatibility
         if (updatedCurrency === 'USD') {
-          // Dispatch a custom event to notify other components about the exchange rate change
-          window.dispatchEvent(new CustomEvent('bdtRateUpdated', { detail: { rate: updatedRateValue } }));
+          window.dispatchEvent(new CustomEvent('bdtRateUpdated', { 
+            detail: { rate: updatedRateValue } 
+          }));
         }
       }
       
@@ -317,9 +346,12 @@ export default function CurrencyRates() {
         }
       } else if (err.response?.data?.message) {
         errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
       }
 
       showError(errorMessage);
+      throw err; // Re-throw to let the popup handle it
     }
   };
 

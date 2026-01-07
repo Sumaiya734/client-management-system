@@ -61,18 +61,25 @@ class ProductService extends BaseService
             $profitMargin = (float) $data['profit_margin'];
             $data['profit'] = $basePrice * ($profitMargin / 100);
             
-            // Calculate BDT price based on base_price with profit margin applied and converted to BDT
-            // Using dynamic exchange rate from currency rates (BDT-based system)
-            $finalUSD = $basePrice * (1 + $profitMargin / 100);
-            $bdtRate = $this->currencyRateService->getByCurrency('BDT');
-            if ($bdtRate) {
-                // In BDT-based system: the stored rate represents how much foreign currency equals 1 BDT
-                // So if the stored rate is 0.0089, it means 1 BDT = 0.0089 USD
-                $bdtConversionRate = $bdtRate->rate;
+            // Calculate BDT price using formula: base price × currency rate (BDT) × (1 + profit%)
+            // Using dynamic exchange rate from currency rates
+            $usdRate = $this->currencyRateService->getByCurrency('USD');
+            if ($usdRate) {
+                $rate = $usdRate->rate;
+                // Convert rate to "1 USD = X BDT" format if needed
+                // If rate < 1, it's "1 BDT = rate USD", convert to "1 USD = 1/rate BDT"
+                if ($rate < 1) {
+                    $usdToBdtRate = 1 / $rate;
+                } else {
+                    $usdToBdtRate = $rate; // Already in "1 USD = rate BDT" format
+                }
             } else {
-                $bdtConversionRate = 0.0089; // Fallback to 0.0089 if BDT rate not found
+                $usdToBdtRate = 110.5; // Fallback: 1 USD = 110.5 BDT
             }
-            $data['bdt_price'] = round($finalUSD / $bdtConversionRate);
+            
+            // Formula: base (USD) × rate (BDT) × (1 + profit%)
+            $baseInBdt = $basePrice * $usdToBdtRate;
+            $data['bdt_price'] = round($baseInBdt * (1 + $profitMargin / 100));
         }
 
         return $this->repository->create($data);
@@ -123,18 +130,25 @@ class ProductService extends BaseService
             $profitMargin = (float) $data['profit_margin'];
             $data['profit'] = $basePrice * ($profitMargin / 100);
             
-            // Calculate BDT price based on base_price with profit margin applied and converted to BDT
-            // Using dynamic exchange rate from currency rates (BDT-based system)
-            $finalUSD = $basePrice * (1 + $profitMargin / 100);
-            $bdtRate = $this->currencyRateService->getByCurrency('BDT');
-            if ($bdtRate) {
-                // In BDT-based system: the stored rate represents how much foreign currency equals 1 BDT
-                // So if the stored rate is 0.0089, it means 1 BDT = 0.0089 USD
-                $bdtConversionRate = $bdtRate->rate;
+            // Calculate BDT price using formula: base price × currency rate (BDT) × (1 + profit%)
+            // Using dynamic exchange rate from currency rates
+            $usdRate = $this->currencyRateService->getByCurrency('USD');
+            if ($usdRate) {
+                $rate = $usdRate->rate;
+                // Convert rate to "1 USD = X BDT" format if needed
+                // If rate < 1, it's "1 BDT = rate USD", convert to "1 USD = 1/rate BDT"
+                if ($rate < 1) {
+                    $usdToBdtRate = 1 / $rate;
+                } else {
+                    $usdToBdtRate = $rate; // Already in "1 USD = rate BDT" format
+                }
             } else {
-                $bdtConversionRate = 0.0089; // Fallback to 0.0089 if BDT rate not found
+                $usdToBdtRate = 110.5; // Fallback: 1 USD = 110.5 BDT
             }
-            $data['bdt_price'] = round($finalUSD / $bdtConversionRate);
+            
+            // Formula: base (USD) × rate (BDT) × (1 + profit%)
+            $baseInBdt = $basePrice * $usdToBdtRate;
+            $data['bdt_price'] = round($baseInBdt * (1 + $profitMargin / 100));
         }
 
         return $this->repository->update($id, $data);
@@ -172,5 +186,58 @@ class ProductService extends BaseService
         }
 
         return $currenciesData;
+    }
+
+    /**
+     * Recalculate BDT prices for all products based on current USD exchange rate
+     * This is called when currency rates change to keep product prices up-to-date
+     */
+    public function recalculateAllProductPrices()
+    {
+        try {
+            // Get current USD rate
+            $usdRate = $this->currencyRateService->getByCurrency('USD');
+            if (!$usdRate) {
+                \Log::warning('USD rate not found, cannot recalculate product prices');
+                return false;
+            }
+
+            $bdtConversionRate = $usdRate->rate;
+            $updatedCount = 0;
+
+            // Get all products that have base_price and profit_margin
+            // Use the Product model directly
+            $products = \App\Models\Product::whereNotNull('base_price')
+                ->whereNotNull('profit_margin')
+                ->get();
+
+            // Convert rate to "1 USD = X BDT" format if needed
+            $usdToBdtRate = $bdtConversionRate;
+            if ($bdtConversionRate < 1) {
+                // Convert from "1 BDT = rate USD" to "1 USD = 1/rate BDT"
+                $usdToBdtRate = 1 / $bdtConversionRate;
+            }
+            
+            foreach ($products as $product) {
+                $basePrice = (float) $product->base_price;
+                $profitMargin = (float) $product->profit_margin;
+                
+                // Calculate using formula: base (USD) × rate (BDT) × (1 + profit%)
+                $baseInBdt = $basePrice * $usdToBdtRate;
+                $newBdtPrice = round($baseInBdt * (1 + $profitMargin / 100));
+                
+                // Update product BDT price
+                $product->bdt_price = $newBdtPrice;
+                $product->save();
+                
+                $updatedCount++;
+            }
+
+            \Log::info("Recalculated BDT prices for {$updatedCount} products using USD rate: {$bdtConversionRate}");
+            return $updatedCount;
+        } catch (\Exception $e) {
+            \Log::error('Error recalculating product prices: ' . $e->getMessage());
+            return false;
+        }
     }
 }
