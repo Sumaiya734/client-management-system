@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 
 class SubscriptionService extends BaseService
 {
@@ -229,7 +230,9 @@ class SubscriptionService extends BaseService
                     'raw_products_subscription_status' => $subscription->products_subscription_status,
                     'invoice' => $subscription->invoice,
                     // Add attachment from purchase
-                    'attachment' => $purchase->attachment ?? null,
+                    'attachment' => $purchase ? $purchase->attachment : null,
+                    'attachment_url' => ($purchase && $purchase->attachment) ? $this->getAttachmentUrl($purchase->attachment) : null,
+                   
                     // Add date fields for frontend modal
                     'start_date' => $subscription->start_date,
                     'end_date' => $subscription->end_date,
@@ -441,7 +444,9 @@ class SubscriptionService extends BaseService
                 'raw_progress' => $subscription->progress,
                 'raw_products_subscription_status' => $subscription->products_subscription_status,
                 // Add attachment from purchase
-                'attachment' => $purchase->attachment ?? null,
+                'attachment' => $purchase ? $purchase->attachment : null,
+                'attachment_url' => ($purchase && $purchase->attachment) ? $this->getAttachmentUrl($purchase->attachment) : null,
+               
                 'start_date' => $subscription->start_date,
                 'end_date' => $subscription->end_date,
                 'delivery_date' => $subscription->delivery_date ?? $purchase->delivery_date ?? null,
@@ -839,5 +844,21 @@ class SubscriptionService extends BaseService
             ]);
             throw $e;
         }
+    }
+    
+    /**
+     * Generate the attachment URL for a given attachment path
+     */
+    private function getAttachmentUrl($attachment)
+    {
+        if (empty($attachment)) {
+            return null;
+        }
+        
+        $path = str_contains($attachment, '/')
+            ? $attachment
+            : 'purchase_attachments/' . $attachment;
+            
+        return asset('storage/' . $path);
     }
 }

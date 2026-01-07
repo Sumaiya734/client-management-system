@@ -293,9 +293,14 @@ export default function CurrencyRates() {
       handleCloseRatePopup();
       
       // Notify other components to refresh BDT prices when USD rate changes (as products are priced in USD)
-      if (rateData.currency === 'USD') {
-        // Dispatch a custom event to notify other components about the exchange rate change
-        window.dispatchEvent(new CustomEvent('bdtRateUpdated', { detail: { rate: rateData.rate } }));
+      {
+        // Determine the effective currency and the latest rate (prefer backend response if available)
+        const updatedCurrency = (response && response.data && response.data.currency) || rateData.currency || (rateData.currencyPair && rateData.currencyPair.split(' / ')[0]);
+        const updatedRateValue = (response && response.data && response.data.rate !== undefined) ? response.data.rate : (parseFloat(rateData.rate) || null);
+        if (updatedCurrency === 'USD') {
+          // Dispatch a custom event to notify other components about the exchange rate change
+          window.dispatchEvent(new CustomEvent('bdtRateUpdated', { detail: { rate: updatedRateValue } }));
+        }
       }
       
     } catch (err) {
@@ -339,6 +344,12 @@ export default function CurrencyRates() {
       showSuccess('Exchange rate deleted successfully');
       setConfirmDialog({ isOpen: false, item: null, action: null });
       console.log('Deleted exchange rate:', rate);
+
+      // If the deleted rate was for USD, notify other components so they can refresh/fallback
+      const deletedCurrency = rate.currency || (rate.currencyPair && rate.currencyPair.split(' / ')[0]);
+      if (deletedCurrency === 'USD') {
+        window.dispatchEvent(new CustomEvent('bdtRateUpdated', { detail: { rate: null } }));
+      }
     } catch (err) {
       console.error('Error deleting exchange rate:', err);
       let errorMessage = 'Failed to delete exchange rate';

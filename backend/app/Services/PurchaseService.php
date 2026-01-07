@@ -260,6 +260,14 @@ class PurchaseService
         $purchaseArray['products'] = $products;
         $purchaseArray['total_amount'] = $purchase->total_amount;
 
+        $purchaseArray['attachment_url'] = null;
+        if (!empty($purchase->attachment)) {
+            $path = str_contains($purchase->attachment, '/')
+                ? $purchase->attachment
+                : 'purchase_attachments/' . $purchase->attachment;
+            $purchaseArray['attachment_url'] = asset('storage/' . $path);
+        }
+
         return $purchaseArray;
     }
 

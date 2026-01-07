@@ -4,12 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\CurrencyRateService;
+use App\Events\CurrencyRateChanged;
 use Illuminate\Http\Request;
 
 class CurrencyRateController extends Controller
 {
     protected $currencyRateService;
-    
+
     public function __construct(CurrencyRateService $currencyRateService)
     {
         $this->currencyRateService = $currencyRateService;
@@ -22,7 +23,7 @@ class CurrencyRateController extends Controller
     {
         try {
             $currencyRates = $this->currencyRateService->getAll();
-            
+
             return response()->json([
                 'success' => true,
                 'data' => $currencyRates,
@@ -45,12 +46,20 @@ class CurrencyRateController extends Controller
         try {
             $currencyRate = $this->currencyRateService->create($request->all());
 
+            // Broadcast/internal event: notify listeners that a rate has been created
+            try {
+                event(new CurrencyRateChanged($currencyRate->currency, $currencyRate->rate, 'created'));
+            } catch (\Throwable $e) {
+                // Non-blocking: don't fail the request if broadcasting isn't configured
+                \Log::warning('Failed to dispatch CurrencyRateChanged event (create): ' . $e->getMessage());
+            }
+
             return response()->json([
                 'success' => true,
                 'data' => $currencyRate,
                 'message' => 'Currency rate created successfully'
             ], 201);
-            
+
         } catch (\Exception $e) {
             // Extract validation errors from the exception message if present
             $errors = [];
@@ -62,7 +71,7 @@ class CurrencyRateController extends Controller
                     'errors' => $errors
                 ], 422);
             }
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create currency rate',
@@ -91,7 +100,7 @@ class CurrencyRateController extends Controller
                 'data' => $currencyRate,
                 'message' => 'Currency rate retrieved successfully'
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -109,12 +118,20 @@ class CurrencyRateController extends Controller
         try {
             $currencyRate = $this->currencyRateService->update($id, $request->all());
 
+            // Broadcast/internal event: notify listeners that a rate has been updated
+            try {
+                event(new CurrencyRateChanged($currencyRate->currency, $currencyRate->rate, 'updated'));
+            } catch (\Throwable $e) {
+                // Non-blocking: don't fail the request if broadcasting isn't configured
+                \Log::warning('Failed to dispatch CurrencyRateChanged event (update): ' . $e->getMessage());
+            }
+
             return response()->json([
                 'success' => true,
                 'data' => $currencyRate,
                 'message' => 'Currency rate updated successfully'
             ]);
-            
+
         } catch (\Exception $e) {
             // Extract validation errors from the exception message if present
             $errors = [];
@@ -126,14 +143,14 @@ class CurrencyRateController extends Controller
                     'errors' => $errors
                 ], 422);
             }
-            
+
             if (strpos($e->getMessage(), 'Currency rate not found') !== false) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Currency rate not found'
                 ], 404);
             }
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update currency rate',
@@ -148,13 +165,27 @@ class CurrencyRateController extends Controller
     public function destroy(string $id)
     {
         try {
+            // Load the rate first so we can capture its currency/rate for broadcasting after delete
+            $currencyRate = $this->currencyRateService->getById($id);
+            $deletedCurrency = $currencyRate ? $currencyRate->currency : null;
+            $deletedRateVal = $currencyRate ? $currencyRate->rate : null;
+
             $result = $this->currencyRateService->delete($id);
+
+            // Broadcast/internal event: notify listeners that a rate has been deleted
+            try {
+                if ($deletedCurrency) {
+                    event(new CurrencyRateChanged($deletedCurrency, $deletedRateVal, 'deleted'));
+                }
+            } catch (\Throwable $e) {
+                \Log::warning('Failed to dispatch CurrencyRateChanged event (delete): ' . $e->getMessage());
+            }
 
             return response()->json([
                 'success' => true,
                 'message' => 'Currency rate deleted successfully'
             ]);
-            
+
         } catch (\Exception $e) {
             if (strpos($e->getMessage(), 'Currency rate not found') !== false) {
                 return response()->json([
@@ -162,7 +193,7 @@ class CurrencyRateController extends Controller
                     'message' => 'Currency rate not found'
                 ], 404);
             }
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete currency rate',
@@ -184,7 +215,7 @@ class CurrencyRateController extends Controller
                 'data' => $currencyRates,
                 'message' => 'Currency rates retrieved successfully'
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -207,7 +238,7 @@ class CurrencyRateController extends Controller
                 'data' => $summary,
                 'message' => 'Currency rates summary retrieved successfully'
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

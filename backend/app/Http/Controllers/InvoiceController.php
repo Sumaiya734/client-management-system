@@ -321,7 +321,17 @@ class InvoiceController extends Controller
         // Format dates
         $issueDate = date('d M, Y', strtotime($invoice->issue_date));
         $dueDate = date('d M, Y', strtotime($invoice->due_date));
-        
+
+        // Load logo from frontend assets if available, else fallback to public image
+        $logoPath = realpath(base_path('../frontend/src/assets/nanosoft logo.png'));
+        if ($logoPath && file_exists($logoPath)) {
+            $logoData = base64_encode(file_get_contents($logoPath));
+            $logoMime = mime_content_type($logoPath) ?: 'image/png';
+            $logoSrc = 'data:' . $logoMime . ';base64,' . $logoData;
+        } else {
+            $logoSrc = '/images/nanosoft-logo.png';
+        }
+
         $html = '<!DOCTYPE html>
         <html>
         <head>
@@ -329,7 +339,7 @@ class InvoiceController extends Controller
             <title>Invoice - ' . $invoice->invoice_number . '</title>
             <style>
                 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
-                
+
                 body {
                     font-family: "Inter", Helvetica, Arial, sans-serif;
                     background-color: #f3f4f6;
@@ -339,7 +349,7 @@ class InvoiceController extends Controller
                     line-height: 1.5;
                     -webkit-font-smoothing: antialiased;
                 }
-                
+
                 .invoice-container {
                     max-width: 800px;
                     margin: 0 auto;
@@ -348,7 +358,7 @@ class InvoiceController extends Controller
                     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
                     overflow: hidden;
                 }
-                
+
                 .header-banner {
                     background-color: #ffffff;
                     padding: 40px 40px 20px;
@@ -357,7 +367,7 @@ class InvoiceController extends Controller
                     align-items: flex-start;
                     border-bottom: 2px solid ' . $colors['primary'] . ';
                 }
-                
+
                 .logo-area h1 {
                     margin: 0;
                     font-size: 28px;
@@ -365,17 +375,17 @@ class InvoiceController extends Controller
                     color: ' . $colors['primary'] . ';
                     letter-spacing: -0.5px;
                 }
-                
+
                 .logo-area p {
                     margin: 5px 0 0;
                     font-size: 14px;
                     color: ' . $colors['text-light'] . ';
                 }
-                
+
                 .invoice-title {
                     text-align: right;
                 }
-                
+
                 .invoice-title h2 {
                     margin: 0;
                     font-size: 42px;
@@ -385,30 +395,30 @@ class InvoiceController extends Controller
                     letter-spacing: 2px;
                     opacity: 0.2;
                 }
-                
+
                 .invoice-meta {
                     margin-top: 10px;
                     text-align: right;
                 }
-                
+
                 .meta-row {
                     display: flex;
                     justify-content: flex-end;
                     margin-bottom: 4px;
                     font-size: 14px;
                 }
-                
+
                 .meta-label {
                     color: ' . $colors['text-light'] . ';
                     font-weight: 500;
                     width: 100px;
                 }
-                
+
                 .meta-value {
                     font-weight: 600;
                     min-width: 120px;
                 }
-                
+
                 .status-badge {
                     display: inline-block;
                     padding: 4px 12px;
@@ -420,18 +430,18 @@ class InvoiceController extends Controller
                     color: ' . ($invoice->status == 'Paid' ? '#166534' : '#475569') . ';
                     margin-top: 8px;
                 }
-                
+
                 .addresses {
                     display: flex;
                     justify-content: space-between;
                     padding: 40px;
                     gap: 40px;
                 }
-                
+
                 .address-block {
                     flex: 1;
                 }
-                
+
                 .address-title {
                     font-size: 11px;
                     text-transform: uppercase;
@@ -442,26 +452,26 @@ class InvoiceController extends Controller
                     border-bottom: 1px solid ' . $colors['border'] . ';
                     padding-bottom: 5px;
                 }
-                
+
                 .address-name {
                     font-weight: 700;
                     font-size: 16px;
                     margin-bottom: 5px;
                     color: ' . $colors['text'] . ';
                 }
-                
+
                 .address-details {
                     color: ' . $colors['text-light'] . ';
                     font-size: 14px;
                     line-height: 1.6;
                 }
-                
+
                 .items-table {
                     width: 100%;
                     border-collapse: collapse;
                     margin-bottom: 0;
                 }
-                
+
                 .items-table th {
                     background-color: #f8fafc;
                     color: ' . $colors['text-light'] . ';
@@ -474,34 +484,34 @@ class InvoiceController extends Controller
                     border-top: 1px solid ' . $colors['border'] . ';
                     border-bottom: 1px solid ' . $colors['border'] . ';
                 }
-                
+
                 .items-table td {
                     padding: 12px 15px; /* Reduced vertical padding */
                     border-bottom: 1px solid ' . $colors['border'] . ';
                     font-size: 14px;
                     color: ' . $colors['text'] . ';
                 }
-                
+
                 .items-table tr:last-child td {
                     border-bottom: none;
                 }
-                
+
                 .col-desc { width: 40%; }
                 .col-qty { text-align: center; width: 15%; }
                 .col-price { text-align: right; width: 20%; }
                 .col-total { text-align: right; width: 25%; font-weight: 600; }
-                
+
                 .summary-section {
                     display: flex;
                     justify-content: flex-end;
                     padding: 30px 40px;
                     background-color: #f8fafc;
                 }
-                
+
                 .summary-table {
                     width: 300px;
                 }
-                
+
                 .summary-row {
                     display: flex;
                     justify-content: space-between;
@@ -509,7 +519,7 @@ class InvoiceController extends Controller
                     font-size: 14px;
                     color: ' . $colors['text-light'] . ';
                 }
-                
+
                 .summary-row.total {
                     margin-top: 15px;
                     padding-top: 15px;
@@ -518,25 +528,25 @@ class InvoiceController extends Controller
                     font-weight: 700;
                     color: ' . $colors['primary'] . ';
                 }
-                
+
                 .notes-section {
                     padding: 30px 40px;
                     border-top: 1px solid ' . $colors['border'] . ';
                 }
-                
+
                 .notes-title {
                     font-size: 14px;
                     font-weight: 600;
                     margin-bottom: 8px;
                     color: ' . $colors['text'] . ';
                 }
-                
+
                 .notes-text {
                     font-size: 13px;
                     color: ' . $colors['text-light'] . ';
                     line-height: 1.6;
                 }
-                
+
                 .footer {
                     background-color: ' . $colors['primary'] . ';
                     color: white;
@@ -545,7 +555,7 @@ class InvoiceController extends Controller
                     font-size: 13px;
                     font-weight: 500;
                 }
-                
+
                 @media print {
                     body {
                         background-color: white;
@@ -562,10 +572,12 @@ class InvoiceController extends Controller
             <div class="invoice-container">
                 <div class="header-banner">
                     <div class="logo-area">
-                        <h1>Nanosoft InfoTech</h1>
-                        <p>Tech Solutions & Management</p>
+                       <img src="' . $logoSrc . '"
+                        alt="Nanosoft InfoTech"
+                        style="height: 60px; display: block;">
+
                     </div>
-                    
+
                     <div class="invoice-title">
                         <h2>Invoice</h2>
                         <div class="invoice-meta">
@@ -587,7 +599,7 @@ class InvoiceController extends Controller
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="addresses">
                     <div class="address-block">
                         <div class="address-title">From</div>
@@ -598,7 +610,7 @@ class InvoiceController extends Controller
                             Email: info@nanotech.com
                         </div>
                     </div>
-                    
+
                     <div class="address-block" style="text-align: right;">
                         <div class="address-title" style="text-align: right;">Bill To</div>
                         <div class="address-name">' . $invoice->client_name . '</div>
@@ -609,7 +621,7 @@ class InvoiceController extends Controller
                         </div>
                     </div>
                 </div>
-                
+
                 <table class="items-table">
                     <thead>
                         <tr>
@@ -620,7 +632,7 @@ class InvoiceController extends Controller
                         </tr>
                     </thead>
                     <tbody>';
-        
+
         foreach ($invoice->items as $item) {
             $html .= '<tr>
                 <td class="col-desc">
@@ -632,31 +644,31 @@ class InvoiceController extends Controller
                 <td class="col-total">৳' . number_format(($item['quantity'] ?? 1) * ($item['unit_price'] ?? 0), 2) . '</td>
             </tr>';
         }
-        
+
         $html .= '</tbody>
                 </table>
-                
+
                 <div class="summary-section">
                     <div class="summary-table">
                         <div class="summary-row">
                             <span>Subtotal:</span>
                             <span>৳' . number_format($invoice->sub_total, 2) . '</span>
                         </div>';
-                        
+
         if ($invoice->tax_amount > 0) {
             $html .= '<div class="summary-row">
                 <span>Tax:</span>
                 <span>৳' . number_format($invoice->tax_amount, 2) . '</span>
             </div>';
         }
-        
+
         if ($invoice->discount_amount > 0) {
             $html .= '<div class="summary-row">
                 <span>Discount:</span>
                 <span>- ৳' . number_format($invoice->discount_amount, 2) . '</span>
             </div>';
         }
-                        
+
         $html .= '<div class="summary-row total">
                             <span>Total Due:</span>
                             <span>৳' . number_format($invoice->total_amount, 2) . '</span>
@@ -672,23 +684,23 @@ class InvoiceController extends Controller
                 <span>৳' . number_format($invoice->balance_amount, 2) . '</span>
             </div>';
         }
-                        
+
         $html .= '</div>
                 </div>';
-                
+
         if ($invoice->notes || $invoice->terms) {
             $html .= '<div class="notes-section">';
-            
+
             if ($invoice->notes) {
                 $html .= '<div class="notes-title">Notes</div>
                 <div class="notes-text" style="margin-bottom: 20px;">' . nl2br($invoice->notes) . '</div>';
             }
-            
+
             if ($invoice->terms) {
                 $html .= '<div class="notes-title">Terms & Conditions</div>
                 <div class="notes-text">' . nl2br($invoice->terms) . '</div>';
             }
-            
+
             $html .= '</div>';
         }
 

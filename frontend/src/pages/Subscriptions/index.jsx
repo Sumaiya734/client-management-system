@@ -31,6 +31,7 @@ export default function Subscriptions() {
   // Renewal state
   const [renewalLoading, setRenewalLoading] = useState(false);
   const [renewals, setRenewals] = useState([]);
+  const [renewedItems, setRenewedItems] = useState(new Set()); // Track renewed items
 
   // Tab state
   const [activeTab, setActiveTab] = useState('subscriptions');
@@ -46,7 +47,24 @@ export default function Subscriptions() {
     } else {
       fetchSubscriptions();
     }
+    
+    // Clear renewed items when switching tabs
+    if (activeTab !== 'renewals') {
+      setRenewedItems(new Set());
+    }
   }, [activeTab]);
+  
+  // Refresh renewal data when renewed items change
+  useEffect(() => {
+    if (activeTab === 'renewals' && renewedItems.size > 0) {
+      // Small delay to allow for backend updates
+      const timer = setTimeout(() => {
+        fetchRenewalData();
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [renewedItems, activeTab]);
 
   const fetchSubscriptions = async () => {
     try {
@@ -188,6 +206,31 @@ export default function Subscriptions() {
       case 'Expired': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const getAttachmentUrl = (attachment) => {
+    if (!attachment) return null;
+
+    const baseUrl = (api?.defaults?.baseURL || 'http://localhost:8000').replace(/\/$/, '');
+    const raw = String(attachment).trim();
+
+    if (/^https?:\/\//i.test(raw)) {
+      try {
+        // Validate URL
+        // eslint-disable-next-line no-new
+        new URL(raw);
+        return raw;
+      } catch (e) {
+        // Handle common case: missing slash after host (e.g. http://localhost:8000purchase_attachments/...)
+        return raw.replace(/^(https?:\/\/[^/]+)(?!\/)(.+)$/i, '$1/$2');
+      }
+    }
+
+    if (raw.startsWith('/')) {
+      return `${baseUrl}${raw}`;
+    }
+
+    return `${baseUrl}/${raw}`;
   };
 
   const handleOpenModal = (product, quantity, subscription, isEdit = false) => {
@@ -350,6 +393,20 @@ export default function Subscriptions() {
 
       // Also refresh renewal data if we are on that tab or to keep counts updated
       fetchRenewalData();
+
+      // If we're on the renewal tab, also track this item as renewed
+      if (editingSubscription?.id) {
+        setRenewedItems(prev => new Set(prev).add(editingSubscription.id));
+        
+        // Clear the renewed status after a delay since the backend data should update
+        setTimeout(() => {
+          setRenewedItems(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(editingSubscription.id);
+            return newSet;
+          });
+        }, 3000); // Reset after 3 seconds to allow backend sync
+      }
 
       // Close modal
       setIsModalOpen(false);
@@ -557,13 +614,24 @@ export default function Subscriptions() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleOpenModal(item.product_name, item.quantity, item, true)}
-                        >
-                          Renew
-                        </Button>
+                        {renewedItems.has(item.id) ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled
+                            className="text-green-600"
+                          >
+                            Done
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleOpenModal(item.product_name, item.quantity, item, true)}
+                          >
+                            Renew
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -706,7 +774,10 @@ export default function Subscriptions() {
                             size="sm"
                             className="text-xs"
                             icon={<Paperclip className="h-3 w-3" />}
-                            onClick={() => window.open(subscription.attachment, '_blank')}
+                            onClick={() => {
+                              const url = getAttachmentUrl(subscription.attachment_url || subscription.attachment);
+                              if (url) window.open(url, '_blank');
+                            }}
                           >
                             View
                           </Button>

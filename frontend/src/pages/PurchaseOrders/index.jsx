@@ -77,6 +77,29 @@ export default function PurchaseOrders() {
     return isNaN(num) ? '0.00' : num.toFixed(2);
   };
 
+  const getAttachmentUrl = (attachment) => {
+    if (!attachment) return null;
+
+    const baseUrl = (api?.defaults?.baseURL || 'http://localhost:8000').replace(/\/$/, '');
+    const raw = String(attachment).trim();
+
+    if (/^https?:\/\//i.test(raw)) {
+      try {
+        // eslint-disable-next-line no-new
+        new URL(raw);
+        return raw;
+      } catch (e) {
+        return raw.replace(/^(https?:\/\/[^/]+)(?!\/)(.+)$/i, '$1/$2');
+      }
+    }
+
+    if (raw.startsWith('/')) {
+      return `${baseUrl}${raw}`;
+    }
+
+    return `${baseUrl}/${raw}`;
+  };
+
   const handleCreatePO = () => setIsCreatePopupOpen(true);
   const handleCloseCreatePopup = () => setIsCreatePopupOpen(false);
   const handleCloseViewPopup = () => setIsViewPopupOpen(false);
@@ -218,7 +241,7 @@ export default function PurchaseOrders() {
           <CardDescription>Manage purchase orders from clients. Use Subscriptions module to manage software subscriptions.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          {/* ✅ Responsive Table Wrapper */}
+          {/* Responsive Table Wrapper */}
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 text-sm">
               <thead className="bg-gray-50">
@@ -288,10 +311,8 @@ export default function PurchaseOrders() {
                             className="text-xs"
                             icon={<Paperclip className="h-3 w-3" />}
                             onClick={() => {
-                              const attachmentUrl = po.attachment.startsWith('http')
-                                ? po.attachment
-                                : `http://localhost:8000${po.attachment}`;
-                              window.open(attachmentUrl, '_blank');
+                              const attachmentUrl = getAttachmentUrl(po.attachment_url || po.attachment);
+                              if (attachmentUrl) window.open(attachmentUrl, '_blank');
                             }}
                           >
                             View
