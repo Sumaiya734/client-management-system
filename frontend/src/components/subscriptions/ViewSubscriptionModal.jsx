@@ -5,6 +5,8 @@ import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
 import { formatDate, formatDateRange } from '../../utils/dateUtils';
 
 
+import { Badge } from '../../components/ui/Badge';
+
 const ViewSubscriptionModal = ({ subscription, isOpen, onClose }) => {
   const { isVisible, isAnimating } = useAnimationState(isOpen);
 
@@ -14,7 +16,7 @@ const ViewSubscriptionModal = ({ subscription, isOpen, onClose }) => {
 
   // Format products for display - handling different possible data structures
   let products = [];
-  
+
   if (subscription.products_subscription_status) {
     // If it's a string, parse it as JSON
     if (typeof subscription.products_subscription_status === 'string') {
@@ -34,11 +36,55 @@ const ViewSubscriptionModal = ({ subscription, isOpen, onClose }) => {
     products = [];
   }
 
+  const getStatusVariant = (status) => {
+    if (!status) return 'default';
+    const s = status.toLowerCase();
+    if (s === 'active' || s === 'completed') return 'success'; // Green
+    if (s === 'pending') return 'warning'; // Yellow
+    if (s === 'expired' || s === 'failed') return 'destructive'; // Red
+    if (s === 'expiring soon') return 'warning'; // Yellow/Orange
+    return 'secondary'; // Gray
+  };
+
+  const getStatusColorClass = (status) => {
+    if (!status) return 'bg-gray-100 text-gray-800';
+    const s = status.toLowerCase();
+    if (s === 'active') return 'bg-green-100 text-green-800';
+    if (s === 'pending') return 'bg-yellow-100 text-yellow-800';
+    if (s === 'expired') return 'bg-red-100 text-red-800';
+    if (s === 'expiring soon') return 'bg-orange-100 text-orange-800';
+    return 'bg-gray-100 text-gray-800';
+  };
+
+  // Determine the display status dynamically if the top-level status isn't updated yet
+  const getDisplayStatus = () => {
+    // If we have explicit 'Active' status on subscription, trust it
+    if (subscription.status === 'Active') return 'Active';
+
+    // Otherwise check products - if ANY product is active, display Active
+    if (products && products.length > 0) {
+      const hasActive = products.some(p => {
+        const s = (p.status || p.Status || '').toLowerCase();
+        return s === 'active';
+      });
+      if (hasActive) return 'Active';
+
+      const hasExpiring = products.some(p => {
+        const s = (p.status || p.Status || '').toLowerCase();
+        return s === 'expiring soon';
+      });
+      if (hasExpiring) return 'Expiring Soon';
+    }
+
+    return subscription.status || 'Pending';
+  };
+
+  const displayStatus = getDisplayStatus();
+
   return createPortal(
     <div
-      className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] transition-opacity duration-300 ${
-        isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'
-      }`}
+      className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
     >
       <PopupAnimation animationType="zoomIn" duration="0.3s">
         <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
@@ -71,8 +117,10 @@ const ViewSubscriptionModal = ({ subscription, isOpen, onClose }) => {
                   </p>
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500">Status</h3>
-                  <p className="text-lg font-medium text-gray-900">{subscription.status || 'N/A'}</p>
+                  <h3 className="text-sm font-medium text-gray-500 mb-1">Status</h3>
+                  <Badge className={getStatusColorClass(displayStatus)}>
+                    {displayStatus}
+                  </Badge>
                 </div>
               </div>
               <div className="space-y-4">
@@ -153,13 +201,13 @@ const ViewSubscriptionModal = ({ subscription, isOpen, onClose }) => {
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-900">{product.quantity || product.Quantity || 1}</td>
                           <td className="px-4 py-3 text-sm text-gray-900">
-                            ৳{typeof (product.price || product.unit_price || product.UnitPrice || 0) === 'number' 
-                              ? (product.price || product.unit_price || product.UnitPrice || 0).toFixed(2) 
+                            ৳{typeof (product.price || product.unit_price || product.UnitPrice || 0) === 'number'
+                              ? (product.price || product.unit_price || product.UnitPrice || 0).toFixed(2)
                               : parseFloat(product.price || product.unit_price || product.UnitPrice || 0).toFixed(2)}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-900">
-                            ৳{typeof (product.sub_total || product.total || product.SubTotal || 0) === 'number' 
-                              ? (product.sub_total || product.total || product.SubTotal || 0).toFixed(2) 
+                            ৳{typeof (product.sub_total || product.total || product.SubTotal || 0) === 'number'
+                              ? (product.sub_total || product.total || product.SubTotal || 0).toFixed(2)
                               : parseFloat(product.sub_total || product.total || product.SubTotal || 0).toFixed(2)}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-900">
@@ -169,19 +217,9 @@ const ViewSubscriptionModal = ({ subscription, isOpen, onClose }) => {
                             {formatDate(product.end_date || product.subscription_end || product.EndDate)}
                           </td>
                           <td className="px-4 py-3 text-sm">
-                            <span
-                              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                (product.status || product.Status) === 'Active' || (product.status || product.Status) === 'active'
-                                  ? 'bg-green-100 text-green-800'
-                                  : (product.status || product.Status) === 'Pending' || (product.status || product.Status) === 'pending'
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : (product.status || product.Status) === 'Expired' || (product.status || product.Status) === 'expired'
-                                  ? 'bg-red-100 text-red-800'
-                                  : 'bg-gray-100 text-gray-800'
-                              }`}
-                            >
+                            <Badge className={getStatusColorClass(product.status || product.Status)}>
                               {(product.status || product.Status) || 'N/A'}
-                            </span>
+                            </Badge>
                           </td>
                         </tr>
                       ))

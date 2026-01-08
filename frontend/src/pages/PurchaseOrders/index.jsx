@@ -170,17 +170,71 @@ export default function PurchaseOrders() {
   };
 
   // Handle viewing subscription details
-  const handleViewSubscription = (po) => {
-    // Format the purchase order data to match subscription format
-    const formattedSubscription = {
-      ...po,
-      products: po.products || [],
-      poNumber: po.po_number,
-      startDate: po.delivery_date,
-      totalAmount: po.total_amount
-    };
-    
-    setSelectedSubscription(formattedSubscription);
+  const handleViewSubscription = async (po) => {
+    try {
+      // Try to find the actual subscription record for this PO to get accurate status/dates
+      const response = await api.get('/subscriptions');
+      const subscription = response.data.find(s =>
+        (s.poNumber === po.po_number) ||
+        (s.po_number === po.po_number) ||
+        (s.purchase_id === po.id)
+      );
+
+      if (subscription) {
+        // Use the actual subscription data
+        // We need to parse products_subscription_status if it exists to ensure ViewSubscriptionModal
+        // can render the products correctly (it has internal parsing but let's be safe)
+        let products = [];
+        if (subscription.products_subscription_status) {
+          if (typeof subscription.products_subscription_status === 'string') {
+            try {
+              products = JSON.parse(subscription.products_subscription_status);
+            } catch (e) {
+              console.error('Error parsing products_subscription_status:', e);
+              products = [];
+            }
+          } else {
+            products = subscription.products_subscription_status;
+          }
+        } else if (Array.isArray(subscription.products)) {
+          products = subscription.products;
+        }
+
+        setSelectedSubscription({
+          ...subscription,
+          products: products,
+          products_subscription_status: null // Force usage of parsed products
+        });
+      } else {
+        // Fallback: Format the purchase order data to match subscription format
+        // This handles cases where a subscription record hasn't been created yet
+        const formattedSubscription = {
+          ...po,
+          products: po.products || [],
+          poNumber: po.po_number,
+          startDate: po.delivery_date,
+          endDate: null, // PO doesn't have end date naturally
+          totalAmount: po.total_amount,
+          status: 'Pending Setup', // Indicate it's not fully tracked yet
+          products_subscription_status: null
+        };
+        setSelectedSubscription(formattedSubscription);
+      }
+    } catch (error) {
+      console.error('Error fetching subscription details:', error);
+      // Fallback on error
+      const formattedSubscription = {
+        ...po,
+        products: po.products || [],
+        poNumber: po.po_number,
+        startDate: po.delivery_date,
+        totalAmount: po.total_amount,
+        status: 'Error Loading Status',
+        products_subscription_status: null
+      };
+      setSelectedSubscription(formattedSubscription);
+    }
+
     setIsViewSubscriptionOpen(true);
   };
 

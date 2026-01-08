@@ -237,7 +237,7 @@ class BillingManagementController extends Controller
 
             return response($html)
                 ->header('Content-Type', 'text/html')
-                ->header('Content-Disposition', 'attachment; filename="bill_' . $billing->bill_number . '.html"');
+                ->header('Content-Disposition', 'inline; filename="bill_' . $billing->bill_number . '.html"');
 
         } catch (\Exception $e) {
             return response()->json([
@@ -274,6 +274,16 @@ class BillingManagementController extends Controller
 
         // Products
         $items = $billing->products ?? [];
+
+        // Load logo from frontend assets if available, else fallback to public image
+        $logoPath = realpath(base_path('../frontend/src/assets/nanosoft logo.png'));
+        if ($logoPath && file_exists($logoPath)) {
+            $logoData = base64_encode(file_get_contents($logoPath));
+            $logoMime = mime_content_type($logoPath) ?: 'image/png';
+            $logoSrc = 'data:' . $logoMime . ';base64,' . $logoData;
+        } else {
+            $logoSrc = '/images/nanosoft-logo.png';
+        }
 
         $html = '<!DOCTYPE html>
         <html>
@@ -497,8 +507,9 @@ class BillingManagementController extends Controller
             <div class="invoice-container">
                 <div class="header-banner">
                     <div class="logo-area">
-                        <h1>Nano InfoTech</h1>
-                        <p>Tech Solutions & Management</p>
+                        <img src="' . $logoSrc . '"
+                        alt="Nanosoft InfoTech"
+                        style="height: 60px; display: block;">
                     </div>
                     
                     <div class="invoice-title">
@@ -526,7 +537,7 @@ class BillingManagementController extends Controller
                 <div class="addresses">
                     <div class="address-block">
                         <div class="address-title">From</div>
-                        <div class="address-name">Nano InfoTech</div>
+                        <div class="address-name">Nanosoft InfoTech</div>
                         <div class="address-details">
                             Dhaka, Bangladesh<br>
                             Phone: +880 1234 567890<br>
