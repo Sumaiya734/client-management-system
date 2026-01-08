@@ -15,6 +15,7 @@ interface Product {
   basePrice: string | number;
   baseCurrency: string;
   profit: string | number;
+  profitMargin?: string | number;
   bdtPrice: string | number;
   bdtLabel: string;
   currencies: Array<{ code: string; price: string }>;
@@ -64,9 +65,9 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
 
   const { isVisible, isAnimating } = useAnimationState(isOpen);
 
+  const [currencyOptions, setCurrencyOptions] = useState(['USD', 'EUR', 'GBP', 'CAD', 'AUD']); // Default currencies
   const categoryOptions = ['Communication', 'Productivity', 'Design', 'AI Tools', 'Media'];
   const subscriptionTypeOptions = ['Per User', 'Per License', 'Per Editor', 'Per Account'];
-  const currencyOptions = ['BDT', 'USD', 'EUR', 'GBP', 'CAD', 'AUD'];
   const statusOptions = ['Active', 'Inactive'];
 
   useEffect(() => {
@@ -82,6 +83,24 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
       }
     };
     fetchVendors();
+    
+    // Fetch available currencies from exchange rates API
+    const fetchCurrencies = async () => {
+      try {
+        const response = await currencyRatesApi.getAll();
+        if (response.data && Array.isArray(response.data)) {
+          // Extract unique currency codes from the exchange rates
+          const uniqueCurrencies = ['USD', ...Array.from(new Set(response.data.map((rate: any) => rate.currency)))];
+          setCurrencyOptions(uniqueCurrencies as string[]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch currencies:', error);
+        // Use default currencies if API call fails
+        setCurrencyOptions(['USD', 'EUR', 'GBP', 'CAD', 'AUD']);
+      }
+    };
+    
+    fetchCurrencies();
   }, []);
 
   useEffect(() => {
@@ -96,7 +115,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
         description: product.description || '',
         basePrice: String(product.basePrice).replace(/ USD$/, ''),
         baseCurrency: product.baseCurrency || 'USD',
-        profitMargin: String(product.profit).replace('%', ''),
+        profitMargin: String(product.profit || product.profitMargin || '').replace('%', ''),
         status: product.status || 'Active',
       });
     } else {
@@ -236,6 +255,49 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
     };
   }, []);
 
+  // Multi-currency rates map
+  const [currencyRatesMap, setCurrencyRatesMap] = useState<Record<string, number>>({});
+  
+  // Fetch all currency rates to enable multi-currency calculations
+  useEffect(() => {
+    const fetchAllCurrencyRates = async () => {
+      try {
+        const response = await currencyRatesApi.getAll();
+        if (response.data && Array.isArray(response.data)) {
+          const rates: Record<string, number> = {};
+          response.data.forEach((rate: any) => {
+            rates[rate.currency] = parseFloat(rate.rate);
+          });
+          setCurrencyRatesMap(rates);
+        }
+      } catch (error) {
+        console.error('Failed to fetch currency rates:', error);
+      }
+    };
+    
+    fetchAllCurrencyRates();
+    
+    // Listen for currency rate update events
+    const handleCurrencyRateUpdate = (e: CustomEvent) => {
+      console.log('Currency rate update event received:', e.detail);
+      if (e.detail) {
+        // Handle general currency rate update
+        if (e.detail.currency && e.detail.rate !== undefined) {
+          setCurrencyRatesMap(prev => ({
+            ...prev,
+            [e.detail.currency]: parseFloat(e.detail.rate)
+          }));
+        }
+      }
+    };
+    
+    window.addEventListener('currencyRateUpdated', handleCurrencyRateUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('currencyRateUpdated', handleCurrencyRateUpdate as EventListener);
+    };
+  }, []);
+  
   // Recalculate price preview whenever rate or form data changes
   // Formula: base price × currency rate (BDT) × (1 + profit%) = total price
   const pricePreview = useMemo(() => {
@@ -267,6 +329,22 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
     // Also calculate final USD for display
     const finalUSD = base * (1 + profit / 100);
     
+    // Calculate prices for other currencies if rates are available
+    const multiCurrencyPrices: Record<string, number> = {};
+    Object.entries(currencyRatesMap).forEach(([currency, currencyRate]) => {
+      if (currency !== 'USD') {
+        // Convert from base price (USD) to target currency
+        // First convert base price to BDT, then to target currency
+        const priceInBdt = base * usdToBdtRate;
+        let targetCurrencyRate = currencyRate;
+        if (currencyRate < 1) {
+          targetCurrencyRate = 1 / currencyRate; // Convert to "1 unit = X BDT" format
+        }
+        const priceInTargetCurrency = priceInBdt / targetCurrencyRate;
+        multiCurrencyPrices[currency] = priceInTargetCurrency * (1 + profit / 100);
+      }
+    });
+    
     console.log('Price calculation:', { 
       base, 
       profitPercent: profit, // This is the percentage value (e.g., 20)
@@ -276,6 +354,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
       baseInBdt: baseInBdt.toFixed(2),
       totalBdt: Math.round(totalBdt),
       finalUSD: finalUSD.toFixed(2),
+      multiCurrencyPrices,
       formula: `${base} × ${usdToBdtRate.toFixed(2)} × (1 + ${profit}%) = ${Math.round(totalBdt)}`
     });
     
@@ -285,8 +364,9 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
       profit: profit, // Keep as percentage value for display (e.g., 20)
       rate: usdToBdtRate,
       baseInBdt: baseInBdt.toFixed(2),
+      multiCurrencyPrices,
     };
-  }, [bdtRate, formData.basePrice, formData.profitMargin]);
+  }, [bdtRate, currencyRatesMap, formData.basePrice, formData.profitMargin]);
 
   const validate = () => {
     const err: Record<string, string> = {};
@@ -308,7 +388,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
     let currentBdtRate = bdtRate; // Use the current state rate
     try {
       const response = await currencyRatesApi.getAll();
-      const usdRateData = response.data.find(rate => rate.currency === 'USD');
+      const usdRateData = response.data.find((rate: any) => rate.currency === 'USD');
       if (usdRateData && usdRateData.rate) {
         currentBdtRate = parseFloat(usdRateData.rate);
       }
@@ -330,6 +410,33 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
     // Formula: base (USD) × rate (BDT) × (1 + profit%)
     const baseInBdt = base * usdToBdtRate;
     const calculatedBdtPrice = Math.round(baseInBdt * (1 + profit / 100));
+    
+    // Calculate multi-currency prices
+    const multiCurrencyData = [];
+    Object.entries(currencyRatesMap).forEach(([currency, currencyRate]) => {
+      if (currency !== 'USD') {
+        // Convert from base price (USD) to target currency
+        // First convert base price to BDT, then to target currency
+        const priceInBdt = base * usdToBdtRate;
+        let targetCurrencyRate = currencyRate;
+        if (currencyRate < 1) {
+          targetCurrencyRate = 1 / currencyRate; // Convert to "1 unit = X BDT" format
+        }
+        const priceInTargetCurrency = priceInBdt / targetCurrencyRate;
+        const finalPrice = priceInTargetCurrency * (1 + profit / 100);
+        
+        multiCurrencyData.push({
+          code: currency,
+          price: finalPrice
+        });
+      }
+    });
+    
+    // Include USD in multi-currency data as well
+    multiCurrencyData.push({
+      code: 'USD',
+      price: base * (1 + profit / 100)
+    });
 
     const updatedProduct = {
       id: product?.id || null,
@@ -342,9 +449,11 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
       basePrice: parseFloat(formData.basePrice),
       baseCurrency: formData.baseCurrency,
       profit: parseFloat(formData.profitMargin),
+      profit_margin: parseFloat(formData.profitMargin),
       bdtPrice: calculatedBdtPrice,
       bdtLabel: 'Final Price (BDT)',
-      currencies: product?.currencies || [],
+      currencies: multiCurrencyData,
+      multi_currency: multiCurrencyData,
       status: formData.status,
     };
 

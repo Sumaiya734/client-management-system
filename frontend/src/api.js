@@ -77,6 +77,26 @@ export const currencyRatesApi = {
   delete: (id) => api.delete(`/currency-rates/${id}`),
   search: (params) => api.get('/currency-rates-search', { params }),
   summary: () => api.get('/currency-rates-summary'),
+
+  // History and rate change functions
+  getHistory: async (params = {}) => {
+    const queryParams = new URLSearchParams();
+    
+    if (params.currency) queryParams.append('currency', params.currency);
+    if (params.days) queryParams.append('days', params.days);
+    if (params.startDate) queryParams.append('start_date', params.startDate);
+    if (params.endDate) queryParams.append('end_date', params.endDate);
+    
+    const queryString = queryParams.toString();
+    const url = queryString ? `/currency-rates/history?${queryString}` : '/currency-rates/history';
+    
+    return api.get(url);
+  },
+  
+  // Rate change log function
+  logRateChange: async (data) => {
+    return api.post('/currency-rates/history/log', data);
+  }
 };
 
 // User Management API functions

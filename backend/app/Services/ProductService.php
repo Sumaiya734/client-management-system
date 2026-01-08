@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Repositories\ProductRepository;
 use App\Services\CurrencyRateService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class ProductService extends BaseService
 {
@@ -189,20 +190,28 @@ class ProductService extends BaseService
     }
 
     /**
-     * Recalculate BDT prices for all products based on current USD exchange rate
+     * Recalculate BDT prices for all products based on current exchange rates
      * This is called when currency rates change to keep product prices up-to-date
      */
     public function recalculateAllProductPrices()
     {
         try {
-            // Get current USD rate
-            $usdRate = $this->currencyRateService->getByCurrency('USD');
-            if (!$usdRate) {
-                \Log::warning('USD rate not found, cannot recalculate product prices');
-                return false;
+            // Get all currency rates
+            $currencyRates = $this->currencyRateService->getAll();
+            $ratesMap = [];
+            
+            foreach ($currencyRates as $rate) {
+                $ratesMap[$rate->currency] = $rate->rate;
             }
-
-            $bdtConversionRate = $usdRate->rate;
+            
+            // Get current USD rate as default for calculations
+            $usdRateValue = $ratesMap['USD'] ?? 110.5;
+            // Convert rate to "1 USD = X BDT" format if needed
+            $usdToBdtRate = $usdRateValue;
+            if ($usdRateValue < 1) {
+                $usdToBdtRate = 1 / $usdRateValue;
+            }
+            
             $updatedCount = 0;
 
             // Get all products that have base_price and profit_margin
@@ -210,13 +219,6 @@ class ProductService extends BaseService
             $products = \App\Models\Product::whereNotNull('base_price')
                 ->whereNotNull('profit_margin')
                 ->get();
-
-            // Convert rate to "1 USD = X BDT" format if needed
-            $usdToBdtRate = $bdtConversionRate;
-            if ($bdtConversionRate < 1) {
-                // Convert from "1 BDT = rate USD" to "1 USD = 1/rate BDT"
-                $usdToBdtRate = 1 / $bdtConversionRate;
-            }
             
             foreach ($products as $product) {
                 $basePrice = (float) $product->base_price;
@@ -228,16 +230,96 @@ class ProductService extends BaseService
                 
                 // Update product BDT price
                 $product->bdt_price = $newBdtPrice;
+                
+                // Update multi_currency prices if they exist
+                if (!empty($product->multi_currency)) {
+                    $multiCurrency = json_decode($product->multi_currency, true);
+                    if (is_array($multiCurrency)) {
+                        foreach ($multiCurrency as &$currencyData) {
+                            if (isset($currencyData['code']) && isset($ratesMap[$currencyData['code']])) {
+                                $currencyRate = $ratesMap[$currencyData['code']];
+                                // Convert from base price (USD) to target currency
+                                if ($currencyData['code'] === 'USD') {
+                                    $currencyData['price'] = $basePrice * (1 + $profitMargin / 100);
+                                } else {
+                                    // First convert base price to BDT, then to target currency
+                                    $priceInBdt = $basePrice * $usdToBdtRate;
+                                    $targetCurrencyRate = $currencyRate;
+                                    if ($currencyRate < 1) {
+                                        $targetCurrencyRate = 1 / $currencyRate; // Convert to "1 unit = X BDT" format
+                                    }
+                                    $priceInTargetCurrency = $priceInBdt / $targetCurrencyRate;
+                                    $currencyData['price'] = $priceInTargetCurrency * (1 + $profitMargin / 100);
+                                }
+                            }
+                        }
+                        $product->multi_currency = json_encode($multiCurrency);
+                    }
+                }
+                
                 $product->save();
                 
                 $updatedCount++;
             }
 
-            \Log::info("Recalculated BDT prices for {$updatedCount} products using USD rate: {$bdtConversionRate}");
+            Log::info("Recalculated prices for {$updatedCount} products using current exchange rates");
             return $updatedCount;
         } catch (\Exception $e) {
-            \Log::error('Error recalculating product prices: ' . $e->getMessage());
+            Log::error('Error recalculating product prices: ' . $e->getMessage());
             return false;
         }
+    }
+    
+    /**
+     * Calculate prices for a specific product based on currency rates
+     */
+    public function calculateProductPrices($basePrice, $profitMargin, $multiCurrency = [])
+    {
+        // Get all currency rates
+        $currencyRates = $this->currencyRateService->getAll();
+        $ratesMap = [];
+        
+        foreach ($currencyRates as $rate) {
+            $ratesMap[$rate->currency] = $rate->rate;
+        }
+        
+        // Get USD to BDT rate
+        $usdRateValue = $ratesMap['USD'] ?? 110.5;
+        $usdToBdtRate = $usdRateValue;
+        if ($usdRateValue < 1) {
+            $usdToBdtRate = 1 / $usdRateValue;
+        }
+        
+        // Calculate BDT price
+        $baseInBdt = $basePrice * $usdToBdtRate;
+        $bdtPrice = round($baseInBdt * (1 + $profitMargin / 100));
+        
+        // Update multi_currency prices if they exist
+        $updatedMultiCurrency = $multiCurrency;
+        if (is_array($multiCurrency)) {
+            foreach ($updatedMultiCurrency as &$currencyData) {
+                if (isset($currencyData['code']) && isset($ratesMap[$currencyData['code']])) {
+                    $currencyRate = $ratesMap[$currencyData['code']];
+                    // Convert from base price (USD) to target currency
+                    if ($currencyData['code'] === 'USD') {
+                        $currencyData['price'] = $basePrice * (1 + $profitMargin / 100);
+                    } else {
+                        // First convert base price to BDT, then to target currency
+                        $priceInBdt = $basePrice * $usdToBdtRate;
+                        $targetCurrencyRate = $currencyRate;
+                        if ($currencyRate < 1) {
+                            $targetCurrencyRate = 1 / $currencyRate; // Convert to "1 unit = X BDT" format
+                        }
+                        $priceInTargetCurrency = $priceInBdt / $targetCurrencyRate;
+                        $currencyData['price'] = $priceInTargetCurrency * (1 + $profitMargin / 100);
+                    }
+                }
+            }
+        }
+        
+        return [
+            'bdt_price' => $bdtPrice,
+            'multi_currency' => $updatedMultiCurrency
+        ];
     }
 }

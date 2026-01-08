@@ -68,11 +68,15 @@ Route::get('billing-managements-summary', [\App\Http\Controllers\Api\BillingMana
 Route::get('billing-managements/{id}/download', [\App\Http\Controllers\Api\BillingManagementController::class, 'download']);
 
 // Currency Rate Routes
-Route::apiResource('currency-rates', \App\Http\Controllers\Api\CurrencyRateController::class);
+// Exchange rate history routes (must be defined before apiResource to avoid conflicts)
+Route::get('currency-rates/history', [\App\Http\Controllers\Api\CurrencyRateController::class, 'getHistory']);
+Route::post('currency-rates/history/log', [\App\Http\Controllers\Api\CurrencyRateController::class, 'logRateChange']);
 
 // Additional currency rate routes
 Route::get('currency-rates-search', [\App\Http\Controllers\Api\CurrencyRateController::class, 'search']);
 Route::get('currency-rates-summary', [\App\Http\Controllers\Api\CurrencyRateController::class, 'summary']);
+
+Route::apiResource('currency-rates', \App\Http\Controllers\Api\CurrencyRateController::class);
 
 // Notification Routes
 Route::apiResource('notifications', \App\Http\Controllers\Api\NotificationController::class);

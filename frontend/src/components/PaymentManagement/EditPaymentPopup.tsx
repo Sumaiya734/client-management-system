@@ -274,9 +274,8 @@ const EditPaymentPopup: React.FC<EditPaymentPopupProps> = ({
 
   return createPortal(
     <div
-      className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] transition-opacity duration-300 ${
-        isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'
-      }`}
+      className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
     >
       <PopupAnimation animationType="zoomIn" duration="0.3s">
         <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
@@ -304,13 +303,20 @@ const EditPaymentPopup: React.FC<EditPaymentPopupProps> = ({
                 <div className="relative">
                   <button
                     type="button"
-                    onClick={() => toggleDropdown('purchaseOrder')}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between"
+                    onClick={() => !isEditMode && toggleDropdown('purchaseOrder')}
+                    disabled={isEditMode}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-left focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between ${isEditMode ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+                      }`}
                   >
                     <span className={formData.purchaseOrder ? 'text-gray-900' : 'text-gray-500'}>
                       {formData.purchaseOrder || 'Select purchase order'}
                     </span>
-                    <ChevronDown size={16} className={`transition-transform ${dropdownStates.purchaseOrder ? 'rotate-180' : ''}`} />
+                    {!isEditMode && (
+                      <ChevronDown
+                        size={16}
+                        className={`transition-transform ${dropdownStates.purchaseOrder ? 'rotate-180' : ''}`}
+                      />
+                    )}
                   </button>
 
                   {dropdownStates.purchaseOrder && (

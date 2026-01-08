@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { formatDate } from '../../utils/dateUtils';
 import {
   X,
   Download,
@@ -116,16 +117,16 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
   const clientData = typeof bill.client === 'object' && bill.client
     ? bill.client
     : {
-        company: (bill as any).client_company || (typeof bill.client === 'string' ? bill.client : 'N/A'),
-        contact: (bill as any).client_contact || '',
-        email: (bill.client as any)?.email || '',
-        phone: (bill.client as any)?.phone || '',
-      };
+      company: (bill as any).client_company || (typeof bill.client === 'string' ? bill.client : 'N/A'),
+      contact: (bill as any).client_contact || '',
+      email: (bill.client as any)?.email || '',
+      phone: (bill.client as any)?.phone || '',
+    };
 
   const billNumber = bill.billNumber || bill.bill_number || 'N/A';
   const poNumber = bill.poNumber || bill.po_number || 'N/A';
-  const billDate = bill.billDate || bill.bill_date || 'N/A';
-  const dueDate = bill.dueDate || bill.due_date || 'N/A';
+  const billDate = formatDate(bill.billDate || bill.bill_date);
+  const dueDate = formatDate(bill.dueDate || bill.due_date);
 
   const totalAmount = bill.total_amount || parseFloat((bill.totalAmount || '0').replace(/[^0-9.-]+/g, ''));
   const paidAmount = bill.paid_amount || parseFloat((bill.paidAmount || '0').replace(/[^0-9.-]+/g, ''));
@@ -135,21 +136,22 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 px-4 transition-opacity duration-300 ${
-        isAnimating ? 'opacity-100' : 'opacity-0'
-      }`}
+      className={`fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 px-2 sm:px-4 transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0'
+        }`}
       onClick={onClose}
     >
       <PopupAnimation animationType="zoomIn" duration="0.3s">
         <div
-          className="w-full max-w-3xl rounded-xl bg-white shadow-xl max-h-[95vh] overflow-hidden"
+          className="w-full max-w-full sm:max-w-xl md:max-w-3xl rounded-xl bg-white shadow-xl max-h-[95vh] overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-3">
+          <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-3 sm:px-5 py-3">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Bill Details</h2>
-              <p className="text-xs text-gray-600 mt-1">#{billNumber} • PO: {poNumber}</p>
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900">Bill Details</h2>
+              <p className="text-xs text-gray-600 mt-1">
+                #{billNumber} • PO: {poNumber}
+              </p>
             </div>
             <button
               onClick={onClose}
@@ -160,10 +162,10 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
           </div>
 
           {/* Body */}
-          <div className="p-5 space-y-5 overflow-y-auto max-h-[calc(95vh-120px)]">
+          <div className="p-3 sm:p-5 space-y-4 sm:space-y-5 overflow-y-auto max-h-[calc(95vh-120px)]">
             {/* Bill + Client Info */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="space-y-3 text-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 text-xs sm:text-sm">
+              <div className="space-y-2 sm:space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Bill Number</span>
                   <span className="font-medium">{billNumber}</span>
@@ -173,16 +175,20 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
                   <span className="font-medium">{poNumber}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600 flex items-center gap-1"><Calendar size={14} /> Bill Date</span>
+                  <span className="text-gray-600 flex items-center gap-1">
+                    <Calendar size={14} /> Bill Date
+                  </span>
                   <span className="font-medium">{billDate}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600 flex items-center gap-1"><Calendar size={14} /> Due Date</span>
+                  <span className="text-gray-600 flex items-center gap-1">
+                    <Calendar size={14} /> Due Date
+                  </span>
                   <span className="font-medium">{dueDate}</span>
                 </div>
               </div>
 
-              <div className="space-y-3 text-sm">
+              <div className="space-y-2 sm:space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Company</span>
                   <span className="font-medium">{clientData.company || 'N/A'}</span>
@@ -193,7 +199,7 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Email</span>
-                  <span className="font-medium">{clientData.email || 'N/A'}</span>
+                  <span className="font-medium break-all">{clientData.email || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Phone</span>
@@ -208,23 +214,27 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
                 <Package size={16} /> Products
               </h3>
               {products.length > 0 ? (
-                <div className="border rounded-md overflow-hidden text-xs">
+                <div className="border rounded-md overflow-hidden text-xs sm:text-sm">
                   <table className="w-full">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-3 py-2 text-left text-gray-700">Item</th>
-                        <th className="px-3 py-2 text-center text-gray-700">Qty</th>
-                        <th className="px-3 py-2 text-right text-gray-700">Price</th>
-                        <th className="px-3 py-2 text-right text-gray-700">Total</th>
+                        <th className="px-2 sm:px-3 py-2 text-left text-gray-700">Item</th>
+                        <th className="px-2 sm:px-3 py-2 text-center text-gray-700">Qty</th>
+                        <th className="px-2 sm:px-3 py-2 text-right text-gray-700">Price</th>
+                        <th className="px-2 sm:px-3 py-2 text-right text-gray-700">Total</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {products.map((p, i) => (
                         <tr key={i}>
-                          <td className="px-3 py-2 text-gray-900">{p.description}</td>
-                          <td className="px-3 py-2 text-center">{p.quantity}</td>
-                          <td className="px-3 py-2 text-right text-gray-900">৳{formatCurrency(p.unit_price || p.unitPrice)}</td>
-                          <td className="px-3 py-2 text-right font-medium">৳{formatCurrency(p.total)}</td>
+                          <td className="px-2 sm:px-3 py-2 text-gray-900">{p.description}</td>
+                          <td className="px-2 sm:px-3 py-2 text-center">{p.quantity}</td>
+                          <td className="px-2 sm:px-3 py-2 text-right text-gray-900">
+                            ৳{formatCurrency(p.unit_price || p.unitPrice)}
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 text-right font-medium">
+                            ৳{formatCurrency(p.total)}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -236,7 +246,7 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
             </div>
 
             {/* Payment Summary */}
-            <div className="max-w-xs ml-auto bg-gray-50 rounded-lg p-4 border text-sm space-y-2">
+            <div className="max-w-full sm:max-w-xs ml-auto bg-gray-50 rounded-lg p-3 sm:p-4 border text-xs sm:text-sm space-y-2">
               <div className="flex justify-between">
                 <span className="text-gray-600">Subtotal</span>
                 <span>৳{formatCurrency(bill.subtotal)}</span>
@@ -262,8 +272,8 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
             </div>
 
             {/* Status + Notes */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-sm">
-              <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 text-xs sm:text-sm">
+              {/* <div>
                 <label className="block text-gray-700 font-medium mb-1">Payment Status</label>
                 <div className="flex items-center gap-3">
                   <select
@@ -278,7 +288,7 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
                   </select>
                   {getStatusBadge(billStatus)}
                 </div>
-              </div>
+              </div> */}
 
               <div>
                 <label className="block text-gray-700 font-medium mb-1">Notes</label>
@@ -294,29 +304,29 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-3 px-5 py-3 border-t border-gray-200 bg-gray-50">
+          <div className="flex flex-wrap justify-end gap-2 sm:gap-3 px-3 sm:px-5 py-3 border-t border-gray-200 bg-gray-50">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-100"
+              className="px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-100"
             >
               Close
             </button>
             <button
               onClick={handleDownload}
-              className="inline-flex items-center gap-1 px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-100"
+              className="inline-flex items-center gap-1 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-100"
             >
               <Download size={15} /> PDF
             </button>
             <button
               onClick={handleSendEmail}
-              className="inline-flex items-center gap-1 px-4 py-2 text-sm text-white bg-gray-800 rounded-md hover:bg-gray-900"
+              className="inline-flex items-center gap-1 px-3 sm:px-4 py-2 text-xs sm:text-sm text-white bg-gray-800 rounded-md hover:bg-gray-900"
             >
               <Mail size={15} /> Email
             </button>
             <button
               onClick={handleSaveChanges}
               disabled={isSaving}
-              className="px-5 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              className="px-4 sm:px-5 py-2 text-xs sm:text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700"
             >
               {isSaving ? 'Saving...' : 'Save'}
             </button>

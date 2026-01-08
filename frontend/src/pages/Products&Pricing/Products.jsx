@@ -69,6 +69,12 @@ export default function Products() {
       console.log('Refreshing exchange rates and updating product prices...');
       const response = await currencyRatesApi.getAll();
       
+      // Get all currency rates
+      const ratesMap = {};
+      response.data.forEach(rate => {
+        ratesMap[rate.currency] = parseFloat(rate.rate);
+      });
+      
       // Get USD to BDT rate for conversion
       const usdRateData = response.data.find(rate => rate.currency === 'USD');
       let usdRate = usdRateData ? parseFloat(usdRateData.rate) : 110.5; // Default: 1 USD = 110.5 BDT
@@ -82,7 +88,7 @@ export default function Products() {
       
       console.log('USD Rate:', usdRate, '→ USD to BDT Rate:', usdToBdtRate);
       
-      // Update BDT prices for all products based on the new exchange rate
+      // Update BDT prices and multi-currency prices for all products based on the new exchange rates
       setProducts(prevProducts => {
         if (!prevProducts || prevProducts.length === 0) {
           console.log('No products to update');
@@ -99,12 +105,44 @@ export default function Products() {
           // Step 2: Apply profit margin
           const newBdtPrice = Math.round(baseInBdt * (1 + profitMargin / 100));
           
+          // Calculate new multi-currency prices
+          let updatedCurrencies = [];
+          if (product.currencies && Array.isArray(product.currencies)) {
+            updatedCurrencies = product.currencies.map(currency => {
+              if (currency.code === 'USD') {
+                // For USD, calculate directly from base price
+                return {
+                  ...currency,
+                  price: (basePrice * (1 + profitMargin / 100)).toFixed(2)
+                };
+              } else if (ratesMap[currency.code]) {
+                // For other currencies, convert from base price via BDT
+                const priceInBdt = basePrice * usdToBdtRate;
+                let targetCurrencyRate = ratesMap[currency.code];
+                if (targetCurrencyRate < 1) {
+                  targetCurrencyRate = 1 / targetCurrencyRate; // Convert to "1 unit = X BDT" format
+                }
+                const priceInTargetCurrency = priceInBdt / targetCurrencyRate;
+                const finalPrice = priceInTargetCurrency * (1 + profitMargin / 100);
+                
+                return {
+                  ...currency,
+                  price: finalPrice.toFixed(2)
+                };
+              } else {
+                // If currency rate is not available, keep the original price
+                return currency;
+              }
+            });
+          }
+          
           console.log(`Product ${product.name}: $${basePrice} × ${usdToBdtRate.toFixed(2)} × (1 + ${profitMargin}%) = ৳${newBdtPrice}`);
           
           return {
             ...product,
             bdtPrice: `৳${newBdtPrice}`,
-            bdtLabel: 'BDT (final price)'
+            bdtLabel: 'BDT (final price)',
+            currencies: updatedCurrencies
           };
         });
         
@@ -389,7 +427,6 @@ export default function Products() {
       }
       
       handleCloseProductPopup();
-      fetchProducts(); // Refresh the list
       // Refresh exchange rates to ensure BDT prices are up to date
       refreshExchangeRates();
     } catch (error) {
