@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Currency_rate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
 
 class CurrencyRateService extends BaseService
 {
@@ -71,7 +72,7 @@ class CurrencyRateService extends BaseService
         }
 
         $validator = Validator::make($data, [
-            'currency' => 'sometimes|string|max:255|unique:currency_rates,currency,' . $id,
+            'currency' => 'sometimes|string|max:255|unique:currency_rates,currency,' . $id . ',id',
             'rate' => 'sometimes|numeric|min:0',
             'last_updated' => 'nullable|date',
             'change' => 'nullable|numeric',
@@ -82,7 +83,30 @@ class CurrencyRateService extends BaseService
             throw new \Exception('Validation error: ' . json_encode($validator->errors()));
         }
 
+        // Store original rate before update to log the change
+        $previousRate = $currencyRate->rate;
+        
         $currencyRate->update($data);
+        
+        // Log the rate change if the rate has changed
+        $newRate = $currencyRate->rate;
+        if ($previousRate != $newRate) {
+            // Create a record in exchange_rate_history table
+            $userId = Auth::check() ? Auth::id() : null; // Get the currently authenticated user ID
+            
+            $exchangeRateHistory = new \App\Models\ExchangeRateHistory();
+            $exchangeRateHistory->currency = $currencyRate->currency;
+            $exchangeRateHistory->rate = $newRate;
+            $exchangeRateHistory->previous_rate = $previousRate;
+            $exchangeRateHistory->change = $newRate - $previousRate;
+            $exchangeRateHistory->percentage_change = $previousRate != 0 ? (($newRate - $previousRate) / $previousRate) * 100 : 0;
+            $exchangeRateHistory->trend = $newRate > $previousRate ? 'up' : ($newRate < $previousRate ? 'down' : 'stable');
+            $exchangeRateHistory->date = now()->toDateString();
+            $exchangeRateHistory->timestamp = now();
+            $exchangeRateHistory->updated_by = $userId;
+            $exchangeRateHistory->save();
+        }
+        
         return $currencyRate;
     }
 
@@ -151,5 +175,40 @@ class CurrencyRateService extends BaseService
             'decreasingTrend' => $decreasingTrend,
             'stableTrend' => $stableTrend
         ];
+    }
+    
+    /**
+     * Get exchange rate history for a specific currency or all currencies
+     */
+    public function getHistory($params = [])
+    {
+        $query = \App\Models\ExchangeRateHistory::query();
+        
+        if (isset($params['currency']) && $params['currency'] !== 'ALL') {
+            $query->where('currency', $params['currency']);
+        }
+        
+        if (isset($params['days'])) {
+            $days = $params['days'];
+            $query->where('date', '>=', now()->subDays($days)->toDateString());
+        }
+        
+        if (isset($params['startDate'])) {
+            $query->where('date', '>=', $params['startDate']);
+        }
+        
+        if (isset($params['endDate'])) {
+            $query->where('date', '<=', $params['endDate']);
+        }
+        
+        return $query->orderBy('date', 'desc')->orderBy('timestamp', 'desc')->get();
+    }
+    
+    /**
+     * Log a rate change manually
+     */
+    public function logRateChange(array $data)
+    {
+        return \App\Models\ExchangeRateHistory::create($data);
     }
 }

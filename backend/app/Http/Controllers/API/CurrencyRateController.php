@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\CurrencyRateService;
 use App\Events\CurrencyRateChanged;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class CurrencyRateController extends Controller
 {
@@ -51,7 +52,7 @@ class CurrencyRateController extends Controller
                 event(new CurrencyRateChanged($currencyRate->currency, $currencyRate->rate, 'created'));
             } catch (\Throwable $e) {
                 // Non-blocking: don't fail the request if broadcasting isn't configured
-                \Log::warning('Failed to dispatch CurrencyRateChanged event (create): ' . $e->getMessage());
+                Log::warning('Failed to dispatch CurrencyRateChanged event (create): ' . $e->getMessage());
             }
 
             return response()->json([
@@ -123,7 +124,7 @@ class CurrencyRateController extends Controller
                 event(new CurrencyRateChanged($currencyRate->currency, $currencyRate->rate, 'updated'));
             } catch (\Throwable $e) {
                 // Non-blocking: don't fail the request if broadcasting isn't configured
-                \Log::warning('Failed to dispatch CurrencyRateChanged event (update): ' . $e->getMessage());
+                Log::warning('Failed to dispatch CurrencyRateChanged event (update): ' . $e->getMessage());
             }
 
             return response()->json([
@@ -178,7 +179,7 @@ class CurrencyRateController extends Controller
                     event(new CurrencyRateChanged($deletedCurrency, $deletedRateVal, 'deleted'));
                 }
             } catch (\Throwable $e) {
-                \Log::warning('Failed to dispatch CurrencyRateChanged event (delete): ' . $e->getMessage());
+                Log::warning('Failed to dispatch CurrencyRateChanged event (delete): ' . $e->getMessage());
             }
 
             return response()->json([
@@ -243,6 +244,81 @@ class CurrencyRateController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve currency rates summary',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
+     * Get exchange rate history
+     */
+    public function getHistory(Request $request)
+    {
+        try {
+            $params = [
+                'currency' => $request->get('currency'),
+                'days' => $request->get('days'),
+                'startDate' => $request->get('start_date'),
+                'endDate' => $request->get('end_date')
+            ];
+            
+            $history = $this->currencyRateService->getHistory($params);
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'history' => $history
+                ],
+                'message' => 'Exchange rate history retrieved successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve exchange rate history',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
+     * Log a rate change manually
+     */
+    public function logRateChange(Request $request)
+    {
+        try {
+            $validatedData = $request->validate([
+                'currency' => 'required|string|max:10',
+                'rate' => 'required|numeric',
+                'previous_rate' => 'nullable|numeric',
+                'change' => 'nullable|numeric',
+                'percentage_change' => 'nullable|numeric',
+                'trend' => 'nullable|in:up,down,stable',
+                'date' => 'nullable|date',
+                'updated_by' => 'nullable|exists:users,id'
+            ]);
+            
+            $rateChange = $this->currencyRateService->logRateChange($validatedData);
+
+            return response()->json([
+                'success' => true,
+                'data' => $rateChange,
+                'message' => 'Rate change logged successfully'
+            ], 201);
+
+        } catch (\Exception $e) {
+            // Extract validation errors if present
+            if ($e instanceof \Illuminate\Validation\ValidationException) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation error',
+                    'errors' => $e->errors()
+                ], 422);
+            }
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to log rate change',
                 'error' => $e->getMessage()
             ], 500);
         }
