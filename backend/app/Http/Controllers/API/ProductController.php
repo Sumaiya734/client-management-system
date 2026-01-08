@@ -86,7 +86,7 @@ class ProductController extends BaseAPIController
                 $query->where('status', $status);
             }
 
-            $products = $query->limit($limit)->get();
+            $products = $query->orderBy('created_at', 'desc')->limit($limit)->get();
 
             return \App\Helpers\ResponseHelper::success($products, 'Products retrieved successfully');
         } catch (\Exception $e) {

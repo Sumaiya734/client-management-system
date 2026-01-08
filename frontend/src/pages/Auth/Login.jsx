@@ -56,14 +56,14 @@ const Login = () => {
             <img 
               src={logo} 
               alt="Nanosoft Logo" 
-              className="w-16 h-16 object-contain"
+              className="w-50 h-20 object-contain"
             />
           </div>
           <h2 className="text-center text-2xl font-bold text-gray-800 mb-1">
-            Welcome Back
+            Business Manager
           </h2>
           <p className="text-center text-gray-600 mb-6">
-            Sign in to continue
+            Enter your credentials to access the system
           </p>
 
           <form className="space-y-4" onSubmit={handleSubmit}>

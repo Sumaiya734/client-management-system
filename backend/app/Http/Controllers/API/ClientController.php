@@ -87,7 +87,7 @@ class ClientController extends BaseAPIController
                 $query->where('status', $status);
             }
 
-            $clients = $query->limit($limit)->get();
+            $clients = $query->orderBy('created_at', 'desc')->limit($limit)->get();
 
             return ResponseHelper::success($clients, 'Clients retrieved successfully');
         } catch (\Exception $e) {
@@ -122,7 +122,7 @@ class ClientController extends BaseAPIController
                 $query->where('status', $status);
             }
 
-            $clients = $query->paginate($perPage);
+            $clients = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
             return ResponseHelper::success($clients, 'Clients retrieved successfully');
         } catch (\Exception $e) {

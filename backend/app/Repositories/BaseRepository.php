@@ -16,7 +16,7 @@ class BaseRepository implements BaseRepositoryInterface
 
     public function all()
     {
-        return $this->model->all();
+        return $this->model->orderBy('created_at', 'desc')->get();
     }
 
     public function find($id)
@@ -66,7 +66,7 @@ class BaseRepository implements BaseRepositoryInterface
             $query->where('status', $request->get('status'));
         }
 
-        return $query->get();
+        return $query->orderBy('created_at', 'desc')->get();
     }
 
     public function paginate(Request $request, $perPage = 10)
@@ -87,7 +87,7 @@ class BaseRepository implements BaseRepositoryInterface
             $query->where('status', $request->get('status'));
         }
 
-        return $query->paginate($perPage);
+        return $query->orderBy('created_at', 'desc')->paginate($perPage);
     }
 
     public function with(array $relations)

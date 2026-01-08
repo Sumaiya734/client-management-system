@@ -91,7 +91,7 @@ class VendorController extends BaseAPIController
                 $query->where('status', $status);
             }
 
-            $vendors = $query->limit($limit)->get();
+            $vendors = $query->orderBy('created_at', 'desc')->limit($limit)->get();
 
             return ResponseHelper::success($vendors, 'Vendors retrieved successfully');
         } catch (\Exception $e) {

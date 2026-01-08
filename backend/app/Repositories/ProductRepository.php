@@ -36,7 +36,7 @@ class ProductRepository extends BaseRepository
             $query->where('status', $request->get('status'));
         }
 
-        return $query->get();
+        return $query->orderBy('created_at', 'desc')->get();
     }
 
     public function paginate(Request $request, $perPage = 10)
@@ -63,6 +63,6 @@ class ProductRepository extends BaseRepository
             $query->where('status', $request->get('status'));
         }
 
-        return $query->paginate($perPage);
+        return $query->orderBy('created_at', 'desc')->paginate($perPage);
     }
 }
