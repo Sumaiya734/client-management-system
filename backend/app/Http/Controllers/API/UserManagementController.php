@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\BaseAPIController;
 use App\Models\User;
+use App\Services\AuditService;
 use App\Services\UserService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -15,16 +16,67 @@ use App\Helpers\ValidationHelper;
 class UserManagementController extends BaseAPIController
 {
     protected $resourceName = 'User';
+    protected $auditService;
     
-    public function __construct(UserService $userService)
+    public function __construct(UserService $userService, AuditService $auditService)
     {
         $this->service = $userService;
+        $this->auditService = $auditService;
         $this->storeRules = [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8',
             'role' => 'required|string|in:admin,user,accountant,sales,support',
+            'status' => 'string|in:Active,Inactive',
         ];
+    }
+    
+    public function store(Request $request)
+    {
+        try {
+            $validationResult = ValidationHelper::validate($request->all(), $this->storeRules);
+            
+            if (!$validationResult['valid']) {
+                return ResponseHelper::validationError($validationResult['errors']);
+            }
+
+            // Handle password hashing
+            $data = $request->only(['name', 'email', 'role']);
+            
+            // Ensure status is included, default to 'Active' if not provided
+            $data['status'] = $request->get('status', 'Active');
+            
+            if (isset($validationResult['validated_data']['password']) && $validationResult['validated_data']['password']) {
+                $data['password'] = Hash::make($validationResult['validated_data']['password']);
+            }
+
+            $resource = $this->service->create($data);
+            
+            // Log the creation action
+            $this->auditService->logCreation(
+                'User Management',
+                "User created: {$resource->name} (ID: {$resource->id})",
+                [
+                    'name' => $resource->name,
+                    'email' => $resource->email,
+                    'role' => $resource->role,
+                    'status' => $resource->status,
+                ]
+            );
+
+            return ResponseHelper::created([
+                'id' => $resource->id,
+                'name' => $resource->name,
+                'email' => $resource->email,
+                'role' => ucfirst($resource->role),
+                'status' => $resource->status,
+                'lastLogin' => $resource->last_login_at ? $resource->last_login_at->format('Y-m-d H:i') : 'Never',
+                'createdAt' => $resource->created_at ? $resource->created_at->format('Y-m-d H:i') : null,
+                'updatedAt' => $resource->updated_at ? $resource->updated_at->format('Y-m-d H:i') : null,
+            ], $this->resourceName . ' created successfully');
+        } catch (\Exception $e) {
+            return ResponseHelper::error('Failed to create ' . strtolower($this->resourceName), $e->getMessage(), 500);
+        }
     }
     
     public function update(Request $request, string $id)
@@ -52,12 +104,40 @@ class UserManagementController extends BaseAPIController
             }
 
             // Handle password hashing specifically for users
-            $data = $request->only(['name', 'email', 'role', 'status']);
+            $data = $request->only(['name', 'email', 'role']);
+            
+            // Include status if provided
+            if ($request->has('status')) {
+                $data['status'] = $request->get('status');
+            }
+            
             if (isset($validationResult['validated_data']['password']) && $validationResult['validated_data']['password']) {
                 $data['password'] = Hash::make($validationResult['validated_data']['password']);
             }
 
+            $oldValues = [
+                'name' => $resource->name,
+                'email' => $resource->email,
+                'role' => $resource->role,
+                'status' => $resource->status,
+            ];
+            
+            $newValues = [
+                'name' => $data['name'] ?? $resource->name,
+                'email' => $data['email'] ?? $resource->email,
+                'role' => $data['role'] ?? $resource->role,
+                'status' => $data['status'] ?? $resource->status,
+            ];
+            
             $updatedResource = $this->service->update($id, $data);
+            
+            // Log the update action
+            $this->auditService->logUpdate(
+                'User Management',
+                "User updated: {$updatedResource->name} (ID: {$updatedResource->id})",
+                $oldValues,
+                $newValues
+            );
 
             // Format the response to match the original format
             return ResponseHelper::success([
@@ -90,6 +170,8 @@ class UserManagementController extends BaseAPIController
             $permissions = $request->get('permissions', []);
             $isAdministrator = $request->get('isAdministrator', false);
 
+            $oldRole = $user->role;
+            
             // Update user role based on administrator status
             if ($isAdministrator) {
                 $user->role = 'admin';
@@ -99,6 +181,14 @@ class UserManagementController extends BaseAPIController
             }
 
             $user->save();
+            
+            // Log the permission update
+            $this->auditService->logUpdate(
+                'User Management',
+                "User permissions updated for: {$user->name} (ID: {$user->id})",
+                ['role' => $oldRole],
+                ['role' => $user->role]
+            );
 
             return ResponseHelper::success(null, 'Permissions updated successfully');
         } catch (\Exception $e) {
@@ -185,5 +275,41 @@ class UserManagementController extends BaseAPIController
         ];
 
         return $permissionMap[$role] ?? [];
+    }
+    
+    public function destroy(string $id)
+    {
+        try {
+            $user = $this->service->getById($id);
+
+            if (!$user) {
+                return ResponseHelper::notFound($this->resourceName . ' not found');
+            }
+            
+            $oldValues = [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+                'status' => $user->status,
+            ];
+
+            $result = $this->service->delete($id);
+
+            if ($result) {
+                // Log the deletion action
+                $this->auditService->logDeletion(
+                    'User Management',
+                    "User deleted: {$user->name} (ID: {$user->id})",
+                    $oldValues
+                );
+                
+                return ResponseHelper::success(null, $this->resourceName . ' deleted successfully');
+            } else {
+                return ResponseHelper::error('Failed to delete ' . strtolower($this->resourceName));
+            }
+        } catch (\Exception $e) {
+            return ResponseHelper::error('Failed to delete ' . strtolower($this->resourceName), $e->getMessage());
+        }
     }
 }

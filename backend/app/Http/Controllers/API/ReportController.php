@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\ReportService;
-use App\Helpers\ResponseHelper;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class ReportController extends Controller
 {
@@ -17,81 +17,146 @@ class ReportController extends Controller
     }
 
     /**
-     * Generate overview report
+     * Generate overview report - matches /reports-overview
      */
-    public function overview()
+    public function overview(Request $request)
     {
         try {
-            $data = $this->reportService->getOverview();
+            $data = $this->reportService->getOverview($request);
             
-            return ResponseHelper::success($data, 'Overview report generated successfully');
+            // Get revenue data for the overview
+            $revenueData = $this->reportService->getRevenue($request);
+            
+            // Return data in exact format expected by frontend
+            return response()->json([
+                'totalRevenue' => $data['totalRevenue'] ?? 0,
+                'totalClients' => $data['totalClients'] ?? 0,
+                'activeSubscriptions' => $data['activeSubscriptions'] ?? 0,
+                'avgRevenuePerClient' => $data['avgRevenuePerClient'] ?? 0,
+                'subscriptionDistribution' => $data['subscriptionDistribution'] ?? [],
+                // Include revenue data that overview tab expects
+                'monthlyRevenueData' => $revenueData['monthlyRevenueData'] ?? [],
+                'revenueByCurrency' => $revenueData['revenueByCurrency'] ?? []
+            ]);
+            
         } catch (\Exception $e) {
             Log::error('Overview report error: ' . $e->getMessage());
-            return ResponseHelper::error('Error generating overview report', $e->getMessage());
+            return response()->json([
+                'error' => 'Error generating overview report',
+                'message' => $e->getMessage()
+            ], 500);
         }
     }
     
     /**
-     * Generate revenue report
+     * Generate revenue report - matches /reports-revenue
      */
-    public function revenue()
+    public function revenue(Request $request)
     {
         try {
-            $data = $this->reportService->getRevenue();
+            $data = $this->reportService->getRevenue($request);
             
-            return ResponseHelper::success($data, 'Revenue report generated successfully');
+            return response()->json($data);
+            
         } catch (\Exception $e) {
             Log::error('Revenue report error: ' . $e->getMessage());
-            return ResponseHelper::error('Error generating revenue report', $e->getMessage());
+            return response()->json([
+                'error' => 'Error generating revenue report',
+                'message' => $e->getMessage()
+            ], 500);
         }
     }
     
     /**
-     * Generate client report
+     * Generate client report - matches /reports-client
      */
-    public function clientReport()
+    public function clientReport(Request $request)
     {
         try {
-            $clients = $this->reportService->getClientReport();
+            $clients = $this->reportService->getClientReport($request);
             
-            return ResponseHelper::success($clients, 'Client report generated successfully');
+            return response()->json($clients);
+            
         } catch (\Exception $e) {
             Log::error('Client report error: ' . $e->getMessage());
-            return ResponseHelper::error('Error generating client report', $e->getMessage());
+            return response()->json([
+                'error' => 'Error generating client report',
+                'message' => $e->getMessage()
+            ], 500);
         }
     }
     
     /**
-     * Generate subscription report
+     * Generate subscription report - matches /reports-subscription
      */
-    public function subscriptionReport()
+    public function subscriptionReport(Request $request)
     {
         try {
-            $data = $this->reportService->getSubscriptionReport();
+            $data = $this->reportService->getSubscriptionReport($request);
             
-            return ResponseHelper::success($data, 'Subscription report generated successfully');
+            return response()->json($data);
+            
         } catch (\Exception $e) {
             Log::error('Subscription report error: ' . $e->getMessage());
-            return ResponseHelper::error('Error generating subscription report', $e->getMessage());
+            return response()->json([
+                'error' => 'Error generating subscription report',
+                'message' => $e->getMessage()
+            ], 500);
         }
     }
     
     /**
-     * Generate a new report
+     * Generate a new report - matches /reports-generate
      */
     public function generateReport(Request $request)
     {
         try {
-            $data = $this->reportService->generateReport($request);
+            $type = $request->input('type', 'overview');
+            $startDate = $request->input('start_date');
+            $endDate = $request->input('end_date');
+            $currency = $request->input('currency');
             
-            return ResponseHelper::success($data, 'Report generated successfully');
-        } catch (\Exception $e) {
-            if (strpos($e->getMessage(), 'Invalid report type') !== false) {
-                return ResponseHelper::error('Invalid report type', null, 400);
+            // Create filtered request for the service
+            $filteredRequest = new Request([
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+                'currency' => $currency
+            ]);
+            
+            $reportData = null;
+            
+            switch ($type) {
+                case 'overview':
+                    $reportData = $this->reportService->getOverview($filteredRequest);
+                    break;
+                case 'revenue':
+                    $reportData = $this->reportService->getRevenue($filteredRequest);
+                    break;
+                case 'client':
+                    $reportData = $this->reportService->getClientReport($filteredRequest);
+                    break;
+                case 'subscription':
+                    $reportData = $this->reportService->getSubscriptionReport($filteredRequest);
+                    break;
+                default:
+                    return response()->json([
+                        'error' => 'Invalid report type',
+                        'message' => 'The report type must be one of: overview, revenue, client, subscription'
+                    ], 400);
             }
             
+            return response()->json([
+                'success' => true,
+                'message' => 'Report generated successfully',
+                'data' => $reportData
+            ]);
+            
+        } catch (\Exception $e) {
             Log::error('Report generation error: ' . $e->getMessage());
-            return ResponseHelper::error('Error generating report', $e->getMessage());
+            return response()->json([
+                'error' => 'Error generating report',
+                'message' => $e->getMessage()
+            ], 500);
         }
     }
 }

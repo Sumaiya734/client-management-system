@@ -11,6 +11,15 @@ class Client extends Model
         'company',
         'email',
         'phone',
+        'address',
         'status'
     ];
+    
+    protected $table = 'clients';
+    
+    // Define the relationship with subscriptions
+    public function subscriptions()
+    {
+        return $this->hasMany(Subscription::class, 'client_id');
+    }
 }

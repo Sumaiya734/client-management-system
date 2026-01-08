@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Shield, Edit, Trash2, Clock } from 'lucide-react';
+import { Shield, Clock } from 'lucide-react';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/ui/Button';
-import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../../components/ui/Card';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/Table';
-import { Badge } from '../../components/ui/Badge';
 import ManagePermissionsModal from '../../components/userManagement/ManagePermissionsModal';
 import EditUserModal from '../../components/userManagement/EditUserModal';
 import { userManagementApi } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { useNotification } from '../../components/Notifications';
+import UsersTab from './tabs/UsersTab';
+import RolesPermissionsTab from './tabs/RolesPermissionsTab';
+import AuditLogTab from './tabs/AuditLogTab';
 
 const UserManagement = () => {
   const { showError, showSuccess } = useNotification();
@@ -80,18 +80,25 @@ const UserManagement = () => {
 
   const handleSaveUser = async (userData) => {
     try {
+      let response;
       if (isAddMode) {
         // Create new user
-        const response = await userManagementApi.create(userData);
+        response = await userManagementApi.create(userData);
         setUsers([...users, response.data]);
+        showSuccess('User created successfully');
       } else {
         // Update existing user
-        const response = await userManagementApi.update(selectedUser.id, userData);
+        response = await userManagementApi.update(selectedUser.id, userData);
         setUsers(users.map(user => user.id === selectedUser.id ? response.data : user));
+        showSuccess('User updated successfully');
       }
       setIsEditUserModalOpen(false);
+      return response.data; // Return the response data for the modal to use
     } catch (error) {
       console.error('Error saving user:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'An error occurred while saving the user';
+      showError(errorMessage);
+      throw error; // Re-throw to be caught by the modal
     }
   };
 
@@ -181,301 +188,33 @@ const UserManagement = () => {
 
       {/* Users Tab Content */}
       {activeTab === 'Users' && (
-        <>
-          {/* Search & Filter Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Search & Filter</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <input
-                    type="text"
-                    placeholder="Search users by name or email..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none text-sm"
-                  />
-                </div>
-                <select
-                  value={roleFilter}
-                  onChange={(e) => setRoleFilter(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none text-sm min-w-[140px]"
-                >
-                  {roleOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Users Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Users ({filteredUsers.length})</CardTitle>
-              <CardDescription>Manage user accounts and access</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Last Login</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan="6" className="text-center py-8">
-                        Loading users...
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredUsers.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan="6" className="text-center py-8 text-gray-500">
-                        No users found
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredUsers.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.name}</TableCell>
-                        <TableCell>{user.email}</TableCell>
-                        <TableCell>
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(user.role)}`}>
-                            {user.role}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={getStatusBadgeVariant(user.status)}>
-                            {user.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{user.lastLogin}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => {
-                                setSelectedUser(user);
-                                setIsPermissionsModalOpen(true);
-                              }}
-                              className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                              title="Permissions"
-                            >
-                              <Shield className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                setSelectedUser(user);
-                                setIsAddMode(false);
-                                setIsEditUserModalOpen(true);
-                              }}
-                              className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                              title="Edit"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteUser(user)}
-                              className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </>
+        <UsersTab
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          roleFilter={roleFilter}
+          setRoleFilter={setRoleFilter}
+          users={users}
+          loading={loading}
+          filteredUsers={filteredUsers}
+          getRoleBadgeColor={getRoleBadgeColor}
+          getStatusBadgeVariant={getStatusBadgeVariant}
+          roleOptions={roleOptions}
+          setSelectedUser={setSelectedUser}
+          setIsPermissionsModalOpen={setIsPermissionsModalOpen}
+          setIsAddMode={setIsAddMode}
+          setIsEditUserModalOpen={setIsEditUserModalOpen}
+          handleDeleteUser={handleDeleteUser}
+        />
       )}
 
       {/* Roles & Permissions Tab Content */}
       {activeTab === 'Roles & Permissions' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Administrator Card */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-gray-600" />
-                <CardTitle>Administrator</CardTitle>
-              </div>
-              <CardDescription>Full access to all modules and settings</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-700">Permissions:</p>
-                <div className="flex flex-wrap gap-2">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-500 text-white">
-                    All Permissions
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Accountant Card */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-gray-600" />
-                <CardTitle>Accountant</CardTitle>
-              </div>
-              <CardDescription>Access to financial data and reports</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-700">Permissions:</p>
-                <div className="flex flex-wrap gap-2">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-300 text-gray-700">
-                    Payment Management
-                  </span>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-300 text-gray-700">
-                    Reports & Analytics
-                  </span>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-300 text-gray-700">
-                    Client Management
-                  </span>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-300 text-gray-700">
-                    Currency Management
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Sales Card */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-gray-600" />
-                <CardTitle>Sales</CardTitle>
-              </div>
-              <CardDescription>Client and product management</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-700">Permissions:</p>
-                <div className="flex flex-wrap gap-2">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-300 text-gray-700">
-                    Client Management
-                  </span>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-300 text-gray-700">
-                    Product Management
-                  </span>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-300 text-gray-700">
-                    Purchase Orders
-                  </span>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-300 text-gray-700">
-                    Reports & Analytics
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Support Card */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-gray-600" />
-                <CardTitle>Support</CardTitle>
-              </div>
-              <CardDescription>Customer support and notifications</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-700">Permissions:</p>
-                <div className="flex flex-wrap gap-2">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-300 text-gray-700">
-                    Client Management
-                  </span>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-300 text-gray-700">
-                    Notifications
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <RolesPermissionsTab />
       )}
 
       {/* Audit Log Tab Content */}
       {activeTab === 'Audit Log' && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-gray-600" />
-              <CardTitle>Audit Log</CardTitle>
-            </div>
-            <CardDescription>Track user actions and system changes</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Module</TableHead>
-                  <TableHead>Details</TableHead>
-                  <TableHead>Timestamp</TableHead>
-                  <TableHead>IP Address</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow>
-                  <TableCell className="font-medium">John Admin</TableCell>
-                  <TableCell>Created new client</TableCell>
-                  <TableCell>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-300 text-gray-700">
-                      Client Management
-                    </span>
-                  </TableCell>
-                  <TableCell>Created client: Tech Solutions Inc</TableCell>
-                  <TableCell>2025-01-20 10:45</TableCell>
-                  <TableCell>192.168.1.100</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Sarah Accountant</TableCell>
-                  <TableCell>Recorded payment</TableCell>
-                  <TableCell>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-300 text-gray-700">
-                      Payment Management
-                    </span>
-                  </TableCell>
-                  <TableCell>Payment of $99.99 for PO-2025-001</TableCell>
-                  <TableCell>2025-01-20 09:30</TableCell>
-                  <TableCell>192.168.1.101</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Mike Sales</TableCell>
-                  <TableCell>Updated product pricing</TableCell>
-                  <TableCell>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-300 text-gray-700">
-                      Product Management
-                    </span>
-                  </TableCell>
-                  <TableCell>Updated Premium Plan pricing</TableCell>
-                  <TableCell>2025-01-19 16:20</TableCell>
-                  <TableCell>192.168.1.102</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <AuditLogTab />
       )}
 
       {/* Manage Permissions Modal */}

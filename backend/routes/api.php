@@ -149,3 +149,8 @@ Route::get('reports-revenue', [\App\Http\Controllers\Api\ReportController::class
 Route::get('reports-client', [\App\Http\Controllers\Api\ReportController::class, 'clientReport']);
 Route::get('reports-subscription', [\App\Http\Controllers\Api\ReportController::class, 'subscriptionReport']);
 Route::post('reports-generate', [\App\Http\Controllers\Api\ReportController::class, 'generateReport']);
+
+// Audit Log Routes
+Route::middleware('auth:sanctum')->group(function () {
+    Route::apiResource('audit-logs', \App\Http\Controllers\Api\AuditLogController::class);
+});

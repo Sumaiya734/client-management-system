@@ -2,24 +2,32 @@ import React, { useState, useEffect } from 'react';
 import { TrendingUp } from 'lucide-react';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/ui/Button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
-import api from '../../api';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
+import api, { currencyRatesApi } from '../../api';
 import { useNotification } from '../../components/Notifications';
+
+// Import tab components
+import OverviewTab from './components/OverviewTab';
+import RevenueAnalysisTab from './components/RevenueAnalysisTab';
+import ClientReportsTab from './components/ClientReportsTab';
+import SubscriptionsTab from './components/SubscriptionsTab';
 
 const ReportsAnalytics = () => {
   const { showSuccess, showError } = useNotification();
-  const [activeTab, setActiveTab] = useState('Revenue Analysis');
+  const [activeTab, setActiveTab] = useState('Overview');
   
   // State variables for API data
   const [metrics, setMetrics] = useState([
-    { title: 'Total Revenue', value: '$0', change: 'Loading...', icon: TrendingUp },
-    { title: 'Total Clients', value: '0', change: 'Loading...', icon: TrendingUp },
-    { title: 'Active Subscriptions', value: '0', change: 'Loading...', icon: TrendingUp },
-    { title: 'Avg Revenue/Client', value: '$0', change: 'Loading...', icon: TrendingUp },
+    { title: 'Total Revenue', value: '$0', change: 'Loading data...', icon: TrendingUp },
+    { title: 'Total Clients', value: '0', change: 'Loading data...', icon: TrendingUp },
+    { title: 'Active Subscriptions', value: '0', change: 'Loading data...', icon: TrendingUp },
+    { title: 'Avg Revenue/Client', value: '$0', change: 'Loading data...', icon: TrendingUp },
   ]);
   
   const [revenueByCurrency, setRevenueByCurrency] = useState([]);
   const [monthlyRevenueData, setMonthlyRevenueData] = useState([]);
+  const [overviewRevenueData, setOverviewRevenueData] = useState([]); // Add this for Overview tab
+  const [subscriptionDistribution, setSubscriptionDistribution] = useState([]); // Add this for subscription distribution
   const [clientData, setClientData] = useState([]);
   const [subscriptionData, setSubscriptionData] = useState({
     planSummary: [],
@@ -33,49 +41,136 @@ const ReportsAnalytics = () => {
     subscription: true
   });
   
+  // State for report filters
+  const [reportType, setReportType] = useState('Revenue Report');
+  const [currency, setCurrency] = useState('All Currencies');
+  const [fromDate, setFromDate] = useState('2025-12-01');
+  const [toDate, setToDate] = useState('2026-01-31');
+  const [availableCurrencies, setAvailableCurrencies] = useState([]);
+  
+  // Applied filters state (what's actually used in API calls)
+  const [appliedFilters, setAppliedFilters] = useState({
+    currency: 'All Currencies',
+    fromDate: '2025-12-01',
+    toDate: '2026-01-31'
+  });
+  
+  // Function to apply filters
+  const applyFilters = () => {
+    console.log('Applying filters:', { currency, fromDate, toDate });
+    setAppliedFilters({
+      currency: currency,
+      fromDate: fromDate,
+      toDate: toDate
+    });
+  };
+  
+  // Function to handle Enter key press
+  const handleKeyPress = (event) => {
+    if (event.key === 'Enter') {
+      applyFilters();
+    }
+  };
+  
+  // Function to check if filters have changed
+  const filtersChanged = () => {
+    return appliedFilters.currency !== currency || 
+           appliedFilters.fromDate !== fromDate || 
+           appliedFilters.toDate !== toDate;
+  };
+  
+  // Fetch available currencies on component mount
+  useEffect(() => {
+    const fetchCurrencies = async () => {
+      try {
+        const response = await currencyRatesApi.getAll();
+        const currencies = response.data.map(rate => rate.currency);
+        setAvailableCurrencies(currencies);
+      } catch (error) {
+        console.error('Error fetching currencies:', error);
+        // Fallback to default currencies
+        setAvailableCurrencies(['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'CNY']);
+      }
+    };
+    
+    fetchCurrencies();
+    
+    // Apply initial filters on component mount
+    applyFilters();
+  }, []);
+  
   const tabs = ['Overview', 'Revenue Analysis', 'Client Reports', 'Subscriptions'];
   
-  // Calculate bar heights for SVG chart (viewBox: 600x280, chart area: 60-560 x 40-230)
-  const maxRevenue = 26000;
-  const chartAreaHeight = 190; // 230 - 40
-  const chartBottom = 230;
-  const calculateBarHeight = (value) => (value / maxRevenue) * chartAreaHeight;
-  const calculateBarY = (value) => chartBottom - calculateBarHeight(value);
+
   
   // Fetch overview metrics
   useEffect(() => {
     const fetchOverview = async () => {
       try {
         setLoading(prev => ({ ...prev, overview: true }));
-        const response = await api.get('/reports-overview');
+        // Pass filter parameters to the API
+        const params = new URLSearchParams({
+          start_date: appliedFilters.fromDate,
+          end_date: appliedFilters.toDate,
+          ...(appliedFilters.currency !== 'All Currencies' && { currency: appliedFilters.currency })
+        }).toString();
+        
+        const response = await api.get(`/reports-overview?${params}`);
         const data = response.data;
         
         setMetrics([
           { 
             title: 'Total Revenue', 
-            value: '$' + data.total_revenue?.toLocaleString() || '0', 
-            change: '+18% from last period', 
+            value: '$' + (parseFloat(data.totalRevenue) || 0).toLocaleString(), 
+            change: 'Current period', 
             icon: TrendingUp 
           },
           { 
             title: 'Total Clients', 
-            value: data.total_clients?.toString() || '0', 
-            change: '+12% from last period', 
+            value: data.totalClients?.toString() || '0', 
+            change: 'Total registered', 
             icon: TrendingUp 
           },
           { 
             title: 'Active Subscriptions', 
-            value: data.active_subscriptions?.toString() || '0', 
-            change: '+8% from last period', 
+            value: data.activeSubscriptions?.toString() || '0', 
+            change: 'Currently active', 
             icon: TrendingUp 
           },
           { 
             title: 'Avg Revenue/Client', 
-            value: '$' + data.avg_revenue_per_client?.toFixed(2) || '0', 
-            change: '+1% from last period', 
+            value: '$' + (parseFloat(data.avgRevenuePerClient) || 0).toFixed(2), 
+            change: 'Per client average', 
             icon: TrendingUp 
           },
         ]);
+
+        // Set subscription distribution data
+        setSubscriptionDistribution(data.subscriptionDistribution || []);
+
+        // Also fetch revenue data for the Overview trend chart
+        const revenueResponse = await api.get(`/reports-revenue?${params}`);
+        const revenueData = revenueResponse.data;
+        
+        // Process monthly revenue data for the overview chart
+        const processedOverviewData = revenueData.monthlyRevenueData.map(item => ({
+          ...item,
+          revenue: parseFloat(item.revenue) || 0,
+          newClients: item.newClients,
+          growthRate: item.growthRate
+        }));
+        
+        setOverviewRevenueData(processedOverviewData);
+        
+        // Set revenue by currency for the overview
+        const processedCurrencyData = revenueData.revenueByCurrency.map(item => ({
+          currency: item.currency,
+          percentage: item.percentage,
+          amount: '$' + (parseFloat(item.amount) || 0).toLocaleString()
+        }));
+        
+        setRevenueByCurrency(processedCurrencyData);
+        
       } catch (error) {
         console.error('Error fetching overview data:', error);
       } finally {
@@ -84,7 +179,7 @@ const ReportsAnalytics = () => {
     };
     
     fetchOverview();
-  }, []);
+  }, [appliedFilters]); // Use appliedFilters instead of individual filter states
   
   // Fetch revenue data when on Revenue Analysis tab
   useEffect(() => {
@@ -92,13 +187,20 @@ const ReportsAnalytics = () => {
       const fetchRevenueData = async () => {
         try {
           setLoading(prev => ({ ...prev, revenue: true }));
-          const response = await api.get('/reports-revenue');
+          // Pass filter parameters to the API
+          const params = new URLSearchParams({
+            start_date: appliedFilters.fromDate,
+            end_date: appliedFilters.toDate,
+            ...(appliedFilters.currency !== 'All Currencies' && { currency: appliedFilters.currency })
+          }).toString();
+          
+          const response = await api.get(`/reports-revenue?${params}`);
           const data = response.data;
           
           // Process monthly revenue data
           const processedRevenueData = data.monthlyRevenueData.map(item => ({
             ...item,
-            revenue: item.revenue,
+            revenue: parseFloat(item.revenue) || 0,
             newClients: item.newClients,
             growthRate: item.growthRate
           }));
@@ -109,7 +211,7 @@ const ReportsAnalytics = () => {
           const processedCurrencyData = data.revenueByCurrency.map(item => ({
             currency: item.currency,
             percentage: item.percentage,
-            amount: '$' + item.amount?.toLocaleString()
+            amount: '$' + (parseFloat(item.amount) || 0).toLocaleString()
           }));
           
           setRevenueByCurrency(processedCurrencyData);
@@ -122,7 +224,7 @@ const ReportsAnalytics = () => {
       
       fetchRevenueData();
     }
-  }, [activeTab]);
+  }, [activeTab, appliedFilters]);
   
   // Fetch client data when on Client Reports tab
   useEffect(() => {
@@ -130,7 +232,14 @@ const ReportsAnalytics = () => {
       const fetchClientData = async () => {
         try {
           setLoading(prev => ({ ...prev, client: true }));
-          const response = await api.get('/reports-client');
+          // Pass filter parameters to the API
+          const params = new URLSearchParams({
+            start_date: appliedFilters.fromDate,
+            end_date: appliedFilters.toDate,
+            ...(appliedFilters.currency !== 'All Currencies' && { currency: appliedFilters.currency })
+          }).toString();
+          
+          const response = await api.get(`/reports-client?${params}`);
           setClientData(response.data);
         } catch (error) {
           console.error('Error fetching client data:', error);
@@ -141,7 +250,7 @@ const ReportsAnalytics = () => {
       
       fetchClientData();
     }
-  }, [activeTab]);
+  }, [activeTab, appliedFilters]);
   
   // Fetch subscription data when on Subscriptions tab
   useEffect(() => {
@@ -149,7 +258,14 @@ const ReportsAnalytics = () => {
       const fetchSubscriptionData = async () => {
         try {
           setLoading(prev => ({ ...prev, subscription: true }));
-          const response = await api.get('/reports-subscription');
+          // Pass filter parameters to the API
+          const params = new URLSearchParams({
+            start_date: appliedFilters.fromDate,
+            end_date: appliedFilters.toDate,
+            ...(appliedFilters.currency !== 'All Currencies' && { currency: appliedFilters.currency })
+          }).toString();
+          
+          const response = await api.get(`/reports-subscription?${params}`);
           setSubscriptionData(response.data);
         } catch (error) {
           console.error('Error fetching subscription data:', error);
@@ -160,7 +276,7 @@ const ReportsAnalytics = () => {
       
       fetchSubscriptionData();
     }
-  }, [activeTab]);
+  }, [activeTab, appliedFilters]);
   
   // Function to handle report generation
   const handleGenerateReport = async () => {
@@ -172,37 +288,47 @@ const ReportsAnalytics = () => {
       if (activeTab === 'Subscriptions') reportType = 'subscription';
       
       const response = await api.post('/reports-generate', {
-        type: reportType
+        type: reportType,
+        start_date: appliedFilters.fromDate,
+        end_date: appliedFilters.toDate,
+        ...(appliedFilters.currency !== 'All Currencies' && { currency: appliedFilters.currency })
       });
       
       // Refresh the data based on the active tab
       if (reportType === 'overview') {
-        const overviewResponse = await api.get('/reports-overview');
+        // Pass filter parameters to the API
+        const params = new URLSearchParams({
+          start_date: appliedFilters.fromDate,
+          end_date: appliedFilters.toDate,
+          ...(appliedFilters.currency !== 'All Currencies' && { currency: appliedFilters.currency })
+        }).toString();
+        
+        const overviewResponse = await api.get(`/reports-overview?${params}`);
         const data = overviewResponse.data;
         
         setMetrics([
           { 
             title: 'Total Revenue', 
-            value: '$' + data.total_revenue?.toLocaleString() || '0', 
-            change: '+18% from last period', 
+            value: '$' + (parseFloat(data.totalRevenue) || 0).toLocaleString(), 
+            change: 'Current period', 
             icon: TrendingUp 
           },
           { 
             title: 'Total Clients', 
-            value: data.total_clients?.toString() || '0', 
-            change: '+12% from last period', 
+            value: data.totalClients?.toString() || '0', 
+            change: 'Total registered', 
             icon: TrendingUp 
           },
           { 
             title: 'Active Subscriptions', 
-            value: data.active_subscriptions?.toString() || '0', 
-            change: '+8% from last period', 
+            value: data.activeSubscriptions?.toString() || '0', 
+            change: 'Currently active', 
             icon: TrendingUp 
           },
           { 
             title: 'Avg Revenue/Client', 
-            value: '$' + data.avg_revenue_per_client?.toFixed(2) || '0', 
-            change: '+1% from last period', 
+            value: '$' + (parseFloat(data.avgRevenuePerClient) || 0).toFixed(2), 
+            change: 'Per client average', 
             icon: TrendingUp 
           },
         ]);
@@ -231,68 +357,142 @@ const ReportsAnalytics = () => {
       />
 
       {/* Key Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {metrics.map((metric) => (
-          <div key={metric.title} className="bg-gray-50 rounded-lg p-5 border border-gray-200 shadow-sm">
-            <div className="flex items-start justify-between mb-3">
-              <h3 className="text-sm font-medium text-gray-700">{metric.title}</h3>
-              <metric.icon className="h-4 w-4 text-gray-600" />
-        </div>
-            <div className="space-y-1">
-              <p className="text-2xl font-bold text-gray-900">{metric.value}</p>
+          <div key={metric.title} className="bg-gray-50 rounded-lg p-3 border border-gray-200 shadow-sm">
+            <div className="flex items-start justify-between mb-2">
+              <h3 className="text-xs font-medium text-gray-700">{metric.title}</h3>
+              <metric.icon className="h-3 w-3 text-gray-600" />
+            </div>
+            <div className="space-y-0.5">
+              <p className="text-xl font-bold text-gray-900">{metric.value}</p>
               <p className="text-xs text-gray-500 flex items-center gap-1">
-                <TrendingUp className="h-3 w-3" />
+                <TrendingUp className="h-2.5 w-2.5" />
                 {metric.change}
               </p>
-        </div>
-        </div>
+            </div>
+          </div>
         ))}
       </div>
 
       {/* Report Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Report Filters</CardTitle>
+      <Card className="!border-0 !shadow-none">
+        <CardHeader className="pb-3 !border-b-0 !shadow-none">
+          <CardTitle className="text-base">Report Filters</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+        <CardContent className="pt-0 !shadow-none">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
                 Report Type
               </label>
-              <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none text-sm bg-white">
-            <option>Revenue Report</option>
-          </select>
-        </div>
-        <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <select 
+                value={reportType}
+                onChange={(e) => setReportType(e.target.value)}
+                onKeyPress={handleKeyPress}
+                className="w-full px-2 py-1.5 border border-gray-300 rounded-md focus:ring-1 focus:ring-gray-900 focus:border-transparent outline-none text-xs bg-white"
+              >
+                <option>Revenue Report</option>
+                <option>Client Report</option>
+                <option>Subscription Report</option>
+                <option>Payment Report</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
                 Currency
               </label>
-              <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none text-sm bg-white">
-            <option>All Currencies</option>
-          </select>
-        </div>
-        <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <select 
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                onKeyPress={handleKeyPress}
+                className="w-full px-2 py-1.5 border border-gray-300 rounded-md focus:ring-1 focus:ring-gray-900 focus:border-transparent outline-none text-xs bg-white"
+              >
+                <option>All Currencies</option>
+                {availableCurrencies.map((curr, index) => (
+                  <option key={index} value={curr}>{curr}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
                 From Date
               </label>
               <input
                 type="date"
-                defaultValue="2025-01-01"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none text-sm"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                onKeyPress={handleKeyPress}
+                className="w-full px-2 py-1.5 border border-gray-300 rounded-md focus:ring-1 focus:ring-gray-900 focus:border-transparent outline-none text-xs"
               />
-        </div>
-        <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
                 To Date
               </label>
               <input
                 type="date"
-                defaultValue="2025-12-23"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none text-sm"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                onKeyPress={handleKeyPress}
+                className="w-full px-2 py-1.5 border border-gray-300 rounded-md focus:ring-1 focus:ring-gray-900 focus:border-transparent outline-none text-xs"
               />
-        </div>
-      </div>
+            </div>
+          </div>
+          
+          {/* Apply Filters Button */}
+          <div className="mt-3 flex items-center justify-between">
+            {/* Filter Status Indicator */}
+            <div className="text-xs text-gray-600">
+              <span className="font-medium">Applied:</span> 
+              <span className="ml-1">
+                {appliedFilters.fromDate} to {appliedFilters.toDate}
+                {appliedFilters.currency !== 'All Currencies' && `, ${appliedFilters.currency}`}
+              </span>
+              {filtersChanged() && (
+                <span className="ml-2 text-orange-600 font-medium">
+                  (Pending changes)
+                </span>
+              )}
+            </div>
+            
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  console.log('Reset button clicked');
+                  setCurrency('All Currencies');
+                  setFromDate('2025-12-01');
+                  setToDate('2026-01-31');
+                  // Apply the reset filters immediately
+                  setAppliedFilters({
+                    currency: 'All Currencies',
+                    fromDate: '2025-12-01',
+                    toDate: '2026-01-31'
+                  });
+                }}
+                className="text-xs px-3 py-1"
+              >
+                Reset
+              </Button>
+              <Button 
+                variant="primary" 
+                size="sm"
+                onClick={() => {
+                  console.log('Apply button clicked');
+                  applyFilters();
+                }}
+                className={`text-xs px-3 py-1 ${
+                  filtersChanged() 
+                    ? 'bg-blue-600 hover:bg-blue-700 animate-pulse' 
+                    : 'bg-gray-900 hover:bg-gray-800'
+                }`}
+              >
+                {filtersChanged() ? 'Apply' : 'Applied'}
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -316,439 +516,34 @@ const ReportsAnalytics = () => {
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'Revenue Analysis' && (
-        <div className="space-y-6">
-          {loading.revenue ? (
-            <div className="flex justify-center items-center h-64">
-              <p>Loading revenue data...</p>
-            </div>
-          ) : (
-            <>
-              {/* Monthly Revenue Analysis */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Monthly Revenue Analysis</CardTitle>
-                  <CardDescription>Detailed revenue breakdown by month</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-80 bg-gray-50 rounded-lg p-6">
-                    <svg className="w-full h-full" viewBox="0 0 600 280" preserveAspectRatio="xMidYMid meet">
-                      {/* Y-axis labels */}
-                      <text x="30" y="30" className="text-xs fill-gray-600 font-medium">26000</text>
-                      <text x="30" y="80" className="text-xs fill-gray-600 font-medium">19500</text>
-                      <text x="30" y="130" className="text-xs fill-gray-600 font-medium">13000</text>
-                      <text x="30" y="180" className="text-xs fill-gray-600 font-medium">6500</text>
-                      <text x="30" y="230" className="text-xs fill-gray-600 font-medium">0</text>
-                      
-                      {/* Grid lines */}
-                      <line x1="60" y1="30" x2="560" y2="30" stroke="#e5e7eb" strokeWidth="1" />
-                      <line x1="60" y1="80" x2="560" y2="80" stroke="#e5e7eb" strokeWidth="1" />
-                      <line x1="60" y1="130" x2="560" y2="130" stroke="#e5e7eb" strokeWidth="1" />
-                      <line x1="60" y1="180" x2="560" y2="180" stroke="#e5e7eb" strokeWidth="1" />
-                      <line x1="60" y1="230" x2="560" y2="230" stroke="#e5e7eb" strokeWidth="1" />
-                      
-                      {/* Bars */}
-                      {monthlyRevenueData.map((data, index) => {
-                        const barHeight = calculateBarHeight(data.revenue);
-                        const barY = calculateBarY(data.revenue);
-                        const barX = 80 + (index * 80);
-                        const barWidth = 50;
-                        
-                        return (
-                          <g key={data.month}>
-                            <rect
-                              x={barX}
-                              y={barY}
-                              width={barWidth}
-                              height={barHeight}
-                              fill="#8b5cf6"
-                              rx="4"
-                            />
-                            <text
-                              x={barX + barWidth / 2}
-                              y={260}
-                              textAnchor="middle"
-                              className="text-xs fill-gray-600 font-medium"
-                            >
-                              {data.month}
-                            </text>
-                          </g>
-                        );
-                      })}
-                    </svg>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Revenue Summary */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Revenue Summary</CardTitle>
-                  <CardDescription>Monthly revenue details</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-gray-200">
-                          <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Month</th>
-                          <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Revenue</th>
-                          <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">New Clients</th>
-                          <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Growth Rate</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {monthlyRevenueData.map((data, index, array) => {
-                          // Calculate growth rate if not provided
-                          let growthRate = data.growthRate;
-                          if (growthRate === null && index > 0) {
-                            const previousRevenue = array[index - 1].revenue;
-                            if (previousRevenue > 0) {
-                              growthRate = ((data.revenue - previousRevenue) / previousRevenue) * 100;
-                            }
-                          }
-                          
-                          return (
-                            <tr key={data.month} className="border-b border-gray-100 hover:bg-gray-50">
-                              <td className="py-3 px-4 text-sm text-gray-900 font-medium">{data.month}</td>
-                              <td className="py-3 px-4 text-sm text-gray-900">${data.revenue?.toLocaleString() || '0'}</td>
-                              <td className="py-3 px-4 text-sm text-gray-900">{data.newClients || '0'}</td>
-                              <td className="py-3 px-4 text-sm">
-                                {growthRate === null ? (
-                                  <span className="text-gray-500">N/A</span>
-                                ) : (
-                                  <span
-                                    className={`font-medium ${
-                                      growthRate < 0
-                                        ? 'text-white bg-red-500 px-2 py-1 rounded'
-                                        : 'text-gray-900'
-                                    }`}
-                                  >
-                                    {growthRate > 0 ? '+' : ''}
-                                    {growthRate.toFixed(1)}%
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Client Reports Tab Content */}
-      {activeTab === 'Client Reports' && (
-        <Card>
-          {loading.client ? (
-            <div className="flex justify-center items-center h-64">
-              <p>Loading client data...</p>
-            </div>
-          ) : (
-            <>
-              <CardHeader>
-                <CardTitle>Client-wise Subscription Report</CardTitle>
-                <CardDescription>Detailed breakdown by client</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Client Name</th>
-                        <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Total Subscriptions</th>
-                        <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Active Subscriptions</th>
-                        <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Total Revenue</th>
-                        <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Last Payment</th>
-                        <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {clientData.map((client) => (
-                        <tr key={client.id} className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="py-3 px-4 text-sm text-gray-900 font-medium">{client.name}</td>
-                          <td className="py-3 px-4 text-sm text-gray-900">{client.totalSubscriptions || 0}</td>
-                          <td className="py-3 px-4 text-sm text-gray-900">{client.activeSubscriptions || 0}</td>
-                          <td className="py-3 px-4 text-sm text-gray-900">${client.totalRevenue?.toLocaleString() || '0'}</td>
-                          <td className="py-3 px-4 text-sm text-gray-900">{client.lastPayment || 'N/A'}</td>
-                          <td className="py-3 px-4 text-sm">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${client.status === 'Active' ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-700'}`}>
-                              {client.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </>
-          )}
-        </Card>
-      )}
-
-      {/* Overview Tab Content (Original Charts) */}
       {activeTab === 'Overview' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Revenue Trend Chart */}
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle>Revenue Trend</CardTitle>
-              <CardDescription>Monthly revenue and client growth</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-                {loading.overview ? (
-                  <p>Loading overview data...</p>
-                ) : (
-                  <div className="w-full h-full relative">
-                    <svg className="w-full h-full" viewBox="0 0 400 200" preserveAspectRatio="none">
-                      {/* Y-axis labels */}
-                      <text x="10" y="20" className="text-xs fill-gray-600">26000</text>
-                      <text x="10" y="60" className="text-xs fill-gray-600">19500</text>
-                      <text x="10" y="100" className="text-xs fill-gray-600">13000</text>
-                      <text x="10" y="140" className="text-xs fill-gray-600">6500</text>
-                      <text x="10" y="180" className="text-xs fill-gray-600">0</text>
-                      
-                      {/* Grid lines */}
-                      <line x1="40" y1="20" x2="380" y2="20" stroke="#e5e7eb" strokeWidth="1" />
-                      <line x1="40" y1="60" x2="380" y2="60" stroke="#e5e7eb" strokeWidth="1" />
-                      <line x1="40" y1="100" x2="380" y2="100" stroke="#e5e7eb" strokeWidth="1" />
-                      <line x1="40" y1="140" x2="380" y2="140" stroke="#e5e7eb" strokeWidth="1" />
-                      <line x1="40" y1="180" x2="380" y2="180" stroke="#e5e7eb" strokeWidth="1" />
-                      
-                      {/* X-axis labels */}
-                      <text x="70" y="195" className="text-xs fill-gray-600">Jan</text>
-                      <text x="130" y="195" className="text-xs fill-gray-600">Feb</text>
-                      <text x="190" y="195" className="text-xs fill-gray-600">Mar</text>
-                      <text x="250" y="195" className="text-xs fill-gray-600">Apr</text>
-                      <text x="310" y="195" className="text-xs fill-gray-600">May</text>
-                      <text x="370" y="195" className="text-xs fill-gray-600">Jun</text>
-                      
-                      {/* Revenue line - purple */}
-                      <polyline
-                        points="70,100 130,80 190,70 250,50 310,60 370,40"
-                        fill="none"
-                        stroke="#8b5cf6"
-                        strokeWidth="2"
-                      />
-                      
-                      {/* Data points */}
-                      <circle cx="70" cy="100" r="4" fill="#8b5cf6" />
-                      <circle cx="130" cy="80" r="4" fill="#8b5cf6" />
-                      <circle cx="190" cy="70" r="4" fill="#8b5cf6" />
-                      <circle cx="250" cy="50" r="4" fill="#8b5cf6" />
-                      <circle cx="310" cy="60" r="4" fill="#8b5cf6" />
-                      <circle cx="370" cy="40" r="4" fill="#8b5cf6" />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Right Column - Two smaller cards */}
-          <div className="space-y-6">
-            {/* Subscription Distribution Chart */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Subscription Distribution</CardTitle>
-                <CardDescription>Breakdown by plan type</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-                  {loading.overview ? (
-                    <p>Loading overview data...</p>
-                  ) : (
-                    <div className="relative w-48 h-48">
-                      <svg viewBox="0 0 200 200" className="w-full h-full">
-                        {/* Multiple slices for pie chart */}
-                        <circle
-                          cx="100"
-                          cy="100"
-                          r="80"
-                          fill="none"
-                          stroke="#a78bfa"
-                          strokeWidth="40"
-                          strokeDasharray={`${2 * Math.PI * 80 * 0.4} ${2 * Math.PI * 80}`}
-                          strokeDashoffset={-2 * Math.PI * 80 * 0.6}
-                          transform="rotate(-90 100 100)"
-                        />
-                        <circle
-                          cx="100"
-                          cy="100"
-                          r="80"
-                          fill="none"
-                          stroke="#c4b5fd"
-                          strokeWidth="40"
-                          strokeDasharray={`${2 * Math.PI * 80 * 0.3} ${2 * Math.PI * 80}`}
-                          strokeDashoffset={-2 * Math.PI * 80 * 0.3}
-                          transform="rotate(-90 100 100)"
-                        />
-                        <circle
-                          cx="100"
-                          cy="100"
-                          r="80"
-                          fill="none"
-                          stroke="#ddd6fe"
-                          strokeWidth="40"
-                          strokeDasharray={`${2 * Math.PI * 80 * 0.3} ${2 * Math.PI * 80}`}
-                          strokeDashoffset="0"
-                          transform="rotate(-90 100 100)"
-                        />
-                        <text x="100" y="100" textAnchor="middle" className="text-xs fill-gray-600 font-medium">
-                          Basic Plan
-                        </text>
-                        <text x="100" y="115" textAnchor="middle" className="text-xs fill-gray-500">
-                          undefined%
-                        </text>
-                      </svg>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Revenue by Currency */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Revenue by Currency</CardTitle>
-                <CardDescription>Multi-currency revenue breakdown</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {loading.revenue ? (
-                  <div className="flex justify-center items-center h-32">
-                    <p>Loading revenue data...</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {revenueByCurrency.map((item) => (
-                      <div key={item.currency}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-gray-900">{item.currency}</span>
-                          <div className="flex items-center gap-3">
-                            <span className="text-sm text-gray-600">{item.percentage}%</span>
-                            <span className="text-sm font-medium text-gray-900">{item.amount}</span>
-                          </div>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-gray-900 h-2 rounded-full"
-                            style={{ width: `${item.percentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+        <OverviewTab 
+          loading={loading}
+          overviewRevenueData={overviewRevenueData}
+          subscriptionDistribution={subscriptionDistribution}
+          revenueByCurrency={revenueByCurrency}
+        />
       )}
 
-      {/* Subscriptions Tab Content */}
-      {activeTab === 'Subscriptions' && (
-        <div className="space-y-6">
-          {loading.subscription ? (
-            <div className="flex justify-center items-center h-64">
-              <p>Loading subscription data...</p>
-            </div>
-          ) : (
-            <>
-              {/* Subscription Plan Summary Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {subscriptionData.planSummary?.map((plan, index) => (
-                  <Card key={index}>
-                    <CardHeader>
-                      <CardTitle>{plan.planName || 'Plan'}</CardTitle>
-                      <CardDescription>Subscription details</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div>
-                          <p className="text-sm text-gray-600 mb-1">Active Subscriptions</p>
-                          <p className="text-2xl font-bold text-gray-900">{plan.activeSubscriptions || 0}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600 mb-1">Monthly Revenue</p>
-                          <p className="text-xl font-semibold text-gray-900">${plan.monthlyRevenue?.toLocaleString() || '0'}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600 mb-1">Avg per Subscription</p>
-                          <p className="text-lg font-medium text-gray-900">${plan.avgPerSubscription?.toFixed(2) || '0.00'}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+      {activeTab === 'Revenue Analysis' && (
+        <RevenueAnalysisTab 
+          loading={loading}
+          monthlyRevenueData={monthlyRevenueData}
+        />
+      )}
 
-              {/* Subscription Trends Chart */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Subscription Trends</CardTitle>
-                  <CardDescription>Growth in subscription count over time</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-80 bg-gray-50 rounded-lg p-6">
-                    <svg className="w-full h-full" viewBox="0 0 600 280" preserveAspectRatio="xMidYMid meet">
-                      {/* Y-axis labels */}
-                      <text x="30" y="30" className="text-xs fill-gray-600 font-medium">60</text>
-                      <text x="30" y="80" className="text-xs fill-gray-600 font-medium">45</text>
-                      <text x="30" y="130" className="text-xs fill-gray-600 font-medium">30</text>
-                      <text x="30" y="180" className="text-xs fill-gray-600 font-medium">15</text>
-                      <text x="30" y="230" className="text-xs fill-gray-600 font-medium">0</text>
-                      
-                      {/* Grid lines */}
-                      <line x1="60" y1="30" x2="560" y2="30" stroke="#e5e7eb" strokeWidth="1" />
-                      <line x1="60" y1="80" x2="560" y2="80" stroke="#e5e7eb" strokeWidth="1" />
-                      <line x1="60" y1="130" x2="560" y2="130" stroke="#e5e7eb" strokeWidth="1" />
-                      <line x1="60" y1="180" x2="560" y2="180" stroke="#e5e7eb" strokeWidth="1" />
-                      <line x1="60" y1="230" x2="560" y2="230" stroke="#e5e7eb" strokeWidth="1" />
-                      
-                      {subscriptionData.trendData?.map((data, index) => {
-                        const maxValue = Math.max(...(subscriptionData.trendData?.map(d => d.value) || [60]), 60);
-                        const chartAreaHeight = 200; // 230 - 30
-                        const chartBottom = 230;
-                        const barHeight = (data.value / maxValue) * chartAreaHeight;
-                        const barY = chartBottom - barHeight;
-                        const barX = 80 + (index * 80);
-                        const barWidth = 50;
-                        
-                        return (
-                          <g key={data.month}>
-                            <rect
-                              x={barX}
-                              y={barY}
-                              width={barWidth}
-                              height={barHeight}
-                              fill="#10b981"
-                              rx="4"
-                            />
-                            <text
-                              x={barX + barWidth / 2}
-                              y={260}
-                              textAnchor="middle"
-                              className="text-xs fill-gray-600 font-medium"
-                            >
-                              {data.month}
-                            </text>
-                          </g>
-                        );
-                      })}
-                    </svg>
-                  </div>
-                </CardContent>
-              </Card>
-            </>
-          )}
-        </div>
+      {activeTab === 'Client Reports' && (
+        <ClientReportsTab 
+          loading={loading}
+          clientData={clientData}
+        />
+      )}
+
+      {activeTab === 'Subscriptions' && (
+        <SubscriptionsTab 
+          loading={loading}
+          subscriptionData={subscriptionData}
+        />
       )}
     </div>
   );

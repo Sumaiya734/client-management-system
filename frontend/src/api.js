@@ -160,6 +160,14 @@ export const purchaseApi = {
   generatePoNumber: () => api.get('/purchases/generate-po'),
 };
 
+// Audit Log API functions
+export const auditLogApi = {
+  getAll: (params) => api.get('/audit-logs', { params }),
+  getById: (id) => api.get(`/audit-logs/${id}`),
+  create: (data) => api.post('/audit-logs', data),
+  delete: (id) => api.delete(`/audit-logs/${id}`),
+};
+
 // Authentication API functions
 export const authApi = {
   login: (credentials) => {
