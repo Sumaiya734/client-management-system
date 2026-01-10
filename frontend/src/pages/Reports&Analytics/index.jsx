@@ -351,7 +351,9 @@ const ReportsAnalytics = () => {
         actions={
           <>
             <Button variant="outline">Export Data</Button>
-            <Button variant="primary" onClick={handleGenerateReport}>Generate Report</Button>
+            <Button variant="primary" onClick={handleGenerateReport} className="rounded-full shadow-xl">  
+              Generate Report
+            </Button>
           </>
         }
       />
@@ -359,7 +361,7 @@ const ReportsAnalytics = () => {
       {/* Key Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {metrics.map((metric) => (
-          <div key={metric.title} className="bg-gray-50 rounded-lg p-3 border border-gray-200 shadow-sm">
+          <div key={metric.title} className="bg-gray-50 rounded-lg p-3 border border-gray-200 shadow-md">
             <div className="flex items-start justify-between mb-2">
               <h3 className="text-xs font-medium text-gray-700">{metric.title}</h3>
               <metric.icon className="h-3 w-3 text-gray-600" />
@@ -505,7 +507,7 @@ const ReportsAnalytics = () => {
               onClick={() => setActiveTab(tab)}
               className={`px-6 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
                 activeTab === tab
-                  ? 'bg-white text-gray-900 shadow-sm'
+                  ? 'bg-white text-gray-900 shadow-xl'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >

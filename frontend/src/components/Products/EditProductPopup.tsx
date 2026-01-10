@@ -65,10 +65,13 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
 
   const { isVisible, isAnimating } = useAnimationState(isOpen);
 
-  const [currencyOptions, setCurrencyOptions] = useState(['USD', 'EUR', 'GBP', 'CAD', 'AUD']); // Default currencies
+  const [currencyOptions, setCurrencyOptions] = useState<string[]>(['USD', 'EUR', 'GBP', 'CAD', 'AUD']);
   const categoryOptions = ['Communication', 'Productivity', 'Design', 'AI Tools', 'Media'];
   const subscriptionTypeOptions = ['Per User', 'Per License', 'Per Editor', 'Per Account'];
   const statusOptions = ['Active', 'Inactive'];
+
+  // Rates map: currency code -> 1 unit = X BDT
+  const [ratesMap, setRatesMap] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const fetchVendors = async () => {
@@ -84,23 +87,39 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
     };
     fetchVendors();
     
-    // Fetch available currencies from exchange rates API
-    const fetchCurrencies = async () => {
+    const fetchCurrenciesAndRates = async () => {
       try {
         const response = await currencyRatesApi.getAll();
         if (response.data && Array.isArray(response.data)) {
-          // Extract unique currency codes from the exchange rates
-          const uniqueCurrencies = ['USD', ...Array.from(new Set(response.data.map((rate: any) => rate.currency)))];
-          setCurrencyOptions(uniqueCurrencies as string[]);
+          const unique = ['USD', ...new Set(response.data.map((r: any) => r.currency))];
+          setCurrencyOptions(unique as string[]);
+
+          const map: Record<string, number> = {};
+          response.data.forEach((r: any) => {
+            let rate = parseFloat(r.rate);
+            if (rate < 1) rate = 1 / rate;
+            map[r.currency] = rate;
+          });
+          // Fallback for USD
+          if (!map['USD']) map['USD'] = 122.2;
+          setRatesMap(map);
         }
-      } catch (error) {
-        console.error('Failed to fetch currencies:', error);
-        // Use default currencies if API call fails
-        setCurrencyOptions(['USD', 'EUR', 'GBP', 'CAD', 'AUD']);
+      } catch (err) {
+        console.error('Failed to fetch currencies:', err);
+        setRatesMap({ USD: 122.2 });
       }
     };
-    
-    fetchCurrencies();
+
+    fetchCurrenciesAndRates();
+
+    // Event listeners for rate updates
+    const handler = () => fetchCurrenciesAndRates();
+    window.addEventListener('currencyRateUpdated', handler);
+    window.addEventListener('bdtRateUpdated', handler);
+    return () => {
+      window.removeEventListener('currencyRateUpdated', handler);
+      window.removeEventListener('bdtRateUpdated', handler);
+    };
   }, []);
 
   useEffect(() => {
@@ -298,75 +317,17 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
     };
   }, []);
   
-  // Recalculate price preview whenever rate or form data changes
-  // Formula: base price × currency rate (BDT) × (1 + profit%) = total price
+  // BDT Preview with any base currency + % symbol visible
   const pricePreview = useMemo(() => {
     const base = parseFloat(formData.basePrice) || 0;
     const profit = parseFloat(formData.profitMargin) || 0;
-    let rate = bdtRate;
-    
-    // Get the conversion rate
-    // If rate is >= 1, it's "1 USD = rate BDT" format (e.g., 110.5 means 1 USD = 110.5 BDT)
-    // If rate is < 1, it's "1 BDT = rate USD" format (e.g., 0.0089 means 1 BDT = 0.0089 USD)
-    if (!rate || rate <= 0) {
-      rate = 110.5; // fallback: 1 USD = 110.5 BDT
-    }
-    
-    // Convert rate to "1 USD = X BDT" format if needed
-    let usdToBdtRate = rate;
-    if (rate < 1) {
-      // Convert from "1 BDT = rate USD" to "1 USD = 1/rate BDT"
-      usdToBdtRate = 1 / rate;
-    }
-    
-    // Calculate: base price (USD) × rate (BDT) × (1 + profit%)
-    // Step 1: Convert base price to BDT
-    const baseInBdt = base * usdToBdtRate;
-    // Step 2: Apply profit margin (profit is already in percentage, e.g., 20 means 20%)
-    // Formula: base × rate × (1 + profit/100)
-    const totalBdt = baseInBdt * (1 + profit / 100);
-    
-    // Also calculate final USD for display
-    const finalUSD = base * (1 + profit / 100);
-    
-    // Calculate prices for other currencies if rates are available
-    const multiCurrencyPrices: Record<string, number> = {};
-    Object.entries(currencyRatesMap).forEach(([currency, currencyRate]) => {
-      if (currency !== 'USD') {
-        // Convert from base price (USD) to target currency
-        // First convert base price to BDT, then to target currency
-        const priceInBdt = base * usdToBdtRate;
-        let targetCurrencyRate = currencyRate;
-        if (currencyRate < 1) {
-          targetCurrencyRate = 1 / currencyRate; // Convert to "1 unit = X BDT" format
-        }
-        const priceInTargetCurrency = priceInBdt / targetCurrencyRate;
-        multiCurrencyPrices[currency] = priceInTargetCurrency * (1 + profit / 100);
-      }
-    });
-    
-    console.log('Price calculation:', { 
-      base, 
-      profitPercent: profit, // This is the percentage value (e.g., 20)
-      profitDecimal: profit / 100, // This is the decimal (e.g., 0.20)
-      rate, 
-      usdToBdtRate,
-      baseInBdt: baseInBdt.toFixed(2),
-      totalBdt: Math.round(totalBdt),
-      finalUSD: finalUSD.toFixed(2),
-      multiCurrencyPrices,
-      formula: `${base} × ${usdToBdtRate.toFixed(2)} × (1 + ${profit}%) = ${Math.round(totalBdt)}`
-    });
-    
-    return {
-      bdt: Math.round(totalBdt),
-      finalUSD: finalUSD.toFixed(2),
-      profit: profit, // Keep as percentage value for display (e.g., 20)
-      rate: usdToBdtRate,
-      baseInBdt: baseInBdt.toFixed(2),
-      multiCurrencyPrices,
-    };
-  }, [bdtRate, currencyRatesMap, formData.basePrice, formData.profitMargin]);
+    const rate = ratesMap[formData.baseCurrency] || 122.2;
+
+    const baseBdt = base * rate;
+    const finalBdt = Math.round(baseBdt * (1 + profit / 100));
+
+    return { rate, baseBdt: Math.round(baseBdt), bdt: finalBdt };
+  }, [formData.basePrice, formData.baseCurrency, formData.profitMargin, ratesMap]);
 
   const validate = () => {
     const err: Record<string, string> = {};
@@ -678,13 +639,17 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Profit (%)</label>
-                <input
-                  type="number"
-                  value={formData.profitMargin}
-                  onChange={(e) => handleInputChange('profitMargin', e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="20"
-                />
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.profitMargin}
+                    onChange={(e) => handleInputChange('profitMargin', e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10"
+                    placeholder="15"
+                  />
+                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sm text-gray-600 pointer-events-none">%</span>
+                </div>
               </div>
             </div>
 
@@ -700,7 +665,7 @@ const EditProductPopup: React.FC<EditProductPopupProps> = ({
                   ${formData.basePrice || 0} × {pricePreview.rate.toFixed(2)} × (1 + {formData.profitMargin || 0}%) = ৳{pricePreview.bdt}
                 </p>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Base: ${formData.basePrice || 0} → ৳{pricePreview.baseInBdt} → Final: ৳{pricePreview.bdt}
+                  Base: ${formData.basePrice || 0} → ৳{pricePreview.baseBdt} → Final: ৳{pricePreview.bdt}
                 </p>
               </div>
             )}

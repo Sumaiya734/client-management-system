@@ -66,92 +66,32 @@ export default function Products() {
   // Formula: base price × currency rate (BDT) × (1 + profit%) = total price
   const refreshExchangeRates = useCallback(async () => {
     try {
-      console.log('Refreshing exchange rates and updating product prices...');
       const response = await currencyRatesApi.getAll();
-      
-      // Get all currency rates
       const ratesMap = {};
       response.data.forEach(rate => {
-        ratesMap[rate.currency] = parseFloat(rate.rate);
+        let toBdt = parseFloat(rate.rate);
+        if (toBdt < 1) toBdt = 1 / toBdt;
+        ratesMap[rate.currency] = toBdt;
       });
-      
-      // Get USD to BDT rate for conversion
-      const usdRateData = response.data.find(rate => rate.currency === 'USD');
-      let usdRate = usdRateData ? parseFloat(usdRateData.rate) : 110.5; // Default: 1 USD = 110.5 BDT
-      
-      // Convert rate to "1 USD = X BDT" format if needed
-      // If rate < 1, it's "1 BDT = rate USD", convert to "1 USD = 1/rate BDT"
-      let usdToBdtRate = usdRate;
-      if (usdRate < 1) {
-        usdToBdtRate = 1 / usdRate;
-      }
-      
-      console.log('USD Rate:', usdRate, '→ USD to BDT Rate:', usdToBdtRate);
-      
-      // Update BDT prices and multi-currency prices for all products based on the new exchange rates
-      setProducts(prevProducts => {
-        if (!prevProducts || prevProducts.length === 0) {
-          console.log('No products to update');
-          return prevProducts;
-        }
-        
-        const updatedProducts = prevProducts.map(product => {
-          // Calculate new BDT price using formula: base × rate × (1 + profit%)
-          const basePrice = parseFloat(product.basePrice) || 0;
-          const profitMargin = parseFloat(product.profit) || 0;
-          
-          // Step 1: Convert base price to BDT
-          const baseInBdt = basePrice * usdToBdtRate;
-          // Step 2: Apply profit margin
-          const newBdtPrice = Math.round(baseInBdt * (1 + profitMargin / 100));
-          
-          // Calculate new multi-currency prices
-          let updatedCurrencies = [];
-          if (product.currencies && Array.isArray(product.currencies)) {
-            updatedCurrencies = product.currencies.map(currency => {
-              if (currency.code === 'USD') {
-                // For USD, calculate directly from base price
-                return {
-                  ...currency,
-                  price: (basePrice * (1 + profitMargin / 100)).toFixed(2)
-                };
-              } else if (ratesMap[currency.code]) {
-                // For other currencies, convert from base price via BDT
-                const priceInBdt = basePrice * usdToBdtRate;
-                let targetCurrencyRate = ratesMap[currency.code];
-                if (targetCurrencyRate < 1) {
-                  targetCurrencyRate = 1 / targetCurrencyRate; // Convert to "1 unit = X BDT" format
-                }
-                const priceInTargetCurrency = priceInBdt / targetCurrencyRate;
-                const finalPrice = priceInTargetCurrency * (1 + profitMargin / 100);
-                
-                return {
-                  ...currency,
-                  price: finalPrice.toFixed(2)
-                };
-              } else {
-                // If currency rate is not available, keep the original price
-                return currency;
-              }
-            });
-          }
-          
-          console.log(`Product ${product.name}: $${basePrice} × ${usdToBdtRate.toFixed(2)} × (1 + ${profitMargin}%) = ৳${newBdtPrice}`);
-          
-          return {
-            ...product,
-            bdtPrice: `৳${newBdtPrice}`,
-            bdtLabel: 'BDT (final price)',
-            currencies: updatedCurrencies
-          };
-        });
-        
-        console.log('All product prices updated successfully');
-        return updatedProducts;
-      });
-    } catch (error) {
-      console.error('Failed to refresh exchange rates:', error);
-      console.error('Error details:', error.response || error.message || error);
+      if (!ratesMap['USD']) ratesMap['USD'] = 122.2;
+
+      setProducts(prev => prev.map(product => {
+        const basePrice = parseFloat(product.basePrice) || 0;
+        const profitMargin = parseFloat(product.profit || product.profitMargin || 0);
+        const baseCurrency = product.baseCurrency || 'USD';
+
+        const rate = ratesMap[baseCurrency] || 122.2;
+        const baseBdt = basePrice * rate;
+        const newBdt = Math.round(baseBdt * (1 + profitMargin / 100));
+
+        return {
+          ...product,
+          bdtPrice: `৳${newBdt.toLocaleString()}`,
+          bdtLabel: 'BDT (final price)',
+        };
+      }));
+    } catch (err) {
+      console.error(err);
     }
   }, []);
 
@@ -356,6 +296,7 @@ export default function Products() {
           category: productData.category,
           vendor: productData.vendor,
           vendor_website: productData.vendorWebsite,
+          profit: parseFloat(productData.profit),
           profit_margin: parseFloat(productData.profit),
           description: productData.description
         };
@@ -376,7 +317,7 @@ export default function Products() {
               type: response.data.subscription_type || response.data.type,
               basePrice: response.data.base_price || 0,
               baseCurrency: response.data.base_currency || 'USD',
-              profit: response.data.profit_margin || 0,
+              profit: response.data.profit || response.data.profit_margin || 0,
               bdtPrice: response.data.bdt_price ? `৳${response.data.bdt_price}` : `৳0`,
               bdtLabel: 'BDT (final price)',
               currencies: response.data.multi_currency ? (typeof response.data.multi_currency === 'string' ? JSON.parse(response.data.multi_currency) : response.data.multi_currency) : [],
@@ -398,6 +339,7 @@ export default function Products() {
           category: productData.category,
           vendor: productData.vendor,
           vendor_website: productData.vendorWebsite,
+          profit: parseFloat(productData.profit),
           profit_margin: parseFloat(productData.profit),
           description: productData.description
         };
@@ -414,7 +356,7 @@ export default function Products() {
           type: response.data.subscription_type || response.data.type,
           basePrice: response.data.base_price || 0,
           baseCurrency: response.data.base_currency || 'USD',
-          profit: response.data.profit_margin || 0,
+          profit: response.data.profit || response.data.profit_margin || 0,
           bdtPrice: response.data.bdt_price ? `৳${response.data.bdt_price}` : `৳0`,
           bdtLabel: 'BDT (final price)',
           currencies: response.data.multi_currency ? (typeof response.data.multi_currency === 'string' ? JSON.parse(response.data.multi_currency) : response.data.multi_currency) : [],
@@ -490,7 +432,7 @@ export default function Products() {
         actions={
           <Button 
             icon={<Plus className="h-4 w-4" />}
-            onClick={handleAddProduct}
+            onClick={handleAddProduct} className="rounded-full shadow-xl"   // pill-shape + shadow
           >
             Add Product
           </Button>
@@ -553,7 +495,7 @@ export default function Products() {
                     <TableCell>
                       <div>
                         <div className="font-medium text-gray-900">{product.basePrice} {product.baseCurrency}</div>
-                        <div className="text-sm text-gray-600">Profit: {product.profit}</div>
+                        <div className="text-sm text-gray-600">Profit: {product.profit}%</div>
                       </div>
                     </TableCell>
                     <TableCell>

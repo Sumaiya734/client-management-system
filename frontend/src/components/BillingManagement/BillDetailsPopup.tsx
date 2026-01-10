@@ -5,12 +5,13 @@ import {
   X,
   Download,
   Mail,
-  Building2,
   Calendar,
-  DollarSign,
   Package,
-  FileText,
-  Edit3,
+  User,
+  Phone,
+  Globe,
+  CreditCard,
+  Building2,
 } from 'lucide-react';
 import { billingManagementApi } from '../../api';
 import { PopupAnimation, useAnimationState } from '../../utils/AnimationUtils';
@@ -99,19 +100,17 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
 
   const formatCurrency = (amount?: string | number) => {
     const num = typeof amount === 'number' ? amount : parseFloat((amount || '0').toString().replace(/[^0-9.-]+/g, '')) || 0;
-    return num.toLocaleString('en-BD');
+    return num.toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  const getStatusBadge = (status: string) => {
-    const styles: Record<string, string> = {
-      paid: 'bg-green-100 text-green-800',
-      'partially paid': 'bg-blue-100 text-blue-800',
-      unpaid: 'bg-yellow-100 text-yellow-800',
-      overdue: 'bg-red-100 text-red-800',
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      paid: 'text-green-600 bg-green-50 border-green-200',
+      'partially paid': 'text-blue-600 bg-blue-50 border-blue-200',
+      unpaid: 'text-amber-600 bg-amber-50 border-amber-200',
+      overdue: 'text-red-600 bg-red-50 border-red-200',
     };
-    const key = status.toLowerCase();
-    const badgeClass = styles[key] || 'bg-gray-100 text-gray-800';
-    return <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${badgeClass}`}>{status}</span>;
+    return colors[status.toLowerCase()] || 'text-gray-600 bg-gray-50 border-gray-200';
   };
 
   const clientData = typeof bill.client === 'object' && bill.client
@@ -133,203 +132,205 @@ const BillDetailsPopup: React.FC<BillDetailsPopupProps> = ({
   const outstanding = Math.max(0, totalAmount - paidAmount);
 
   const products = bill.products || [];
+  const statusColor = getStatusColor(billStatus);
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 px-2 sm:px-4 transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0'
-        }`}
+      className={`fixed inset-0 z-[9999] flex items-center justify-center transition-all duration-200 ${
+        isAnimating 
+          ? 'opacity-100 backdrop-blur-sm bg-black/20' 
+          : 'opacity-0 pointer-events-none'
+      }`}
       onClick={onClose}
     >
-      <PopupAnimation animationType="zoomIn" duration="0.3s">
+      <PopupAnimation animationType="fadeIn" duration="0.2s">
         <div
-          className="w-full max-w-full sm:max-w-xl md:max-w-3xl rounded-xl bg-white shadow-xl max-h-[95vh] overflow-hidden"
+          className="w-full max-w-full mx-4 sm:mx-6 md:mx-8 lg:mx-auto lg:max-w-2xl xl:max-w-3xl rounded-lg bg-white shadow-lg flex flex-col"
+          style={{ maxHeight: '90vh' }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-3 sm:px-5 py-3">
+          <div className="flex items-center justify-between border-b px-4 sm:px-6 py-4 flex-shrink-0">
             <div>
-              <h2 className="text-base sm:text-lg font-semibold text-gray-900">Bill Details</h2>
-              <p className="text-xs text-gray-600 mt-1">
-                #{billNumber} • PO: {poNumber}
-              </p>
+              <h2 className="text-lg font-semibold text-gray-900">Bill #{billNumber}</h2>
+              <p className="text-sm text-gray-500 mt-1">PO: {poNumber}</p>
             </div>
             <button
               onClick={onClose}
-              className="rounded-md p-1.5 text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+              className="p-2 hover:bg-gray-100 rounded-md transition-colors"
             >
-              <X size={20} />
+              <X className="w-5 h-5 text-gray-500" />
             </button>
           </div>
 
-          {/* Body */}
-          <div className="p-3 sm:p-5 space-y-4 sm:space-y-5 overflow-y-auto max-h-[calc(95vh-120px)]">
-            {/* Bill + Client Info */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 text-xs sm:text-sm">
-              <div className="space-y-2 sm:space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Bill Number</span>
-                  <span className="font-medium">{billNumber}</span>
+          {/* Scrollable Content Area */}
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+            <div className="space-y-6">
+              {/* Status & Dates Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm text-gray-600">Bill Date:</span>
+                    <span className="text-sm font-medium">{billDate}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm text-gray-600">Due Date:</span>
+                    <span className="text-sm font-medium">{dueDate}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">PO Number</span>
-                  <span className="font-medium">{poNumber}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 flex items-center gap-1">
-                    <Calendar size={14} /> Bill Date
-                  </span>
-                  <span className="font-medium">{billDate}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 flex items-center gap-1">
-                    <Calendar size={14} /> Due Date
-                  </span>
-                  <span className="font-medium">{dueDate}</span>
-                </div>
-              </div>
-
-              <div className="space-y-2 sm:space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Company</span>
-                  <span className="font-medium">{clientData.company || 'N/A'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Contact</span>
-                  <span className="font-medium">{clientData.contact || 'N/A'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Email</span>
-                  <span className="font-medium break-all">{clientData.email || 'N/A'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Phone</span>
-                  <span className="font-medium">{clientData.phone || 'N/A'}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Products */}
-            <div>
-              <h3 className="text-sm font-medium text-gray-900 mb-2 flex items-center gap-1">
-                <Package size={16} /> Products
-              </h3>
-              {products.length > 0 ? (
-                <div className="border rounded-md overflow-hidden text-xs sm:text-sm">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-2 sm:px-3 py-2 text-left text-gray-700">Item</th>
-                        <th className="px-2 sm:px-3 py-2 text-center text-gray-700">Qty</th>
-                        <th className="px-2 sm:px-3 py-2 text-right text-gray-700">Price</th>
-                        <th className="px-2 sm:px-3 py-2 text-right text-gray-700">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {products.map((p, i) => (
-                        <tr key={i}>
-                          <td className="px-2 sm:px-3 py-2 text-gray-900">{p.description}</td>
-                          <td className="px-2 sm:px-3 py-2 text-center">{p.quantity}</td>
-                          <td className="px-2 sm:px-3 py-2 text-right text-gray-900">
-                            ৳{formatCurrency(p.unit_price || p.unitPrice)}
-                          </td>
-                          <td className="px-2 sm:px-3 py-2 text-right font-medium">
-                            ৳{formatCurrency(p.total)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p className="text-xs text-gray-500">No items</p>
-              )}
-            </div>
-
-            {/* Payment Summary */}
-            <div className="max-w-full sm:max-w-xs ml-auto bg-gray-50 rounded-lg p-3 sm:p-4 border text-xs sm:text-sm space-y-2">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Subtotal</span>
-                <span>৳{formatCurrency(bill.subtotal)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Tax</span>
-                <span>৳{formatCurrency(bill.tax)}</span>
-              </div>
-              <div className="pt-2 border-t flex justify-between font-medium">
-                <span>Total</span>
-                <span>৳{formatCurrency(totalAmount)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Paid</span>
-                <span className="text-green-600">৳{formatCurrency(paidAmount)}</span>
-              </div>
-              <div className="flex justify-between font-medium">
-                <span className="text-gray-600">Due</span>
-                <span className={outstanding === 0 ? 'text-green-600' : 'text-red-600'}>
-                  ৳{formatCurrency(outstanding)}
-                </span>
-              </div>
-            </div>
-
-            {/* Status + Notes */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 text-xs sm:text-sm">
-              {/* <div>
-                <label className="block text-gray-700 font-medium mb-1">Payment Status</label>
-                <div className="flex items-center gap-3">
+                
+                {/* <div className="flex flex-col sm:items-end">
+                  <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md border ${statusColor}`}>
+                    <span className="text-sm font-medium capitalize">{billStatus}</span>
+                  </div>
                   <select
                     value={billStatus}
                     onChange={(e) => setBillStatus(e.target.value)}
-                    className="flex-1 rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="mt-2 w-full sm:w-auto text-sm border rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   >
-                    <option>Paid</option>
-                    <option>Partially Paid</option>
-                    <option>Unpaid</option>
-                    <option>Overdue</option>
+                    <option value="paid">Paid</option>
+                    <option value="partially paid">Partially Paid</option>
+                    <option value="unpaid">Unpaid</option>
+                    <option value="overdue">Overdue</option>
                   </select>
-                  {getStatusBadge(billStatus)}
-                </div>
-              </div> */}
+                </div> */}
+              </div>
 
+              {/* Client Info */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <Building2 className="w-4 h-4" />
+                  Client Information
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-gray-400" />
+                      <span className="text-gray-600">Company:</span>
+                      <span className="font-medium">{clientData.company || 'N/A'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4 text-gray-400" />
+                      <span className="text-gray-600">Contact:</span>
+                      <span className="font-medium">{clientData.contact || 'N/A'}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-gray-400" />
+                      <span className="text-gray-600">Email:</span>
+                      <span className="font-medium truncate">{clientData.email || 'N/A'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-gray-400" />
+                      <span className="text-gray-600">Phone:</span>
+                      <span className="font-medium">{clientData.phone || 'N/A'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Products */}
+              {products.length > 0 && (
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="bg-gray-50 px-4 py-3 border-b">
+                    <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                      <Package className="w-4 h-4" />
+                      Products ({products.length})
+                    </h3>
+                  </div>
+                  <div className="divide-y">
+                    {products.map((p, i) => (
+                      <div key={i} className="px-4 py-3 flex justify-between items-center hover:bg-gray-50">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900">{p.description}</p>
+                          <p className="text-xs text-gray-500">Qty: {p.quantity}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-medium">৳{formatCurrency(p.total)}</p>
+                          <p className="text-xs text-gray-500">৳{formatCurrency(p.unit_price || p.unitPrice)} each</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Payment Summary */}
+              <div className="border rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <CreditCard className="w-4 h-4" />
+                  Payment Summary
+                </h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Total Amount:</span>
+                    <span className="text-sm font-bold">৳{formatCurrency(totalAmount)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Paid Amount:</span>
+                    <span className="text-sm font-medium text-green-600">৳{formatCurrency(paidAmount)}</span>
+                  </div>
+                  <div className="pt-2 border-t">
+                    <div className="flex justify-between">
+                      <span className="text-sm font-semibold text-gray-700">Outstanding:</span>
+                      <span className={`text-sm font-bold ${outstanding === 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        ৳{formatCurrency(outstanding)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes */}
               <div>
-                <label className="block text-gray-700 font-medium mb-1">Notes</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Notes
+                </label>
                 <textarea
                   rows={3}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Internal notes..."
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Add notes here..."
+                  className="w-full text-sm border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
                 />
               </div>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="flex flex-wrap justify-end gap-2 sm:gap-3 px-3 sm:px-5 py-3 border-t border-gray-200 bg-gray-50">
-            <button
-              onClick={onClose}
-              className="px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-100"
-            >
-              Close
-            </button>
-            <button
-              onClick={handleDownload}
-              className="inline-flex items-center gap-1 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-100"
-            >
-              <Download size={15} /> PDF
-            </button>
-            <button
-              onClick={handleSendEmail}
-              className="inline-flex items-center gap-1 px-3 sm:px-4 py-2 text-xs sm:text-sm text-white bg-gray-800 rounded-md hover:bg-gray-900"
-            >
-              <Mail size={15} /> Email
-            </button>
-            <button
-              onClick={handleSaveChanges}
-              disabled={isSaving}
-              className="px-4 sm:px-5 py-2 text-xs sm:text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700"
-            >
-              {isSaving ? 'Saving...' : 'Save'}
-            </button>
+          <div className="border-t px-4 sm:px-6 py-4 bg-gray-50 flex-shrink-0">
+            <div className="flex flex-col sm:flex-row justify-end gap-3">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={handleDownload}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Download
+              </button>
+              <button
+                onClick={handleSendEmail}
+                className="px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded-lg hover:bg-gray-900 transition-colors flex items-center justify-center gap-2"
+              >
+                <Mail className="w-4 h-4" />
+                Send Email
+              </button>
+              <button
+                onClick={handleSaveChanges}
+                disabled={isSaving}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
           </div>
         </div>
       </PopupAnimation>

@@ -209,6 +209,7 @@ export default function VendorManagement() {
           <Button 
             icon={<Plus className="h-4 w-4" />}
             onClick={handleAddVendor}
+            className="rounded-full shadow-xl"   // pill-shape + shadow
           >
             Add Vendor
           </Button>

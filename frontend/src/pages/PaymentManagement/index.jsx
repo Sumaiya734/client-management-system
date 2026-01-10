@@ -396,7 +396,7 @@ export default function PaymentManagement() {
             <Button
               variant="outline"
               icon={<RefreshCw className={`h-4 w-4 ${statisticsLoading ? 'animate-spin' : ''}`} />}
-              onClick={refreshStatistics}
+              onClick={refreshStatistics}className="rounded-full shadow-md"   // pill-shape + shadow
               disabled={statisticsLoading}
               title="Refresh Statistics"
             >
@@ -404,7 +404,7 @@ export default function PaymentManagement() {
             </Button>
             <Button
               icon={<Plus className="h-4 w-4" />}
-              onClick={handleRecordPayment}
+              onClick={handleRecordPayment}className="rounded-full shadow-xl"   // pill-shape + shadow
             >
               Record Payment
             </Button>

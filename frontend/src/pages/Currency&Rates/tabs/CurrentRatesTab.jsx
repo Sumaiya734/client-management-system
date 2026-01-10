@@ -1,6 +1,6 @@
 // src/pages/Currency/tabs/CurrentRatesTab.js
-import React, { useState, useEffect, useRef } from 'react';
-import { Edit, Trash2, ArrowUpRight, ArrowDownRight, ArrowRight, ChevronRight, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { Edit, Trash2, ArrowUpRight, ArrowDownRight, ArrowRight, ChevronRight, ChevronLeft, Loader2 } from 'lucide-react';
 import { SearchFilter } from '../../../components/ui/SearchFilter';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../../../components/ui/Card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../../components/ui/Table';
@@ -8,8 +8,9 @@ import { Button } from '../../../components/ui/Button';
 import EditExchangeRatePopup from '../../../components/Currency/EditExchangeRatePopup';
 import { currencyRatesApi } from '../../../api';
 import { useNotification } from '../../../components/Notifications';
+import { formatDate } from '../../../utils/dateUtils';
 
-export default function CurrentRatesTab() {
+const CurrentRatesTab = forwardRef((props, ref) => {
   const { showError, showSuccess } = useNotification();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
@@ -307,15 +308,44 @@ export default function CurrentRatesTab() {
       scrollContainerRef.current.scrollBy({ left: 200, behavior: 'smooth' });
     }
   };
+  
+  const scrollLeft = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: -200, behavior: 'smooth' });
+    }
+  };
+
+  // Expose handleSetRate to parent component
+  useImperativeHandle(ref, () => ({
+    handleSetRate
+  }));
 
   return (
     <>
       {/* Mini Cards Scrollable Section */}
-      <div className="relative group">
+      <div className="relative">
+        <div className="flex justify-between items-center mb-2">
+          <h3 className="text-sm font-medium text-gray-700">Currency Overview</h3>
+          <div className="flex space-x-2">
+            <button
+              onClick={scrollLeft}
+              className="p-2 rounded-full bg-white shadow-md border border-gray-200 hover:bg-gray-50 transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4 text-gray-600" />
+            </button>
+            <button
+              onClick={scrollRight}
+              className="p-2 rounded-full bg-white shadow-md border border-gray-200 hover:bg-gray-50 transition-colors"
+            >
+              <ChevronRight className="h-4 w-4 text-gray-600" />
+            </button>
+          </div>
+        </div>
+        
         <div
           ref={scrollContainerRef}
-          className="flex space-x-4 overflow-x-auto pb-2 scrollbar-hide"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          className="flex space-x-4 overflow-x-auto pb-2 custom-scrollbar"
+          style={{ scrollbarWidth: 'thin', msOverflowStyle: 'auto' }}
         >
           {exchangeRates.map((rate) => {
             const currencyCode = rate.currencyPair.split(' / ')[0];
@@ -349,15 +379,6 @@ export default function CurrentRatesTab() {
             );
           })}
         </div>
-
-        {exchangeRates.length > 0 && (
-          <button
-            onClick={scrollRight}
-            className="absolute -right-3 top-1/2 -translate-y-1/2 bg-white rounded-full p-2 shadow-lg border border-gray-200 z-10 hover:bg-gray-50 transition-colors opacity-0 group-hover:opacity-100 duration-200"
-          >
-            <ChevronRight className="h-5 w-5 text-gray-600" />
-          </button>
-        )}
       </div>
 
       <SearchFilter
@@ -398,7 +419,7 @@ export default function CurrentRatesTab() {
                   <TableRow key={`row-${rate.id}`}>
                     <TableCell>{rate.currencyPair}</TableCell>
                     <TableCell>{rate.rate}</TableCell>
-                    <TableCell>{rate.lastUpdated}</TableCell>
+                    <TableCell>{formatDate(rate.lastUpdated)}</TableCell>
                     <TableCell>
                       <span className={`font-medium ${rate.change.includes('-') ? 'text-red-600' : 'text-green-600'}`}>
                         {rate.change}
@@ -479,4 +500,6 @@ export default function CurrentRatesTab() {
       )}
     </>
   );
-}
+});
+
+export default CurrentRatesTab;

@@ -428,13 +428,13 @@ export default function BillingManagement() {
             <Button 
               variant="outline" 
               icon={<Download className="h-4 w-4" />}
-              onClick={handleExportBills}
+              onClick={handleExportBills} className="rounded-full shadow-md"   // pill-shape + shadow
             >
               Export Bills
             </Button>
             <Button 
               icon={<FileText className="h-4 w-4" />}
-              onClick={handleGenerateReport}
+              onClick={handleGenerateReport} className="rounded-full shadow-xl"   // pill-shape + shadow
             >
               Generate Report
             </Button>
