@@ -21,7 +21,7 @@ class PurchaseService
      */
     public function getAll()
     {
-        $purchases = Purchase::with(['client', 'invoice'])->get();
+        $purchases = Purchase::with(['client', 'invoice'])->orderBy('created_at', 'desc')->get();
 
         return $purchases->map(function ($purchase) {
             return $this->transformPurchaseWithProducts($purchase);

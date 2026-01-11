@@ -125,51 +125,50 @@ const SubscriptionModal = ({
     >
       <PopupAnimation animationType="zoomIn" duration="0.3s">
         <div
-          className="w-full max-w-4xl bg-white rounded-lg shadow-2xl max-h-[95vh] overflow-hidden"
+          className="w-full max-w-3xl bg-white rounded-lg shadow-2xl max-h-[90vh] overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-50">
+          <div className="flex items-center justify-between px-4 py-2 border-b bg-gray-50">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-sm font-semibold text-gray-900">
                 {previousSubscription ? 'Edit Subscription' : 'Create Subscription'}
               </h2>
-              <p className="text-xs text-gray-600">
-                {product} — {quantity} {quantity > 1 ? 'licenses' : 'license'}
+              <p className="text-[10px] text-gray-600">
+                {product} — {quantity} {quantity > 1 ? 'lic' : 'lic'}
               </p>
               {originalSubscription && (
-                <p className="text-xs text-gray-500">
+                <p className="text-[10px] text-gray-500">
                   PO: {originalSubscription.poNumber || 'N/A'} |
                   Client: {originalSubscription.client?.company || originalSubscription.client?.cli_name || 'N/A'}
                 </p>
               )}
             </div>
-            <button className="p-1.5 rounded-md hover:bg-gray-200" onClick={onRequestClose}>
-              <X size={18} />
+            <button className="p-1 rounded-md hover:bg-gray-200" onClick={onRequestClose}>
+              <X size={16} />
             </button>
           </div>
 
           {/* Body */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4">
             {/* Left */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium text-gray-900">Subscription Period</h3>
+            <div className="space-y-3">
+              <h3 className="text-xs font-medium text-gray-900">Subscription Period</h3>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                  <label className="block text-[10px] font-medium text-gray-700 mb-1">
                     Start Date *
                   </label>
                   <input
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full rounded-md border px-3 py-2 text-xs focus:ring-1 focus:ring-blue-500"
-                  />
+                    className="w-full rounded-md border px-2 py-1 text-[10px] focus:ring-1 focus:ring-blue-500" />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                  <label className="block text-[10px] font-medium text-gray-700 mb-1">
                     End Date *
                   </label>
                   <input
@@ -177,74 +176,70 @@ const SubscriptionModal = ({
                     value={endDate}
                     min={startDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full rounded-md border px-3 py-2 text-xs focus:ring-1 focus:ring-blue-500"
-                  />
+                    className="w-full rounded-md border px-2 py-1 text-[10px] focus:ring-1 focus:ring-blue-500" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-[10px] font-medium text-gray-700 mb-1">
                   Expected Delivery
                 </label>
                 <input
                   type="date"
                   value={deliveryDate}
                   onChange={(e) => setDeliveryDate(e.target.value)}
-                  className="w-full rounded-md border px-3 py-2 text-xs focus:ring-1 focus:ring-blue-500"
-                />
+                  className="w-full rounded-md border px-2 py-1 text-[10px] focus:ring-1 focus:ring-blue-500" />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-[10px] font-medium text-gray-700 mb-1">
                   Notes
                 </label>
                 <textarea
                   rows={2}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full rounded-md border px-3 py-1.5 text-xs resize-none focus:ring-1 focus:ring-blue-500"
-                />
+                  className="w-full rounded-md border px-2 py-1 text-[10px] resize-none focus:ring-1 focus:ring-blue-500" />
               </div>
 
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
                   Attachment
                 </label>
-                <label className="block border border-dashed rounded-md p-2.5 text-center cursor-pointer hover:bg-gray-50">
-                  <Upload size={18} className="mx-auto text-gray-400 mb-1" />
-                  <p className="text-xs text-gray-600 truncate">
-                    {attachment ? attachment.name : 'Upload file'}
+                <label className="block border border-dashed rounded-md p-2 text-center cursor-pointer hover:bg-gray-50">
+                  <Upload size={16} className="mx-auto text-gray-400 mb-0.5" />
+                  <p className="text-[10px] text-gray-600 truncate">
+                    {attachment ? attachment.name : 'Upload'}
                   </p>
-                  <p className="text-[10px] text-gray-500">PDF, DOC, JPG, PNG</p>
+                  <p className="text-[9px] text-gray-500">PDF, DOC, JPG</p>
                   <input type="file" className="hidden" onChange={handleFileChange} />
                 </label>
               </div>
             </div>
 
             {/* Right */}
-            <div className="border rounded-lg p-4 space-y-3 text-sm">
+            <div className="border rounded-lg p-3 space-y-2 text-xs">
               <div className="flex justify-between items-center">
-                <h3 className="font-semibold">Order Summary</h3>
+                <h3 className="font-semibold text-xs">Order Summary</h3>
                 <button
                   onClick={() => setCustomPrice(!customPrice)}
-                  className="text-xs text-blue-600 flex items-center gap-1"
-                >
+                  className="text-[10px] text-blue-600 flex items-center gap-1">
                   {customPrice ? <Lock size={14} /> : <Unlock size={14} />}
                   {customPrice ? 'Locked' : 'Edit'}
                 </button>
               </div>
 
-              <div className="flex justify-between text-xs">
+              <div className="flex justify-between text-[10px]">
                 <span>Product</span>
                 <span className="font-medium">{product}</span>
               </div>
 
-              <div className="flex justify-between text-xs">
-                <span>Quantity</span>
+              <div className="flex justify-between text-[10px]">
+                <span>Qty</span>
                 <span className="font-medium">{quantity}</span>
               </div>
 
-              <div className="flex justify-between text-xs">
+              <div className="flex justify-between text-[10px]">
                 <span>Unit Price</span>
                 <span className="font-medium">{currency}{unitPrice}</span>
               </div>
@@ -254,28 +249,27 @@ const SubscriptionModal = ({
                   type="text"
                   value={customTotal}
                   onChange={(e) => setCustomTotal(e.target.value)}
-                  className="w-full rounded-md border px-3 py-2 text-xs"
-                />
+                  className="w-full rounded-md border px-2 py-1 text-[10px]" />
               )}
 
-              <div className="flex justify-between pt-2 border-t">
-                <span className="font-semibold">Total</span>
-                <span className="text-lg font-bold text-blue-600">{displayTotal}</span>
+              <div className="flex justify-between pt-1 border-t">
+                <span className="font-semibold text-xs">Total</span>
+                <span className="text-sm font-bold text-blue-600">{displayTotal}</span>
               </div>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-3 px-5 py-3 border-t bg-gray-50">
+          <div className="flex justify-end gap-2 px-4 py-2 border-t bg-gray-50">
             <button
               onClick={onRequestClose}
-              className="px-4 py-2 text-xs border rounded-md"
+              className="px-3 py-1.5 text-[10px] border rounded-md"
             >
               Cancel
             </button>
             <button
               onClick={handleSubmit}
-              className="px-6 py-2 text-xs text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              className="px-4 py-1.5 text-[10px] text-white bg-blue-600 rounded-md hover:bg-blue-700"
             >
               {previousSubscription ? 'Update' : 'Activate'}
             </button>

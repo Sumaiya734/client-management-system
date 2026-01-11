@@ -10,7 +10,6 @@ const EditVendorPopup = ({
   isEditMode = true,
 }) => {
   const [formData, setFormData] = useState(() => {
-    // Initialize with default values to prevent undefined values
     return {
       id: vendor.id || null,
       name: vendor.name || '',
@@ -26,7 +25,6 @@ const EditVendorPopup = ({
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // Update form data when vendor prop changes
   useEffect(() => {
     setFormData({
       id: vendor.id || null,
@@ -42,12 +40,7 @@ const EditVendorPopup = ({
   }, [vendor]);
 
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-    
-    // Clear error for this field when user types
+    setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -59,44 +52,24 @@ const EditVendorPopup = ({
 
   const validateForm = () => {
     const newErrors = {};
-    
-    if (!formData.name.trim()) {
-      newErrors.name = 'Name is required';
-    }
-    
+    if (!formData.name.trim()) newErrors.name = 'Required';
     if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
+      newErrors.email = 'Required';
     } else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(formData.email)) {
-      newErrors.email = 'Email is invalid';
+      newErrors.email = 'Invalid';
     }
-    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
     if (validateForm()) {
-      // Map frontend field names to backend field names
-      const backendData = {
-        id: formData.id,
-        name: formData.name,
-        company: formData.company,
-        email: formData.email,
-        phone: formData.phone,
-        address: formData.address,
-        website: formData.website,
-        contact_person: formData.contact_person,
-        status: formData.status,
-      };
-      
-      onUpdate(backendData);
+      onUpdate({ ...formData });
     }
   };
 
   const handleCancel = () => {
-    // Reset form data with proper mapping
     setFormData({
       id: vendor.id || null,
       name: vendor.name || '',
@@ -108,192 +81,140 @@ const EditVendorPopup = ({
       contact_person: vendor.contact_person || '',
       status: vendor.status || 'Active',
     });
-    setErrors({}); // Clear errors
+    setErrors({});
     onClose();
   };
-
-  const statusOptions = ['Active', 'Inactive'];
 
   if (!isOpen) return null;
 
   return createPortal(
-    <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose}>
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50/50">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">
+            <h2 className="text-sm font-bold text-gray-900 leading-tight">
               {isEditMode ? 'Edit Vendor' : 'Add Vendor'}
             </h2>
-            <p className="text-xs text-gray-600 mt-1">
-              {isEditMode ? 'Update vendor information' : 'Create a new vendor'}
-            </p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X size={20} />
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+            <X size={16} />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-4 text-sm space-y-4">
-          {/* Name and Company Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="name" className="block text-xs font-medium text-gray-700 mb-1">
-                Name *
-              </label>
+        <form onSubmit={handleSubmit} className="p-4 space-y-3">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+            <div className="col-span-1">
+              <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">Name *</label>
               <input
                 type="text"
-                id="name"
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
-                className={`w-full px-2 py-1.5 border ${errors.name ? 'border-red-500' : 'border-gray-300'} rounded-md text-sm`}
-                required
+                className={`w-full px-2 py-1 border ${errors.name ? 'border-red-500' : 'border-gray-300'} rounded text-xs outline-none focus:border-blue-500`}
               />
-              {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name}</p>}
             </div>
-            <div>
-              <label htmlFor="company" className="block text-xs font-medium text-gray-700 mb-1">
-                Company
-              </label>
+            <div className="col-span-1">
+              <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">Company</label>
               <input
                 type="text"
-                id="company"
                 value={formData.company}
                 onChange={(e) => handleInputChange('company', e.target.value)}
-                className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                className="w-full px-2 py-1 border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
               />
             </div>
-          </div>
 
-          {/* Contact Person and Email Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="contact_person" className="block text-xs font-medium text-gray-700 mb-1">
-                Contact Person
-              </label>
+            <div className="col-span-1">
+              <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">Contact Person</label>
               <input
                 type="text"
-                id="contact_person"
                 value={formData.contact_person}
                 onChange={(e) => handleInputChange('contact_person', e.target.value)}
-                className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                className="w-full px-2 py-1 border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
               />
             </div>
-            <div>
-              <label htmlFor="email" className="block text-xs font-medium text-gray-700 mb-1">
-                Email *
-              </label>
+            <div className="col-span-1">
+              <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">Email *</label>
               <input
                 type="email"
-                id="email"
                 value={formData.email}
                 onChange={(e) => handleInputChange('email', e.target.value)}
-                className={`w-full px-2 py-1.5 border ${errors.email ? 'border-red-500' : 'border-gray-300'} rounded-md text-sm`}
-                required
+                className={`w-full px-2 py-1 border ${errors.email ? 'border-red-500' : 'border-gray-300'} rounded text-xs outline-none focus:border-blue-500`}
               />
-              {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email}</p>}
             </div>
-          </div>
 
-          {/* Phone and Website Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="phone" className="block text-xs font-medium text-gray-700 mb-1">
-                Phone
-              </label>
+            <div className="col-span-1">
+              <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">Phone</label>
               <input
                 type="tel"
-                id="phone"
                 value={formData.phone}
                 onChange={(e) => handleInputChange('phone', e.target.value)}
-                className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                className="w-full px-2 py-1 border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
               />
             </div>
-            <div>
-              <label htmlFor="website" className="block text-xs font-medium text-gray-700 mb-1">
-                Website
-              </label>
+            <div className="col-span-1">
+              <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">Status</label>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                  className="w-full px-2 py-1 border border-gray-300 rounded bg-white text-left text-xs flex items-center justify-between"
+                >
+                  {formData.status}
+                  <ChevronDown size={12} className={isStatusDropdownOpen ? 'rotate-180' : ''} />
+                </button>
+                {isStatusDropdownOpen && (
+                  <div className="absolute w-full bg-white border border-gray-200 rounded shadow-md mt-1 z-50 overflow-hidden">
+                    {['Active', 'Inactive'].map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => { handleInputChange('status', s); setIsStatusDropdownOpen(false); }}
+                        className="w-full px-2 py-1 text-left text-xs hover:bg-gray-50"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">Website</label>
               <input
                 type="url"
-                id="website"
                 value={formData.website}
                 onChange={(e) => handleInputChange('website', e.target.value)}
-                className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
-                placeholder="https://example.com"
+                className="w-full px-2 py-1 border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
+                placeholder="https://..."
+              />
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">Address</label>
+              <input
+                type="text"
+                value={formData.address}
+                onChange={(e) => handleInputChange('address', e.target.value)}
+                className="w-full px-2 py-1 border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
               />
             </div>
           </div>
 
-          {/* Address */}
-          <div>
-            <label htmlFor="address" className="block text-xs font-medium text-gray-700 mb-1">
-              Address
-            </label>
-            <input
-              type="text"
-              id="address"
-              value={formData.address}
-              onChange={(e) => handleInputChange('address', e.target.value)}
-              className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
-            />
-          </div>
-
-          {/* Status Dropdown */}
-          <div>
-            <label htmlFor="status" className="block text-xs font-medium text-gray-700 mb-1">
-              Status
-            </label>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
-                className="w-full px-2 py-1.5 border border-gray-300 rounded-md bg-white text-left text-sm flex items-center justify-between"
-              >
-                <span>{formData.status}</span>
-                <ChevronDown
-                  size={14}
-                  className={`transition-transform ${isStatusDropdownOpen ? 'rotate-180' : ''}`}
-                />
-              </button>
-
-              {isStatusDropdownOpen && (
-                <div className="absolute w-full bg-white border border-gray-200 rounded-md shadow-md mt-1 text-xs z-10">
-                  {statusOptions.map((status) => (
-                    <button
-                      key={status}
-                      type="button"
-                      onClick={() => {
-                        handleInputChange('status', status);
-                        setIsStatusDropdownOpen(false);
-                      }}
-                      className="w-full px-2 py-1.5 text-left hover:bg-gray-50"
-                    >
-                      {status}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex justify-end space-x-3 mt-8">
+          <div className="flex justify-end space-x-2 pt-2">
             <button
               type="button"
               onClick={handleCancel}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="px-3 py-1 text-xs font-medium text-gray-600 hover:text-gray-800"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="px-4 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 shadow-sm"
             >
-              {isEditMode ? 'Update Vendor' : 'Create Vendor'}
+              {isEditMode ? 'Update' : 'Create'}
             </button>
           </div>
         </form>
