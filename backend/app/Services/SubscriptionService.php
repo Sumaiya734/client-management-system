@@ -778,11 +778,46 @@ class SubscriptionService extends BaseService
             $now = Carbon::now();
             $sevenDaysFromNow = Carbon::now()->addDays(7);
             
-            // Get all subscriptions that have an end_date
-            $allSubscriptions = $this->model->whereNotNull('end_date')
-                ->where('end_date', '<=', $sevenDaysFromNow) // Only get subscriptions expiring within 7 days or already expired
-                ->with(['client', 'product', 'purchase', 'invoice'])
+            // Get all subscriptions to check for renewals (removed whereNotNull constraint to include all)
+            $allSubscriptions = $this->model->with(['client', 'product', 'purchase', 'invoice'])
                 ->get();
+            
+            // Filter for subscriptions that are expiring soon or have expired
+            $allSubscriptions = $allSubscriptions->filter(function ($subscription) use ($sevenDaysFromNow) {
+                // First check the main subscription end date
+                if ($subscription->end_date && Carbon::parse($subscription->end_date)->lte($sevenDaysFromNow)) {
+                    return true;
+                }
+                
+                // Then check individual products in the JSON data
+                if ($subscription->products_subscription_status) {
+                    $products = is_string($subscription->products_subscription_status) ? 
+                        json_decode($subscription->products_subscription_status, true) : 
+                        $subscription->products_subscription_status;
+                    
+                    if (is_array($products)) {
+                        foreach ($products as $product) {
+                            $productEndDate = $product['end_date'] ?? $subscription->end_date;
+                            if ($productEndDate && Carbon::parse($productEndDate)->lte($sevenDaysFromNow)) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                
+                // Additionally check if there are no end dates but there are delivery dates that might indicate renewal is needed
+                if (!$subscription->end_date && !$subscription->products_subscription_status) {
+                    // If no specific end date is set but there's a delivery date, check if it's close to expiration
+                    if ($subscription->delivery_date) {
+                        $deliveryDate = Carbon::parse($subscription->delivery_date);
+                        if ($deliveryDate->lte($sevenDaysFromNow)) {
+                            return true;
+                        }
+                    }
+                }
+                
+                return false; // Not expiring soon or expired
+            });
             
             logger()->info('SubscriptionService::getRenewals() - Found expiring/expired subscriptions:', [
                 'total_count' => $allSubscriptions->count(),
@@ -792,19 +827,78 @@ class SubscriptionService extends BaseService
             $transformedRenewals = $allSubscriptions->map(function ($subscription) {
                 $purchase = $subscription->purchase;
                 
-                // Determine status based on end date
+                // Determine status based on both main subscription end date and individual product statuses
                 $status = 'Active';
-                if ($subscription->end_date) {
-                    $endDate = Carbon::parse($subscription->end_date);
-                    $now = Carbon::now();
-                    $daysToExpiry = $now->diffInDays($endDate, false);
+                $productBasedStatus = null;
+                
+                // First check individual products from JSON data
+                if ($subscription->products_subscription_status) {
+                    $products = is_string($subscription->products_subscription_status) ? 
+                        json_decode($subscription->products_subscription_status, true) : 
+                        $subscription->products_subscription_status;
                     
-                    if ($now->gt($endDate)) {
-                        $status = 'Expired';
-                    } elseif ($daysToExpiry <= 7) {
-                        $status = 'Expiring Soon';
+                    if (is_array($products)) {
+                        $now = Carbon::now();
+                        $anyExpired = false;
+                        $anyExpiringSoon = false;
+                        
+                        foreach ($products as $product) {
+                            $productEndDate = $product['end_date'] ?? $subscription->end_date;
+                            
+                            if ($productEndDate) {
+                                $endDate = Carbon::parse($productEndDate);
+                                $daysToExpiry = $now->diffInDays($endDate, false);
+                                
+                                if ($now->gt($endDate)) {
+                                    $anyExpired = true;
+                                } elseif ($daysToExpiry <= 7) {
+                                    $anyExpiringSoon = true;
+                                }
+                            }
+                        }
+                        
+                        if ($anyExpired) {
+                            $productBasedStatus = 'Expired';
+                        } elseif ($anyExpiringSoon) {
+                            $productBasedStatus = 'Expiring Soon';
+                        } else {
+                            $productBasedStatus = 'Active';
+                        }
+                    }
+                }
+                
+                // If we have product-based status, use it; otherwise fall back to main subscription date
+                if ($productBasedStatus) {
+                    $status = $productBasedStatus;
+                } else {
+                    // Fallback to main subscription date logic
+                    if ($subscription->end_date) {
+                        $endDate = Carbon::parse($subscription->end_date);
+                        $now = Carbon::now();
+                        $daysToExpiry = $now->diffInDays($endDate, false);
+                        
+                        if ($now->gt($endDate)) {
+                            $status = 'Expired';
+                        } elseif ($daysToExpiry <= 7) {
+                            $status = 'Expiring Soon';
+                        } else {
+                            $status = 'Active';
+                        }
                     } else {
-                        $status = 'Active';
+                        // If no end_date, check delivery_date as fallback
+                        if ($subscription->delivery_date) {
+                            $deliveryDate = Carbon::parse($subscription->delivery_date);
+                            $now = Carbon::now();
+                            $daysToExpiry = $now->diffInDays($deliveryDate, false);
+                            
+                            if ($now->gt($deliveryDate)) {
+                                $status = 'Expired';
+                            } elseif ($daysToExpiry <= 7) {
+                                $status = 'Expiring Soon';
+                            } else {
+                                $status = 'Active';
+                            }
+                        }
                     }
                 }
                 

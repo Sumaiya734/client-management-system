@@ -10,9 +10,17 @@ use App\Models\Vendor;
 use App\Models\Product;
 use App\Models\Purchase;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 
 class DashboardService
 {
+    protected $subscriptionService;
+    
+    public function __construct(SubscriptionService $subscriptionService)
+    {
+        $this->subscriptionService = $subscriptionService;
+    }
+    
     /**
      * Get dashboard statistics and summary data.
      */
@@ -69,6 +77,18 @@ class DashboardService
         $totalBills = Billing_management::count();
         $paymentRate = $totalBills > 0 ? round(($paidBills / $totalBills) * 100, 2) : 0;
         
+        // Get expiring soon subscriptions
+        $expiringSoonSubscriptionsCollection = $this->subscriptionService->getRenewals();
+        $expiringSoonSubscriptions = $expiringSoonSubscriptionsCollection->count();
+        
+        // Calculate changes and trends for expiring soon subscriptions
+        $prevExpiringSoonSubscriptions = Subscription::whereBetween('end_date', [
+            Carbon::now()->subMonth()->addDays(7)->startOfMonth(),
+            Carbon::now()->subMonth()->addDays(7)->endOfMonth()
+        ])->count();
+        $expiringSoonSubscriptionsChange = $this->calculatePercentageChange($prevExpiringSoonSubscriptions, $expiringSoonSubscriptions);
+        $expiringSoonSubscriptionsTrend = $this->getTrend($prevExpiringSoonSubscriptions, $expiringSoonSubscriptions);
+        
         return [
             'summary' => [
                 'totalClients' => $totalClients,
@@ -93,12 +113,16 @@ class DashboardService
                 'pendingPaymentsTrend' => $pendingPaymentsTrend,
                 'monthlyRevenueTrend' => $monthlyRevenueTrend,
                 'paymentRate' => $paymentRate . '%',
-                'totalBills' => $totalBills
+                'totalBills' => $totalBills,
+                'expiringSoonSubscriptions' => $expiringSoonSubscriptions,
+                'expiringSoonSubscriptionsChange' => $expiringSoonSubscriptionsChange,
+                'expiringSoonSubscriptionsTrend' => $expiringSoonSubscriptionsTrend
             ],
             'recent' => [
                 'recentClients' => $recentClients,
                 'recentPayments' => $recentPayments,
-                'recentBills' => $recentBills
+                'recentBills' => $recentBills,
+                'expiringSoonSubscriptions' => $expiringSoonSubscriptions
             ]
         ];
     }

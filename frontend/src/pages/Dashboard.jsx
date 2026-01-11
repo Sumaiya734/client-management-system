@@ -34,6 +34,18 @@ export default function Dashboard() {
   const summary = dashboardData?.summary || {};
   const recent = dashboardData?.recent || {};
   
+  // Get expiring soon subscriptions
+  const expiringSoonSubscriptionsData = dashboardData?.recent?.expiringSoonSubscriptions || [];
+  
+  const expiringSoonSubscriptions = Array.isArray(expiringSoonSubscriptionsData) ? expiringSoonSubscriptionsData.map(sub => ({
+    id: sub.id,
+    productName: sub.product_name || 'N/A',
+    client: sub.client?.company || sub.client?.cli_name || 'N/A',
+    endDate: sub.end_date || 'N/A',
+    poNumber: sub.poNumber || 'N/A',
+    status: sub.status || 'N/A'
+  })) : [];
+  
   const handleCardClick = (cardName) => {
     switch(cardName) {
       case 'Total Clients':
@@ -57,8 +69,8 @@ export default function Dashboard() {
       case 'Monthly Revenue':
         navigate('/reports');
         break;
-      case 'Total Bills':
-        navigate('/billing');
+      case 'Expiring Soon':
+        navigate('/subscriptions?tab=renewals');
         break;
       default:
         break;
@@ -123,11 +135,11 @@ export default function Dashboard() {
       description: 'from last month' 
     },
     { 
-      name: 'Total Bills', 
-      value: summary.totalBills || 0, 
-      change: summary.totalBillsChange || '+0%', 
-      trend: summary.totalBillsTrend || 'up',
-      icon: FileText, 
+      name: 'Expiring Soon', 
+      value: summary.expiringSoonSubscriptions || 0, 
+      change: summary.expiringSoonSubscriptionsChange || '+0%', 
+      trend: summary.expiringSoonSubscriptionsTrend || 'up',
+      icon: AlertTriangle, 
       description: 'from last month' 
     },
   ];
@@ -324,6 +336,37 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Expiring Soon Subscriptions */}
+      <Card className="p-3 border-l-4 border-red-500">
+        <CardHeader className="p-2 pb-1">
+          <CardTitle className="text-base text-red-700">Expiring Soon Subscriptions</CardTitle>
+          <CardDescription className="text-sm text-red-600">Subscriptions expiring soon</CardDescription>
+        </CardHeader>
+        <CardContent className="p-2 pt-1">
+          <div className="space-y-2">
+            {expiringSoonSubscriptions.length > 0 ? (
+              expiringSoonSubscriptions.map((sub, index) => (
+                <div key={sub.id || index} className="flex items-center justify-between py-1">
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-900">{sub.productName}</h3>
+                    <p className="text-sm text-gray-500">Client: {sub.client}</p>
+                    <p className="text-xs text-gray-400">PO: {sub.poNumber} | End: {sub.endDate}</p>
+                  </div>
+                  <div className="text-right">
+                    <Badge size="sm" variant={sub.status === 'Expiring Soon' ? 'destructive' : 'inactive'}>
+                      {sub.status}
+                    </Badge>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-gray-600">No expiring soon subscriptions</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
 
       {/* Payment Summary */}
       <Card className="p-3">

@@ -36,11 +36,24 @@ export default function Subscriptions() {
   // Tab state
   const [activeTab, setActiveTab] = useState('subscriptions');
 
+  // Navigate and Location hooks - moved before useEffect that uses them
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Check URL parameters to determine if we should start on renewal tab
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const tab = urlParams.get('tab');
+    if (tab === 'renewals') {
+      setActiveTab('renewals');
+    }
+  }, [location.search, navigate]);
+
   // View subscription modal state
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState(null);
 
-  // Fetch subscriptions or renewal data based on active tab
+  // Fetch subscriptions based on active tab
   useEffect(() => {
     if (activeTab === 'renewals') {
       fetchRenewalData();
@@ -53,6 +66,11 @@ export default function Subscriptions() {
       setRenewedItems(new Set());
     }
   }, [activeTab]);
+  
+  // Also fetch renewal data when component mounts to ensure consistency
+  useEffect(() => {
+    fetchRenewalData();
+  }, []);
   
   // Refresh renewal data when renewed items change
   useEffect(() => {
@@ -132,27 +150,27 @@ export default function Subscriptions() {
   const summaryStats = [
     {
       title: 'Total Subscriptions',
-      value: subscriptions.length.toString(),
+      value: (subscriptions && subscriptions.length) ? subscriptions.length.toString() : '0',
       icon: Package,
       color: 'blue'
     },
     {
       title: 'Active',
-      value: subscriptions.filter(s => s.products.some(p => p.status === 'Active')).length.toString(),
+      value: (subscriptions && Array.isArray(subscriptions)) ? subscriptions.filter(s => s.products && s.products.some(p => p.status === 'Active')).length.toString() : '0',
       icon: CheckCircle,
       color: 'green'
     },
     {
       title: 'Pending',
-      value: subscriptions.filter(s => s.products.some(p => p.status === 'Pending')).length.toString(),
+      value: (subscriptions && Array.isArray(subscriptions)) ? subscriptions.filter(s => s.products && s.products.some(p => p.status === 'Pending')).length.toString() : '0',
       icon: AlertTriangle,
       color: 'orange'
     },
     {
       title: 'Expiring Soon',
-      value: subscriptions.filter(s => s.products.some(p => p.status === 'Expiring Soon')).length.toString(),
-      icon: Clock,
-      color: 'yellow'
+      value: (renewals && Array.isArray(renewals)) ? renewals.length.toString() : '0', // Use renewals count instead of local filter
+      icon: AlertTriangle,
+      color: 'red'
     }
   ];
 
@@ -173,8 +191,6 @@ export default function Subscriptions() {
       options: statusOptions,
     }
   ];
-  const navigate = useNavigate();
-  const location = useLocation();
 
   const getIconColor = (color) => {
     const colors = {
@@ -202,7 +218,7 @@ export default function Subscriptions() {
     switch (status) {
       case 'Active': return 'bg-green-100 text-green-800';
       case 'Pending': return 'bg-gray-200 text-gray-700';
-      case 'Expiring Soon': return 'bg-red-100 text-red-800';
+      case 'Expiring Soon': return 'bg-red-100 text-red-800'; // Red alert for expiring soon
       case 'Expired': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
@@ -398,14 +414,27 @@ export default function Subscriptions() {
       if (editingSubscription?.id) {
         setRenewedItems(prev => new Set(prev).add(editingSubscription.id));
         
-        // Clear the renewed status after a delay since the backend data should update
-        setTimeout(() => {
-          setRenewedItems(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(editingSubscription.id);
-            return newSet;
-          });
-        }, 3000); // Reset after 3 seconds to allow backend sync
+        // Refresh the renewal data to reflect the updated subscription status
+        if (activeTab === 'renewals') {
+          setTimeout(() => {
+            fetchRenewalData();
+            // Clear the temporary 'Done' indicator after a short delay
+            setRenewedItems(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(editingSubscription.id);
+              return newSet;
+            });
+          }, 500); // Short delay to allow backend to update
+        } else {
+          // Clear the temporary 'Done' indicator after a delay
+          setTimeout(() => {
+            setRenewedItems(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(editingSubscription.id);
+              return newSet;
+            });
+          }, 1000); // Reset after 1 second
+        }
       }
 
       // Close modal
@@ -516,7 +545,13 @@ export default function Subscriptions() {
           Subscription Management
         </button>
         <button
-          onClick={() => setActiveTab('renewals')}
+          onClick={() => {
+            setActiveTab('renewals');
+            // Update URL to reflect the active tab
+            const urlParams = new URLSearchParams(location.search);
+            urlParams.set('tab', 'renewals');
+            navigate(`${location.pathname}?${urlParams.toString()}`);
+          }}
           className={`px-4 py-2 text-sm font-medium rounded-full transition ${activeTab === 'renewals'
             ? 'bg-white text-gray-900 shadow-xl'
             : 'text-gray-600 hover:text-gray-900'
@@ -584,9 +619,10 @@ export default function Subscriptions() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  renewals.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>
+                  Array.isArray(renewals) && renewals.length > 0 ? 
+                    renewals.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>
                         <div className="flex items-center gap-2">
                           <Package className="h-4 w-4 text-gray-500" />
                           <span className="font-medium text-gray-900">{item.product_name}</span>
@@ -606,7 +642,7 @@ export default function Subscriptions() {
                       </TableCell>
                       <TableCell>
                         <Badge variant={
-                          item.status === 'Expiring Soon' ? 'warning' :
+                          item.status === 'Expiring Soon' ? 'destructive' : // Changed to destructive (red) for better alert visibility
                             item.status === 'Active' ? 'success' :
                               item.status === 'Expired' ? 'destructive' : 'secondary'
                         }>
@@ -635,6 +671,12 @@ export default function Subscriptions() {
                       </TableCell>
                     </TableRow>
                   ))
+                  : 
+                  <TableRow>
+                    <TableCell colSpan="5" className="text-center py-8 text-gray-500">
+                      No upcoming renewals
+                    </TableCell>
+                  </TableRow>
                 )}
               </TableBody>
             </Table>
@@ -734,7 +776,7 @@ export default function Subscriptions() {
                                   size="xs"
                                   className="text-xs"
                                   onClick={() => handleOpenModal(product, product.quantity, subscription, product.action === 'Edit')}
-                                > Edit
+                                >Edit
                                   {product.action}
                                 </Button>
 
