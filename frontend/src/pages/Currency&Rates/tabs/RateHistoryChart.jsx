@@ -14,12 +14,13 @@ import {
 } from 'recharts';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../../../components/ui/Card';
 import { TrendingUp, TrendingDown, Minus, Loader2 } from 'lucide-react';
+import { formatDate } from '../../../utils/dateUtils';
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-white p-4 border border-gray-200 rounded-lg shadow-lg">
-        <p className="text-sm font-medium text-gray-900">{label}</p>
+        <p className="text-sm font-medium text-gray-900">{formatDate(label)}</p>
         {payload.map((entry, index) => (
           <div key={index} className="flex items-center justify-between mt-1">
             <div className="flex items-center">

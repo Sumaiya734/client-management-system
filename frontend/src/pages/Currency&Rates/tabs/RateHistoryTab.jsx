@@ -36,6 +36,7 @@ import { currencyRatesApi } from '../../../api';
 import { useNotification } from '../../../components/Notifications';
 import RateHistoryChart from './RateHistoryChart';
 import RateHistoryExport from './RateHistoryExport';
+import { formatDate, formatTime } from '../../../utils/dateUtils';
 
 export default function RateHistoryTab() {
   const { showError, showSuccess } = useNotification();
@@ -317,9 +318,9 @@ export default function RateHistoryTab() {
                   {rateHistory.map((history) => (
                     <TableRow key={history.id} className="hover:bg-gray-50">
                       <TableCell className="font-medium">
-                        <div>{history.date}</div>
+                        <div>{formatDate(history.date)}</div>
                         <div className="text-xs text-gray-500">
-                          {new Date(history.timestamp).toLocaleTimeString()}
+                          {formatTime(history.timestamp, 'time')}
                         </div>
                       </TableCell>
                       <TableCell>

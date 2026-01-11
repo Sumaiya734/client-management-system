@@ -62,6 +62,32 @@ export const formatDateForInput = (dateString) => {
 };
 
 /**
+ * Format a timestamp to show time only
+ * @param {string|Date} dateString - The date string or Date object to format
+ * @param {string} format - Format type ('time' for HH:MM:SS, 'datetime' for full date and time)
+ * @returns {string} - Formatted time string or 'N/A' if invalid
+ */
+export const formatTime = (dateString, format = 'time') => {
+  if (!dateString || dateString === 'N/A') return 'N/A';
+  
+  try {
+    const date = new Date(dateString);
+    if (date.toString() === 'Invalid Date') return 'N/A';
+    
+    if (format === 'time') {
+      return date.toLocaleTimeString();
+    } else if (format === 'datetime') {
+      return date.toLocaleString();
+    } else {
+      return date.toLocaleDateString();
+    }
+  } catch (error) {
+    console.warn('Error formatting time:', error);
+    return 'N/A';
+  }
+};
+
+/**
  * Check if a date is valid
  * @param {string|Date} dateString - The date to validate
  * @returns {boolean} - True if valid, false otherwise
