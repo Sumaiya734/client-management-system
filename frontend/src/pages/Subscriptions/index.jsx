@@ -60,18 +60,18 @@ export default function Subscriptions() {
     } else {
       fetchSubscriptions();
     }
-    
+
     // Clear renewed items when switching tabs
     if (activeTab !== 'renewals') {
       setRenewedItems(new Set());
     }
   }, [activeTab]);
-  
+
   // Also fetch renewal data when component mounts to ensure consistency
   useEffect(() => {
     fetchRenewalData();
   }, []);
-  
+
   // Refresh renewal data when renewed items change
   useEffect(() => {
     if (activeTab === 'renewals' && renewedItems.size > 0) {
@@ -79,7 +79,7 @@ export default function Subscriptions() {
       const timer = setTimeout(() => {
         fetchRenewalData();
       }, 500);
-      
+
       return () => clearTimeout(timer);
     }
   }, [renewedItems, activeTab]);
@@ -137,7 +137,13 @@ export default function Subscriptions() {
     try {
       setRenewalLoading(true);
       const response = await api.get('/subscriptions/renewals');
-      setRenewals(response.data || []);
+      // The interceptor already normalizes to response.data.data if it exists
+      // Convert to array if it's an object (happens if Laravel collection has non-sequential keys)
+      let data = response.data;
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        data = Object.values(data);
+      }
+      setRenewals(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching renewal list:', error);
       showError('Failed to load renewal data');
@@ -413,7 +419,7 @@ export default function Subscriptions() {
       // If we're on the renewal tab, also track this item as renewed
       if (editingSubscription?.id) {
         setRenewedItems(prev => new Set(prev).add(editingSubscription.id));
-        
+
         // Refresh the renewal data to reflect the updated subscription status
         if (activeTab === 'renewals') {
           setTimeout(() => {
@@ -619,64 +625,64 @@ export default function Subscriptions() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  Array.isArray(renewals) && renewals.length > 0 ? 
+                  Array.isArray(renewals) && renewals.length > 0 ?
                     renewals.map((item) => (
                       <TableRow key={item.id}>
                         <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Package className="h-4 w-4 text-gray-500" />
-                          <span className="font-medium text-gray-900">{item.product_name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-gray-500" />
-                          <span>{formatDate(item.renewal_date)}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium text-gray-900">{item.client?.company || 'N/A'}</div>
-                          <div className="text-sm text-gray-600">{item.client?.cli_name || 'N/A'}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={
-                          item.status === 'Expiring Soon' ? 'destructive' : // Changed to destructive (red) for better alert visibility
-                            item.status === 'Active' ? 'success' :
-                              item.status === 'Expired' ? 'destructive' : 'secondary'
-                        }>
-                          {item.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {renewedItems.has(item.id) ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled
-                            className="text-green-600"
-                          >
-                            Done
-                          </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleOpenModal(item.product_name, item.quantity, item, true)}
-                          >
-                            Renew
-                          </Button>
-                        )}
+                          <div className="flex items-center gap-2">
+                            <Package className="h-4 w-4 text-gray-500" />
+                            <span className="font-medium text-gray-900">{item.product_name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-gray-500" />
+                            <span>{formatDate(item.renewal_date)}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium text-gray-900">{item.client?.company || item.client?.name || 'N/A'}</div>
+                            <div className="text-sm text-gray-600">{item.client?.cli_name || item.client?.contact || 'N/A'}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            item.status === 'Expiring Soon' ? 'destructive' : // Changed to destructive (red) for better alert visibility
+                              item.status === 'Active' ? 'success' :
+                                item.status === 'Expired' ? 'destructive' : 'secondary'
+                          }>
+                            {item.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {renewedItems.has(item.id) ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled
+                              className="text-green-600"
+                            >
+                              Done
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleOpenModal(item.product_name, item.quantity, item, true)}
+                            >
+                              Renew
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                    :
+                    <TableRow>
+                      <TableCell colSpan="5" className="text-center py-8 text-gray-500">
+                        No upcoming renewals
                       </TableCell>
                     </TableRow>
-                  ))
-                  : 
-                  <TableRow>
-                    <TableCell colSpan="5" className="text-center py-8 text-gray-500">
-                      No upcoming renewals
-                    </TableCell>
-                  </TableRow>
                 )}
               </TableBody>
             </Table>
@@ -733,8 +739,16 @@ export default function Subscriptions() {
                       </TableCell>
                       <TableCell>
                         <div>
-                          <div className="font-medium text-gray-900">{subscription.client?.company || 'N/A'}</div>
-                          <div className="text-sm text-gray-600">{subscription.client?.cli_name || subscription.client.contact || 'N/A'}</div>
+                          <div className="font-medium text-gray-900">
+                            {subscription.client?.company && subscription.client.company !== 'N/A'
+                              ? subscription.client.company
+                              : (subscription.client?.cli_name || 'N/A')}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {subscription.client?.cli_name && subscription.client.cli_name !== 'N/A'
+                              ? subscription.client.cli_name
+                              : (subscription.client?.contact || 'N/A')}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>

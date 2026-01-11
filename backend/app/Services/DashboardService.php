@@ -122,7 +122,7 @@ class DashboardService
                 'recentClients' => $recentClients,
                 'recentPayments' => $recentPayments,
                 'recentBills' => $recentBills,
-                'expiringSoonSubscriptions' => $expiringSoonSubscriptions
+                'expiringSoonSubscriptions' => $expiringSoonSubscriptionsCollection
             ]
         ];
     }

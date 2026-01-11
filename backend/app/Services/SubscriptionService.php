@@ -141,30 +141,18 @@ class SubscriptionService extends BaseService
                         
                         if ($now->gt($endDate)) {
                             $status = 'Expired';
-                        } elseif ($daysToExpiry <= 7 && $status !== 'Active') { 
-                             // Only mark as expiring soon if not already Active (avoid flickering if just renewed)
-                             // Actually, if it IS expiring soon, it should say so.
-                             // But the user says "change holo na" (didn't change).
-                             // If they renewed it, the date should be future.
+                        } elseif ($daysToExpiry >= 0 && $daysToExpiry <= 7) { 
                              $status = 'Expiring Soon';
                         } else {
-                            // If date is far in future, it is active.
-                            // But we should respect the 'status' field if it says 'Active' from the DB
-                            if ($daysToExpiry > 7) {
+                            // If date is far in future or status is Active from DB, keep it Active
+                            if ($daysToExpiry > 7 || $status === 'Active') {
                                 $status = 'Active';
                             }
                         }
                     }
                     
-                    // Specific fix for user request: If status was saved as 'Active' in the DB (during renewal update), allow it to stay Active
-                    // The update() method updates the products_subscription_status JSON.
-                    // So we should prefer the status from $product['status'] if the dates match.
-                    if ($product['status'] === 'Active' && isset($productEndDate) && Carbon::now()->lte(Carbon::parse($productEndDate))) {
-                         $status = 'Active';
-                    }
-                    
                     $product['status'] = $status;
-                    $product['action'] = ($status === 'Pending' || $status === 'Expiring Soon' || $status === 'Active') ? 'Edit' : 'Edit';
+                    $product['action'] = 'Edit';
                     
                     return $product;
                 }, $products);
@@ -206,9 +194,9 @@ class SubscriptionService extends BaseService
                     'poNumber' => $subscription->po_number ?? $purchase->po_number ?? 'N/A',
                     'createdDate' => $subscription->start_date ?? $purchase->delivery_date ?? 'N/A',
                     'client' => [
-                        'company' => $subscription->client->company ?? $subscription->client->name ?? $purchase->cli_name ?? 'N/A',
-                        'contact' => $subscription->client->contact ?? 'N/A',
-                        'cli_name' => $subscription->client->cli_name ?? $purchase->cli_name ?? 'N/A'
+                        'company' => optional($subscription->client)->company ?? optional($subscription->client)->name ?? $purchase->cli_name ?? 'N/A',
+                        'contact' => optional($subscription->client)->contact ?? 'N/A',
+                        'cli_name' => optional($subscription->client)->cli_name ?? $purchase->cli_name ?? 'N/A'
                     ],
                     'products' => $products,
                     'products_subscription_status' => $subscription->products_subscription_status,
@@ -348,11 +336,9 @@ class SubscriptionService extends BaseService
                 ];
             }
     
-            // Determine individual product status based on dates
             $products = array_map(function($product) use ($subscription) {
                 $status = $product['status'];
                 
-                // Only override status if it's NOT explicitly 'Active' or if we need to check for expiry
                 // Use product-specific end_date if available, otherwise subscription end_date
                 $productEndDate = $product['end_date'] ?? $subscription->end_date;
                 
@@ -363,24 +349,17 @@ class SubscriptionService extends BaseService
                     
                     if ($now->gt($endDate)) {
                         $status = 'Expired';
-                    } elseif ($daysToExpiry <= 7 && $status !== 'Active') { 
-                         // Only mark as expiring soon if not already Active
+                    } elseif ($daysToExpiry >= 0 && $daysToExpiry <= 7) { 
                          $status = 'Expiring Soon';
                     } else {
-                        // If date is far in future, it is active.
-                        if ($daysToExpiry > 7) {
+                        if ($daysToExpiry > 7 || $status === 'Active') {
                             $status = 'Active';
                         }
                     }
                 }
                 
-                // Keep 'Active' if persisted as such and not actually expired
-                if ($product['status'] === 'Active' && isset($productEndDate) && Carbon::now()->lte(Carbon::parse($productEndDate))) {
-                     $status = 'Active';
-                }
-                
                 $product['status'] = $status;
-                $product['action'] = ($status === 'Pending' || $status === 'Expiring Soon' || $status === 'Active') ? 'Edit' : 'Edit';
+                $product['action'] = 'Edit';
                 
                 return $product;
             }, $products);
@@ -422,9 +401,9 @@ class SubscriptionService extends BaseService
                 'poNumber' => $subscription->po_number ?? $purchase->po_number ?? 'N/A',
                 'createdDate' => $subscription->start_date ?? $purchase->delivery_date ?? 'N/A',
                 'client' => [
-                    'company' => $subscription->client->company ?? $subscription->client->name ?? $purchase->cli_name ?? 'N/A',
-                    'contact' => $subscription->client->contact ?? 'N/A',
-                    'cli_name' => $subscription->client->cli_name ?? $purchase->cli_name ?? 'N/A'
+                    'company' => optional($subscription->client)->company ?? optional($subscription->client)->name ?? $purchase->cli_name ?? 'N/A',
+                    'contact' => optional($subscription->client)->contact ?? 'N/A',
+                    'cli_name' => optional($subscription->client)->cli_name ?? $purchase->cli_name ?? 'N/A'
                 ],
                 'products' => $products,
                 'products_subscription_status' => $subscription->products_subscription_status,
@@ -782,7 +761,6 @@ class SubscriptionService extends BaseService
             $allSubscriptions = $this->model->with(['client', 'product', 'purchase', 'invoice'])
                 ->get();
             
-            // Filter for subscriptions that are expiring soon or have expired
             $allSubscriptions = $allSubscriptions->filter(function ($subscription) use ($sevenDaysFromNow) {
                 // First check the main subscription end date
                 if ($subscription->end_date && Carbon::parse($subscription->end_date)->lte($sevenDaysFromNow)) {
@@ -817,7 +795,7 @@ class SubscriptionService extends BaseService
                 }
                 
                 return false; // Not expiring soon or expired
-            });
+            })->values();
             
             logger()->info('SubscriptionService::getRenewals() - Found expiring/expired subscriptions:', [
                 'total_count' => $allSubscriptions->count(),
@@ -910,8 +888,8 @@ class SubscriptionService extends BaseService
                     'end_date' => $subscription->end_date,
                     'quantity' => $subscription->quantity ?? 1,
                     'client' => [
-                        'company' => $subscription->client->company ?? $subscription->client->name ?? $purchase->cli_name ?? 'N/A',
-                        'cli_name' => $subscription->client->cli_name ?? $purchase->cli_name ?? 'N/A',
+                        'company' => optional($subscription->client)->company ?? optional($subscription->client)->name ?? $purchase->cli_name ?? 'N/A',
+                        'cli_name' => optional($subscription->client)->cli_name ?? $purchase->cli_name ?? 'N/A',
                         'client_id' => $subscription->client_id
                     ],
                     'status' => $status,
