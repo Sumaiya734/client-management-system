@@ -33,21 +33,39 @@ export default function Dashboard() {
   // Get stats from API data or fallback to empty values
   const summary = dashboardData?.summary || {};
   const recent = dashboardData?.recent || {};
-  
+
   // Get expiring soon subscriptions
   const expiringSoonSubscriptionsData = dashboardData?.recent?.expiringSoonSubscriptions || [];
-  
-  const expiringSoonSubscriptions = Array.isArray(expiringSoonSubscriptionsData) ? expiringSoonSubscriptionsData.map(sub => ({
-    id: sub.id,
-    productName: sub.product_name || 'N/A',
-    client: sub.client?.company || sub.client?.cli_name || 'N/A',
-    endDate: sub.end_date || 'N/A',
-    poNumber: sub.poNumber || 'N/A',
-    status: sub.status || 'N/A'
-  })) : [];
-  
+
+  // Group expiring soon subscriptions by client
+  const groupedExpiringSoonSubscriptions = Array.isArray(expiringSoonSubscriptionsData) ? expiringSoonSubscriptionsData.reduce((acc, sub) => {
+    const clientName = sub.client?.company || sub.client?.cli_name || 'N/A';
+    if (!acc[clientName]) {
+      acc[clientName] = {
+        client: clientName,
+        subscriptions: [],
+        total: 0
+      };
+    }
+    acc[clientName].subscriptions.push({
+      id: sub.id,
+      productName: sub.product_name || 'N/A',
+      endDate: sub.end_date || 'N/A',
+      poNumber: sub.poNumber || 'N/A',
+      status: sub.status || 'N/A'
+    });
+    acc[clientName].total++;
+    return acc;
+  }, {}) : {};
+
+  const expiringSoonSubscriptionsByClient = Object.entries(groupedExpiringSoonSubscriptions).map(([client, data]) => ({
+    client: client,
+    subscriptions: data.subscriptions,
+    total: data.total
+  }));
+
   const handleCardClick = (cardName) => {
-    switch(cardName) {
+    switch (cardName) {
       case 'Total Clients':
         navigate('/clients');
         break;
@@ -76,71 +94,71 @@ export default function Dashboard() {
         break;
     }
   };
-  
+
   const stats = [
-    { 
-      name: 'Total Clients', 
-      value: summary.totalClients || 0, 
-      change: summary.totalClientsChange || '+0%', 
+    {
+      name: 'Total Clients',
+      value: summary.totalClients || 0,
+      change: summary.totalClientsChange || '+0%',
       trend: summary.totalClientsTrend || 'up',
-      icon: Users, 
-      description: 'from last month' 
+      icon: Users,
+      description: 'from last month'
     },
-    { 
-      name: 'Total Vendors', 
-      value: summary.totalVendors || 0, 
-      change: summary.totalVendorsChange || '+0%', 
+    {
+      name: 'Total Vendors',
+      value: summary.totalVendors || 0,
+      change: summary.totalVendorsChange || '+0%',
       trend: summary.totalVendorsTrend || 'up',
-      icon: Package, 
-      description: 'from last month' 
+      icon: Package,
+      description: 'from last month'
     },
-    { 
-      name: 'Total Products', 
-      value: summary.totalProducts || 0, 
-      change: summary.totalProductsChange || '+0%', 
+    {
+      name: 'Total Products',
+      value: summary.totalProducts || 0,
+      change: summary.totalProductsChange || '+0%',
       trend: summary.totalProductsTrend || 'up',
-      icon: Package, 
-      description: 'from last month' 
+      icon: Package,
+      description: 'from last month'
     },
-    { 
-      name: 'Total Purchases', 
-      value: summary.totalPurchases || 0, 
-      change: summary.totalPurchasesChange || '+0%', 
+    {
+      name: 'Total Purchases',
+      value: summary.totalPurchases || 0,
+      change: summary.totalPurchasesChange || '+0%',
       trend: summary.totalPurchasesTrend || 'up',
-      icon: Package, 
-      description: 'from last month' 
+      icon: Package,
+      description: 'from last month'
     },
-    { 
-      name: 'Active Subscriptions', 
-      value: summary.activeSubscriptions || 0, 
-      change: summary.activeSubscriptionsChange || '+0%', 
+    {
+      name: 'Active Subscriptions',
+      value: summary.activeSubscriptions || 0,
+      change: summary.activeSubscriptionsChange || '+0%',
       trend: summary.activeSubscriptionsTrend || 'up',
-      icon: Package, 
-      description: 'from last month' 
+      icon: Package,
+      description: 'from last month'
     },
-    { 
-      name: 'Pending Payments', 
-      value: summary.pendingPayments || 0, 
-      change: summary.pendingPaymentsChange || '+0%', 
+    {
+      name: 'Pending Payments',
+      value: summary.pendingPayments || 0,
+      change: summary.pendingPaymentsChange || '+0%',
       trend: summary.pendingPaymentsTrend || 'up',
-      icon: FileText, 
-      description: 'from last month' 
+      icon: FileText,
+      description: 'from last month'
     },
-    { 
-      name: 'Monthly Revenue', 
-      value: summary.monthlyRevenue ? `$${summary.monthlyRevenue.toLocaleString()}` : '$0', 
-      change: summary.monthlyRevenueChange || '+0%', 
+    {
+      name: 'Monthly Revenue',
+      value: summary.monthlyRevenue ? `$${summary.monthlyRevenue.toLocaleString()}` : '$0',
+      change: summary.monthlyRevenueChange || '+0%',
       trend: summary.monthlyRevenueTrend || 'up',
-      icon: DollarSign, 
-      description: 'from last month' 
+      icon: DollarSign,
+      description: 'from last month'
     },
-    { 
-      name: 'Expiring Soon', 
-      value: summary.expiringSoonSubscriptions || 0, 
-      change: summary.expiringSoonSubscriptionsChange || '+0%', 
+    {
+      name: 'Expiring Soon',
+      value: summary.expiringSoonSubscriptions || 0,
+      change: summary.expiringSoonSubscriptionsChange || '+0%',
       trend: summary.expiringSoonSubscriptionsTrend || 'up',
-      icon: AlertTriangle, 
-      description: 'from last month' 
+      icon: AlertTriangle,
+      description: 'from last month'
     },
   ];
 
@@ -222,8 +240,8 @@ export default function Dashboard() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         {stats.map((stat) => (
-          <Card 
-            key={stat.name} 
+          <Card
+            key={stat.name}
             className="p-2 cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => handleCardClick(stat.name)}
           >
@@ -309,7 +327,7 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="p-3">
           <CardHeader className="p-2 pb-1">
             <CardTitle className="text-base">Recent Bills</CardTitle>
@@ -338,25 +356,48 @@ export default function Dashboard() {
       </div>
 
       {/* Expiring Soon Subscriptions */}
-      <Card className="p-3 border-l-4 border-red-500">
+      <Card className="p-3 border-l-4 border-red-500"
+        style={{
+          boxShadow: '0 10px 15px -3px rgba(239, 68, 68, 0.5), 0 4px 6px -2px rgba(239, 68, 68, 0.25)',
+          outline: '2px solid #ef4444'
+        }}>
         <CardHeader className="p-2 pb-1">
-          <CardTitle className="text-base text-red-700">Expiring Soon Subscriptions</CardTitle>
-          <CardDescription className="text-sm text-red-600">Subscriptions expiring soon</CardDescription>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle className="text-base text-red-700">Expiring Soon Subscriptions</CardTitle>
+              <CardDescription className="text-sm text-red-600">Subscriptions expiring soon</CardDescription>
+            </div>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={() => navigate('/subscriptions?tab=renewals')}>
+              View All
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-2 pt-1">
           <div className="space-y-2">
-            {expiringSoonSubscriptions.length > 0 ? (
-              expiringSoonSubscriptions.map((sub, index) => (
-                <div key={sub.id || index} className="flex items-center justify-between py-1">
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900">{sub.productName}</h3>
-                    <p className="text-sm text-gray-500">Client: {sub.client}</p>
-                    <p className="text-xs text-gray-400">PO: {sub.poNumber} | End: {sub.endDate}</p>
+            {expiringSoonSubscriptionsByClient.length > 0 ? (
+              expiringSoonSubscriptionsByClient.map((clientData, index) => (
+                <div key={index} className="border border-gray-200 rounded p-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-900">{clientData.client}</h3>
+                      <p className="text-xs text-gray-500">{clientData.total} subscription{clientData.total > 1 ? 's' : ''}</p>
+                    </div>
+                    <div className="text-right">
+                      <Badge size="sm" variant="destructive">
+                        {clientData.total} expiring
+                      </Badge>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <Badge size="sm" variant={sub.status === 'Expiring Soon' ? 'destructive' : 'inactive'}>
-                      {sub.status}
-                    </Badge>
+                  <div className="mt-2 space-y-1">
+                    {clientData.subscriptions.map((sub, subIndex) => (
+                      <div key={sub.id || subIndex} className="flex items-center justify-between text-xs pl-2 border-l-2 border-red-200">
+                        <span className="text-gray-700">{sub.productName}</span>
+                        <span className="text-gray-500">End: {formatDate(sub.endDate)}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))

@@ -459,7 +459,7 @@ export default function Products() {
                 <TableHead>Vendor & Type</TableHead>
                 <TableHead>Base Price</TableHead>
                 <TableHead>BDT Price (with profit)</TableHead>
-                <TableHead>Multi-Currency</TableHead>
+                {/* <TableHead>Multi-Currency</TableHead> */}
                 <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -504,8 +504,8 @@ export default function Products() {
                         <div className="text-sm text-gray-600">{product.bdtLabel}</div>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
+                    {/* <TableCell> // Multi-Currency Pricing
+                      <div className="flex flex-wrap gap-1"> 
                         {product.currencies && product.currencies.length > 0 ? (
                           product.currencies.map((currency) => (
                             <Badge 
@@ -520,8 +520,8 @@ export default function Products() {
                           <span className="text-sm text-gray-500">No currencies</span>
                         )}
                       </div>
-                    </TableCell>
-                    <TableCell>
+                    </TableCell> */}
+                    <TableCell>   
                       <Badge variant="active">
                         {product.status}
                       </Badge>
