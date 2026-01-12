@@ -30,7 +30,7 @@ class SubscriptionService extends BaseService
     public function getAll()
     {
         try {
-            $subscriptions = $this->model->with(['client', 'product', 'purchase', 'invoice'])->get();
+            $subscriptions = $this->model->with(['client', 'product', 'purchase', 'invoice'])->orderBy('created_at', 'desc')->get();
             
             logger()->info('SubscriptionService::getAll() - Found subscriptions:', [
                 'count' => $subscriptions->count(),
@@ -759,6 +759,7 @@ class SubscriptionService extends BaseService
             
             // Get all subscriptions to check for renewals (removed whereNotNull constraint to include all)
             $allSubscriptions = $this->model->with(['client', 'product', 'purchase', 'invoice'])
+                ->orderBy('created_at', 'desc')
                 ->get();
             
             $allSubscriptions = $allSubscriptions->filter(function ($subscription) use ($sevenDaysFromNow) {

@@ -24,7 +24,7 @@ class PaymentManagementService extends BaseService
      */
     public function getAll()
     {
-        return $this->model->with(['client', 'billing'])->get();
+        return $this->model->with(['client', 'billing'])->orderBy('created_at', 'desc')->get();
     }
 
     /**

@@ -363,8 +363,8 @@ export default function Products() {
           status: response.data.status
         };
         
-        // Add the new product to the local state
-        setProducts(prevProducts => [...prevProducts, newProduct]);
+        // Add the new product to the beginning of the local state to ensure it appears at the top
+        setProducts(prevProducts => [newProduct, ...prevProducts]);
         showSuccess('Product created successfully');
       }
       

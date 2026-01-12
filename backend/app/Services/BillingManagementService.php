@@ -21,7 +21,7 @@ class BillingManagementService extends BaseService
      */
     public function getAll()
     {
-        $billings = $this->model->with('client', 'subscription', 'purchase')->get();
+        $billings = $this->model->with('client', 'subscription', 'purchase')->orderBy('created_at', 'desc')->get();
         
         // Process each billing record to include products from the associated purchase
         // Process each billing record to include products from the associated purchase or subscription
@@ -262,7 +262,7 @@ class BillingManagementService extends BaseService
             $query->where('bill_date', '<=', $request->get('end_date'));
         }
 
-        $billings = $query->with('client', 'subscription', 'purchase')->get();
+        $billings = $query->with('client', 'subscription', 'purchase')->orderBy('created_at', 'desc')->get();
         
         // Process each billing record to include products from the associated purchase
         // Process each billing record to include products from the associated purchase or subscription
