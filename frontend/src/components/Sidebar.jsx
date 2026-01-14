@@ -76,14 +76,23 @@ export default function Sidebar() {
   };
 
   return (
-    <div className={`${isCollapsed ? 'w-16' : 'w-60'} bg-white shadow-sm border-r border-gray-200 min-h-screen flex flex-col transition-all duration-300`}>
+    <div
+  className={`
+    ${isCollapsed ? 'w-16' : 'w-60'}
+    min-h-screen flex flex-col transition-all duration-300
+    bg-white/60 backdrop-blur-xl
+    border-r border-white/40
+    shadow-[0_10px_30px_rgba(0,0,0,0.15)]
+  `}
+>
+
       {/* Top Section - Logo and Toggle */}
-      <div className="p-3 border-b border-gray-200 flex items-center justify-between">
+      <div className="p-2 border-b border-gray-200 flex items-center justify-between">
         {!isCollapsed && (
           <img
             src={logo}
             alt="Nanosoft Logo"
-            className="w-40 h-10 object-contain"
+            className="w-40 h-8 object-contain"
           />
         )}
         <button

@@ -381,7 +381,7 @@ const ReportsAnalytics = () => {
       <Card className="!border-0 !shadow-none">
         <CardHeader className="pb-3 !border-b-0 !shadow-none">
           <CardTitle className="text-base">Report Filters</CardTitle>
-        </CardHeader>
+        </CardHeader> <br />
         <CardContent className="pt-0 !shadow-none">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>

@@ -26,9 +26,7 @@ const UsersTab = ({
     <>
       {/* Search & Filter Section */}
       <Card>
-        <CardHeader>
-          <CardTitle>Search & Filter</CardTitle>
-        </CardHeader>
+        
         <CardContent>
           <div className="flex gap-4">
             <div className="relative flex-1">

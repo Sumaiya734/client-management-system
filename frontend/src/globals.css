@@ -1,71 +1,19 @@
-/* Global color variables */
 :root {
-  --soft-purple: #797272;
-  --light-soft-purple: #ebe8e8;
-  --dark-soft-purple: #d9e2ff;
-  --shadow-color: rgba(0, 0, 0, 0.253);
+  --glass-bg-1: #9691fa;   /* soft lavender */
+  --glass-bg-2: #a39abd;   /* white purple */
+  --glass-bg-3: #8698b6;   /* blue tint */
+  --glass-bg-4: #a583a8;   /* pink tint */
 }
 
-/* Apply soft purple background to all pages */
+/* Full app background */
 body {
-  background-color: var(--light-soft-purple);
-  margin: 0;
   min-height: 100vh;
-}
-
-/* 3D Shadow effect */
-/* .shadow-3d {
-  box-shadow: 0 10px 20px var(--shadow-color),
-              0 6px 6px var(--shadow-color);
-  transition: all 0.3s ease;
-}
-
-.shadow-3d:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 14px 28px var(--shadow-color),
-              0 10px 10px var(--shadow-color);
-} */
-
-/* Variations of 3D shadows */
-/* .shadow-3d-lg {
-  box-shadow: 0 20px 25px -5px var(--shadow-color),
-              0 10px 10px -5px var(--shadow-color);
-  transition: all 0.3s ease;
-}
-
-.shadow-3d-lg:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 25px 50px -12px var(--shadow-color);
-}
-
-.shadow-3d-sm {
-  box-shadow: 0 4px 6px var(--shadow-color);
-  transition: all 0.3s ease;
-}
-
-.shadow-3d-sm:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 12px var(--shadow-color);
-} */
-
-/* Card-specific 3D effect */
-/* .card-3d {
-  transform-style: preserve-3d;
-  perspective: 1000px;
-  transition: all 0.3s ease;
-}
-
-.card-3d:hover {
-  transform: translateY(-5px) translateZ(20px);
-  box-shadow: 0 20px 30px var(--shadow-color);
-} */
-
-/* AOS Animation base styles */
-[data-aos] {
-  pointer-events: auto;
-  visibility: hidden;
-}
-
-[data-aos].aos-animate {
-  visibility: visible;
+  margin: 0;
+  background:
+    radial-gradient(circle at 20% 20%, var(--glass-bg-4), transparent 40%),
+    radial-gradient(circle at 80% 30%, var(--glass-bg-3), transparent 45%),
+    radial-gradient(circle at 50% 80%, var(--glass-bg-1), transparent 50%),
+    linear-gradient(135deg, var(--glass-bg-2), var(--glass-bg-1));
+  background-attachment: fixed;
+  font-family: 'Inter', sans-serif;
 }
