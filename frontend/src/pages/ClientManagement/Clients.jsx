@@ -246,8 +246,8 @@ export default function Clients() {
                   </TableCell>
                 </TableRow>
               ) : clients.length > 0 ? (
-                clients.map((client) => (
-                  <TableRow key={client.id}>
+                clients.map((client, index) => (
+                  <TableRow key={client.id} className={`hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-100'}`}>
                     <TableCell>{client.cli_name}</TableCell>
                     <TableCell>{client.company}</TableCell>
                     <TableCell>{client.email}</TableCell>

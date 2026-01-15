@@ -319,8 +319,8 @@ export default function PurchaseOrders() {
                     <td colSpan="7" className="text-center py-6 text-gray-500">No purchase orders found</td>
                   </tr>
                 ) : (
-                  purchaseOrders.map((po) => (
-                    <tr key={po.id} className="hover:bg-gray-50">
+                  purchaseOrders.map((po, index) => (
+                    <tr key={po.id} className={`hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-100'}`}>
                       <td className="px-3 py-3 whitespace-nowrap">
                         <div className="text-sm font-semibold text-gray-900">{po.po_number}</div>
                         <div className="text-xs text-gray-500">Delivery: {formatDate(po.delivery_date)}</div>

@@ -626,8 +626,8 @@ export default function Subscriptions() {
                   </TableRow>
                 ) : (
                   Array.isArray(renewals) && renewals.length > 0 ?
-                    renewals.map((item) => (
-                      <TableRow key={item.id}>
+                    renewals.map((item, index) => (
+                      <TableRow key={item.id} className={`hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-100'}`}>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Package className="h-4 w-4 text-gray-500" />
@@ -729,8 +729,8 @@ export default function Subscriptions() {
                       return subscription.products.some(product => product.status === statusFilter);
                     }
                     return true; // No filter applied
-                  }).map((subscription) => (
-                    <TableRow key={subscription.id}>
+                  }).map((subscription, index) => (
+                    <TableRow key={subscription.id} className={`hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                       <TableCell>
                         <div>
                           <div className="font-semibold text-gray-900">{subscription.poNumber}</div>

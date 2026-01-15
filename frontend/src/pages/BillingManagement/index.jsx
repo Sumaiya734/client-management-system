@@ -491,7 +491,7 @@ export default function BillingManagement() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredBills.map((bill) => {
+              {filteredBills.map((bill, index) => {
                 // Format data for display
                 const billNumber = bill.bill_number || bill.billNumber || 'N/A';
                 const clientCompany = typeof bill.client === 'object' ? bill.client?.company || 'N/A' : bill.client || 'N/A';
@@ -506,7 +506,7 @@ export default function BillingManagement() {
                 const isPaid = paymentStatus === 'Paid';
                 
                 return (
-                  <TableRow key={bill.id}>
+                  <TableRow key={bill.id} className={`hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-100'}`}>
                     <TableCell>
                       <div className="font-semibold text-gray-900">{billNumber}</div>
                     </TableCell>

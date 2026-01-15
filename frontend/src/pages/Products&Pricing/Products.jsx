@@ -472,8 +472,8 @@ export default function Products() {
                   </TableCell>
                 </TableRow>
               ) : products.length > 0 ? (
-                products.map((product) => (
-                  <TableRow key={product.id}>
+                products.map((product, index) => (
+                  <TableRow key={product.id} className={`hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-100'}`}>
                     <TableCell>
                       <div>
                         <div className="font-semibold text-gray-900 mb-1">{product.name}</div>

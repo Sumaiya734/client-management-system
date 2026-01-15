@@ -449,7 +449,7 @@ export default function PaymentManagement() {
           <CardDescription>Track all payment transactions</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
+          <Table className="min-w-full divide-y divide-gray-200 text-sm">
             <TableHeader>
               <TableRow>
                 <TableHead>PO Number</TableHead>
@@ -463,7 +463,7 @@ export default function PaymentManagement() {
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody  className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <TableRow>
                   <TableCell colSpan="9" className="text-center py-8 text-gray-500">
@@ -477,8 +477,8 @@ export default function PaymentManagement() {
                   </TableCell>
                 </TableRow>
               ) : (
-                payments.map((payment) => (
-                  <TableRow key={payment.id}>
+                payments.map((payment, index) => (
+                  <TableRow key={payment.id} className={`hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-100'}`}>
                     <TableCell>{payment.poNumber}</TableCell>
                     <TableCell>
                       <div>

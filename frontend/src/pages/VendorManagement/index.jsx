@@ -249,8 +249,8 @@ export default function VendorManagement() {
                   </TableCell>
                 </TableRow>
               ) : vendors.length > 0 ? (
-                vendors.map((vendor) => (
-                  <TableRow key={vendor.id}>
+                vendors.map((vendor, index) => (
+                  <TableRow key={vendor.id} className={`hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-100'}`}>
                     <TableCell>{vendor.name}</TableCell>
                     <TableCell>{vendor.company}</TableCell>
                     <TableCell>{vendor.contact_person}</TableCell>

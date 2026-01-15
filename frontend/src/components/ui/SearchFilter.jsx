@@ -20,7 +20,6 @@ export const SearchFilter = ({
         p-6
         shadow-[0_20px_40px_rgba(0,0,0,0.15)]
         transition-all duration-300
-        hover:-translate-y-1
         hover:shadow-[0_30px_60px_rgba(0,0,0,0.25)]
         ${className}
       `}

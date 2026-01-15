@@ -274,10 +274,10 @@ export default function Dashboard() {
       {/* Recent Clients, Recent Payments, and Recent Bills */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <Card className="p-3">
-          <CardHeader className="p-2 pb-1">
+          
             <CardTitle className="text-base">Recent Clients</CardTitle>
             <CardDescription className="text-sm">Latest client additions and updates</CardDescription>
-          </CardHeader>
+            <hr className="my-2" />
           <CardContent className="p-2 pt-1">
             <div className="space-y-2">
               {recentClients.length > 0 ? (
@@ -300,10 +300,11 @@ export default function Dashboard() {
         </Card>
 
         <Card className="p-3">
-          <CardHeader className="p-2 pb-1">
+          {/* <CardHeader className="p-2 pb-1"> */}
             <CardTitle className="text-base">Recent Payments</CardTitle>
             <CardDescription className="text-sm">Latest payment transactions</CardDescription>
-          </CardHeader>
+          {/* </CardHeader> */}
+          <hr className="my-2" />
           <CardContent className="p-2 pt-1">
             <div className="space-y-2">
               {recentPayments.length > 0 ? (
@@ -329,10 +330,11 @@ export default function Dashboard() {
         </Card>
 
         <Card className="p-3">
-          <CardHeader className="p-2 pb-1">
+          {/* <CardHeader className="p-2 pb-1"> */}
             <CardTitle className="text-base">Recent Bills</CardTitle>
             <CardDescription className="text-sm">Latest billing records</CardDescription>
-          </CardHeader>
+          {/* </CardHeader>  */}
+          <hr className="my-2" />
           <CardContent className="p-2 pt-1">
             <div className="space-y-2">
               {recentBills.length > 0 ? (
@@ -361,7 +363,7 @@ export default function Dashboard() {
           boxShadow: '0 10px 15px -3px rgba(239, 68, 68, 0.5), 0 4px 6px -2px rgba(239, 68, 68, 0.25)',
           outline: '2px solid #ef4444'
         }}>
-        <CardHeader className="p-2 pb-1">
+        {/* <CardHeader className="p-2 pb-1"> */}
           <div className="flex justify-between items-center">
             <div>
               <CardTitle className="text-base text-red-700">Expiring Soon Subscriptions</CardTitle>
@@ -374,7 +376,8 @@ export default function Dashboard() {
               View All
             </Button>
           </div>
-        </CardHeader>
+        {/* </CardHeader> */}
+        <hr className="my-2" />
         <CardContent className="p-2 pt-1">
           <div className="space-y-2">
             {expiringSoonSubscriptionsByClient.length > 0 ? (
@@ -411,10 +414,11 @@ export default function Dashboard() {
 
       {/* Payment Summary */}
       <Card className="p-3">
-        <CardHeader className="p-2 pb-1">
+        {/* <CardHeader className="p-2 pb-1"> */}
           <CardTitle className="text-base">Payment Summary</CardTitle>
           <CardDescription className="text-sm">Overall payment status and completion rate</CardDescription>
-        </CardHeader>
+        {/* </CardHeader> */}
+        <hr className="my-2" />
         <CardContent className="p-2 pt-1">
           <div className="grid grid-cols-2 gap-4">
             <div>
