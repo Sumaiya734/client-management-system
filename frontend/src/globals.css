@@ -1,8 +1,8 @@
 :root {
-  --glass-bg-1: #9691fa;   /* soft lavender */
-  --glass-bg-2: #a39abd;   /* white purple */
-  --glass-bg-3: #8698b6;   /* blue tint */
-  --glass-bg-4: #a583a8;   /* pink tint */
+  --glass-bg-1: #5b7baf;   /* soft lavender */
+  --glass-bg-2: #bad0f5;   /* white purple */
+  --glass-bg-3: #bad0f5;   /* blue tint */
+  --glass-bg-4: #5b7baf;   /* pink tint */
 }
 
 /* Full app background */
